@@ -13,6 +13,10 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+        serif: ['Playfair Display', 'Georgia', 'serif'],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -46,6 +50,12 @@ export default {
         card: {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
+        },
+        // University theme colors
+        university: {
+          navy: "hsl(var(--university-navy))",
+          gold: "hsl(var(--university-gold))",
+          maroon: "hsl(var(--university-maroon))",
         },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",

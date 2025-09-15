@@ -2,41 +2,62 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* University Societies Management Platform Design System */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap');
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-
+    /* University Color Palette */
+    --university-navy: 240 100% 18%;          /* #00005c */
+    --university-gold: 44 54% 61%;            /* #CEAD72 */  
+    --university-maroon: 350 100% 18%;        /* #5B0007 */
+    
+    /* Base Theme */
+    --background: 0 0% 98%;
+    --foreground: 240 100% 18%;
+    
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-
+    --card-foreground: 240 100% 18%;
+    
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-
-    --radius: 0.5rem;
+    --popover-foreground: 240 100% 18%;
+    
+    /* Primary uses university navy */
+    --primary: 240 100% 18%;
+    --primary-foreground: 0 0% 98%;
+    
+    /* Secondary uses university gold */
+    --secondary: 44 54% 61%;
+    --secondary-foreground: 240 100% 18%;
+    
+    /* Accent uses university maroon */
+    --accent: 350 100% 18%;
+    --accent-foreground: 0 0% 98%;
+    
+    --muted: 240 10% 95%;
+    --muted-foreground: 240 15% 45%;
+    
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    
+    --border: 240 10% 90%;
+    --input: 240 10% 90%;
+    --ring: 240 100% 18%;
+    
+    /* University specific design tokens */
+    --gradient-primary: linear-gradient(135deg, hsl(var(--university-navy)), hsl(var(--university-maroon)));
+    --gradient-secondary: linear-gradient(135deg, hsl(var(--university-gold)), hsl(44 70% 75%));
+    --gradient-hero: linear-gradient(135deg, hsl(var(--university-navy)) 0%, hsl(var(--university-maroon)) 50%, hsl(var(--university-navy)) 100%);
+    --gradient-card: linear-gradient(145deg, hsl(0 0% 100%), hsl(240 20% 98%));
+    
+    --shadow-elegant: 0 10px 30px -10px hsl(var(--university-navy) / 0.3);
+    --shadow-card: 0 4px 20px -4px hsl(var(--university-navy) / 0.15);
+    --shadow-gold: 0 8px 25px -8px hsl(var(--university-gold) / 0.4);
+    
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-spring: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    
+    --radius: 0.75rem;
 
     --sidebar-background: 0 0% 98%;
 
@@ -91,6 +112,10 @@ All colors MUST be HSL.
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Dark mode adjustments for university theme */
+    --university-navy: 240 80% 25%;
+    --university-gold: 44 60% 65%;
+    --university-maroon: 350 80% 25%;
   }
 }
 
@@ -100,6 +125,49 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Playfair Display', Georgia, serif;
+  }
+}
+
+@layer components {
+  .gradient-primary {
+    background: var(--gradient-primary);
+  }
+  
+  .gradient-secondary {
+    background: var(--gradient-secondary);
+  }
+  
+  .gradient-hero {
+    background: var(--gradient-hero);
+  }
+  
+  .gradient-card {
+    background: var(--gradient-card);
+  }
+  
+  .shadow-elegant {
+    box-shadow: var(--shadow-elegant);
+  }
+  
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+  
+  .shadow-gold {
+    box-shadow: var(--shadow-gold);
+  }
+  
+  .transition-smooth {
+    transition: var(--transition-smooth);
+  }
+  
+  .transition-spring {
+    transition: var(--transition-spring);
   }
 }
