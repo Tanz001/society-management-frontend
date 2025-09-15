@@ -125,7 +125,7 @@ Whether you're a beginner learning your first programming language or an advance
             </div>
             
             <div className="space-y-4">
-              <Button variant="hero" size="lg" className="w-full">
+              <Button variant="university" size="lg" className="w-full">
                 <Users className="h-5 w-5 mr-2" />
                 Join Society
               </Button>

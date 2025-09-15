@@ -8,6 +8,10 @@ import AuthLayout from "@/components/auth/AuthLayout";
 import LoginForm from "@/components/auth/LoginForm";
 import StudentDashboard from "@/components/dashboard/StudentDashboard";
 import SocietyDetail from "@/components/societies/SocietyDetail";
+import SocietyRegistration from "@/components/society/SocietyRegistration";
+import SocietyDashboard from "@/components/society/SocietyDashboard";
+import CreatePost from "@/components/society/CreatePost";
+import AdminDashboard from "@/components/admin/AdminDashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -44,6 +48,12 @@ const App = () => (
           
           {/* Society Routes */}
           <Route path="/society/:id" element={<SocietyDetail />} />
+          <Route path="/society/register" element={<SocietyRegistration />} />
+          <Route path="/dashboard/society" element={<SocietyDashboard />} />
+          <Route path="/society/post/create" element={<CreatePost />} />
+          
+          {/* Admin Routes */}
+          <Route path="/dashboard/admin" element={<AdminDashboard />} />
           
           {/* Catch-all route */}
           <Route path="*" element={<NotFound />} />
