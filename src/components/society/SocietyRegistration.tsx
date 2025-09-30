@@ -18,7 +18,7 @@ import { toast } from "@/components/ui/use-toast";
 
 const formSchema = z.object({
   name: z.string().min(3, "Society name must be at least 3 characters").nonempty("Society name is required"),
-  description: z.string(),
+  description: z.string().min(1, "Description is required"), // required
   category: z.string().min(1, "Please select a category"),
   location: z.string().min(1, "Location is required"),
   advisor: z.string().min(1, "Faculty advisor is required"),
@@ -36,9 +36,9 @@ const SocietyRegistration = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [achievements, setAchievements] = useState<string[]>([]);
   const [events, setEvents] = useState<Array<{title: string, description: string, date: string}>>([]);
-  const [formData, setFormData] = useState<z.infer<typeof formSchema>>({
+  const [savedFormData, setSavedFormData] = useState<z.infer<typeof formSchema>>({
     name: "",
-    description: "",
+    description: "", // important: never undefined
     category: "",
     location: "",
     advisor: "",
@@ -47,18 +47,19 @@ const SocietyRegistration = () => {
     events: [],
     terms: false,
   });
-  
+
   const totalSteps = 5;
   const progress = (currentStep / totalSteps) * 100;
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: formData,  // Use our saved form data
-    shouldUnregister: false,   // 👈 keep values across steps
-    mode: "onChange",          // Validate on change
-    reValidateMode: "onChange", // Re-validate on change
-    criteriaMode: "all",      // Show all validation errors
+    defaultValues: savedFormData,
+    shouldUnregister: false,
+    mode: "onChange",
+    reValidateMode: "onChange",
+    criteriaMode: "all",
   });
+
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [societyLogo, setSocietyLogo] = useState<File | null>(null);
@@ -83,10 +84,9 @@ const SocietyRegistration = () => {
       setIsSubmitting(true);
       console.log("Form values:", values);
 
-      // Get user ID from localStorage
       const userStr = localStorage.getItem('user');
       console.log("Raw user data from localStorage:", userStr);
-      
+
       if (!userStr) {
         throw new Error("No user data found in localStorage");
       }
@@ -95,7 +95,7 @@ const SocietyRegistration = () => {
       try {
         const user = JSON.parse(userStr);
         console.log("Parsed user data:", user);
-        
+
         if (!user.id) {
           throw new Error("User ID not found in parsed user data");
         }
@@ -123,30 +123,25 @@ const SocietyRegistration = () => {
         return;
       }
 
-      // Create FormData to handle file uploads
-      const formData = new FormData();
+      // Create FormData to handle file uploads (renamed to avoid confusion)
+      const payload = new FormData();
       console.log("onSubmit received values:", values);
       console.log("Name field:", values.name);
-      // Add user ID
-      formData.append('userId', userId);
 
-      // Add all the form values
-      formData.append('name', values.name);
-      formData.append('description', values.description);
-      console.log("Description:", values.description);
-      formData.append('category', values.category);
-      formData.append('location', values.location);
-      formData.append('advisor', values.advisor);
-      formData.append('purpose', values.purpose);
-      formData.append('terms', values.terms.toString());
+      payload.append('userId', userId);
+      payload.append('name', values.name);
+      payload.append('description', values.description); // guaranteed present
+      payload.append('category', values.category);
+      payload.append('location', values.location);
+      payload.append('advisor', values.advisor);
+      payload.append('purpose', values.purpose);
+      payload.append('terms', (values.terms ?? false).toString());
 
-      // Add arrays as JSON strings
-      formData.append('achievements', JSON.stringify(achievements));
-      formData.append('events', JSON.stringify(events));
+      payload.append('achievements', JSON.stringify(achievements));
+      payload.append('events', JSON.stringify(events));
 
-      // Add files if they exist
-      formData.append('societyLogo', societyLogo);
-      formData.append('coverPhoto', coverPhoto);
+      payload.append('societyLogo', societyLogo);
+      payload.append('coverPhoto', coverPhoto);
 
       console.log('Submitting form data:', {
         userId,
@@ -158,23 +153,13 @@ const SocietyRegistration = () => {
         hasCover: !!coverPhoto
       });
 
-      console.log("Preparing to send request to backend");
-      console.log("FormData contents:", {
-        userId: formData.get('userId'),
-        name: formData.get('name'),
-        category: formData.get('category'),
-        hasLogo: !!formData.get('societyLogo'),
-        hasCover: !!formData.get('coverPhoto')
-      });
-
       const token = localStorage.getItem('token');
       console.log("Auth token available:", !!token);
 
-      // Send the data to the backend
       try {
         const response = await axios.post(
           "http://localhost:5000/society/register",
-          formData,
+          payload,
           {
             headers: {
               'Content-Type': 'multipart/form-data',
@@ -245,16 +230,14 @@ const SocietyRegistration = () => {
 
   const validateCurrentStep = async () => {
     let fieldsToValidate: (keyof z.infer<typeof formSchema>)[] = [];
-    
+
     switch (currentStep) {
       case 1:
         fieldsToValidate = ['name', 'description', 'category', 'location', 'advisor'];
-        // Get all required field values
         const values = form.getValues();
         console.log("Step 1 validation - Current values:", values);
 
-        // Validate name
-        if (!values.name || values.name.length < 3) {
+        if (!values.name || values.name.trim().length < 3) {
           form.setError('name', {
             type: 'manual',
             message: !values.name ? 'Society name is required' : 'Society name must be at least 3 characters'
@@ -262,9 +245,14 @@ const SocietyRegistration = () => {
           return false;
         }
 
-        // Description validation removed
+        if (!values.description || values.description.trim().length < 1) {
+          form.setError('description', {
+            type: 'manual',
+            message: 'Description is required'
+          });
+          return false;
+        }
 
-        // Validate category
         if (!values.category) {
           form.setError('category', {
             type: 'manual',
@@ -273,7 +261,6 @@ const SocietyRegistration = () => {
           return false;
         }
 
-        // Validate location
         if (!values.location) {
           form.setError('location', {
             type: 'manual',
@@ -282,7 +269,6 @@ const SocietyRegistration = () => {
           return false;
         }
 
-        // Validate advisor
         if (!values.advisor) {
           form.setError('advisor', {
             type: 'manual',
@@ -305,19 +291,15 @@ const SocietyRegistration = () => {
         break;
 
       case 3:
-        // Achievements are optional
         return true;
 
       case 4:
-        // Events are optional
         return true;
 
       case 5:
-        // Terms validation removed
         return true;
     }
 
-    // If we get here, basic validation passed
     const result = await form.trigger(fieldsToValidate);
     if (!result) {
       console.log("Validation failed, current errors:", form.formState.errors);
@@ -329,30 +311,35 @@ const SocietyRegistration = () => {
     return true;
   };
 
- 
   const nextStep = async () => {
     const isValid = await validateCurrentStep();
-    
+
     if (isValid && currentStep < totalSteps) {
-      // Get ALL current form values before moving to next step
       const currentValues = form.getValues();
       console.log("Current form values:", currentValues);
-      console.log("Description:", currentValues.description);
-      
-      // Save ALL form data including achievements and events
-      const updatedFormData = {
-        ...formData, // Keep existing data
-        ...currentValues, // Merge with current values
-        achievements: achievements,
-        events: events,
+
+      // Ensure description is explicitly preserved (prefer current value, otherwise fallback)
+      const descriptionValue = currentValues.description ?? savedFormData.description ?? "";
+
+      const updatedSavedFormData = {
+        ...savedFormData,
+        ...currentValues,
+        description: descriptionValue,
+        achievements,
+        events,
       };
-      setFormData(updatedFormData);
-      console.log("Updated form data:", updatedFormData);
-      
-      // Reset form with updated values to ensure React Hook Form keeps them
-      form.reset(updatedFormData, { keepValues: true, keepDefaultValues: false });
-      
-      // Move to next step
+      setSavedFormData(updatedSavedFormData);
+      console.log("Updated saved form data:", updatedSavedFormData);
+
+      // Reset form with the full merged values (do NOT use keepValues)
+      form.reset(updatedSavedFormData);
+
+      // Explicitly set description to be safe (helps when field is unmounted)
+      form.setValue('description', updatedSavedFormData.description);
+
+      // debug
+      console.log("After reset, form values:", form.getValues());
+
       setCurrentStep(currentStep + 1);
     }
   };
@@ -372,9 +359,6 @@ const SocietyRegistration = () => {
               <h2 className="text-2xl font-bold text-university-navy mb-2">Basic Information</h2>
               <p className="text-muted-foreground">Tell us about your society</p>
             </div>
-            
-           
-            
 
             <FormField
               control={form.control}
@@ -394,7 +378,7 @@ const SocietyRegistration = () => {
               )}
             />
 
-<FormField
+            <FormField
               control={form.control}
               name="name"
               render={({ field }) => {
@@ -403,14 +387,13 @@ const SocietyRegistration = () => {
                   <FormItem>
                     <FormLabel>Society Name</FormLabel>
                     <FormControl>
-                      <Input 
+                      <Input
                         name="name"
                         placeholder="e.g., Computer Science Society"
                         onChange={(e) => {
                           field.onChange(e);
                           console.log("Name changed to:", e.target.value);
-                          // Explicitly update the form
-                          form.setValue("name", e.target.value, { 
+                          form.setValue("name", e.target.value, {
                             shouldValidate: true,
                             shouldDirty: true,
                             shouldTouch: true
@@ -433,7 +416,7 @@ const SocietyRegistration = () => {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Category</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select category" />
@@ -491,7 +474,7 @@ const SocietyRegistration = () => {
               <h2 className="text-2xl font-bold text-university-navy mb-2">Purpose & Goals</h2>
               <p className="text-muted-foreground">What does your society aim to achieve?</p>
             </div>
-            
+
             <FormField
               control={form.control}
               name="purpose"
@@ -509,7 +492,6 @@ const SocietyRegistration = () => {
                 </FormItem>
               )}
             />
-
           </div>
         );
 
@@ -520,7 +502,7 @@ const SocietyRegistration = () => {
               <h2 className="text-2xl font-bold text-university-navy mb-2">Achievements</h2>
               <p className="text-muted-foreground">Share your society's accomplishments</p>
             </div>
-            
+
             <div className="space-y-4">
               {achievements.map((achievement, index) => (
                 <div key={index} className="flex gap-2">
@@ -554,7 +536,7 @@ const SocietyRegistration = () => {
               <h2 className="text-2xl font-bold text-university-navy mb-2">Planned Events</h2>
               <p className="text-muted-foreground">What events do you plan to organize?</p>
             </div>
-            
+
             <div className="space-y-6">
               {events.map((event, index) => (
                 <Card key={index} className="p-4">
@@ -603,7 +585,7 @@ const SocietyRegistration = () => {
               <h2 className="text-2xl font-bold text-university-navy mb-2">Media & Files</h2>
               <p className="text-muted-foreground">Upload images and documents</p>
             </div>
-            
+
             <div className="grid md:grid-cols-2 gap-6">
               <Card className="p-6 border-dashed border-2 border-muted-foreground/25 hover:border-university-gold transition-colors">
                 <div className="text-center">
@@ -699,7 +681,6 @@ const SocietyRegistration = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="gradient-primary text-white py-6 px-4">
         <div className="container mx-auto max-w-4xl">
           <div className="flex items-center justify-between">
@@ -725,16 +706,15 @@ const SocietyRegistration = () => {
         </div>
       </header>
 
-      {/* Form */}
       <section className="py-12 px-4">
         <div className="container mx-auto max-w-2xl">
           <Form {...form}>
-            <form  onSubmit={form.handleSubmit(onSubmit, (errors) => {
-    console.log("❌ Validation errors:", errors);
-  })}>
+            <form onSubmit={form.handleSubmit(onSubmit, (errors) => {
+              console.log("❌ Validation errors:", errors);
+            })}>
               <Card className="p-8 shadow-card">
                 {renderStep()}
-                
+
                 <div className="flex justify-between mt-8 pt-6 border-t">
                   <Button
                     type="button"
@@ -745,14 +725,13 @@ const SocietyRegistration = () => {
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     Previous
                   </Button>
-                  
+
                   {currentStep === totalSteps ? (
-                      <Button 
+                    <Button
                       type="submit"
-                      variant="university" 
+                      variant="university"
                       className="px-8"
                       disabled={isSubmitting}
-                      // onClick={async () => onSubmit(form.getValues())}
                     >
                       {isSubmitting ? "Submitting..." : "Submit Application"}
                     </Button>
