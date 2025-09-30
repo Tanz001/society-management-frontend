@@ -13,6 +13,12 @@ import SocietyDashboard from "@/components/society/SocietyDashboard";
 import CreatePost from "@/components/society/CreatePost";
 import AdminDashboard from "@/components/admin/AdminDashboard";
 import NotFound from "./pages/NotFound";
+import RegisterForm from "./components/auth/RegisterForm";
+import ProfilePage from "./components/profile/ProfilePage";
+import Analytics from "./components/society/Analytics";
+import EventsManagement from "./components/society/EventsManagement";
+import EngagementPage from "./components/engagement/EngagementPage";
+import EventsPage from "./components/events/EventsPage";
 
 const queryClient = new QueryClient();
 
@@ -26,20 +32,19 @@ const App = () => (
           <Route path="/" element={<LandingPage />} />
           
           {/* Authentication Routes */}
-          <Route path="/auth/student" element={
+          <Route path="/auth/login" element={
             <AuthLayout title="Student Login" subtitle="Access your student dashboard">
               <LoginForm userType="student" />
             </AuthLayout>
           } />
-          <Route path="/auth/society" element={
-            <AuthLayout title="Society Owner Login" subtitle="Manage your society">
-              <LoginForm userType="society" />
-            </AuthLayout>
-          } />
-          <Route path="/auth/admin" element={
-            <AuthLayout title="Administrator Login" subtitle="Access admin panel">
-              <LoginForm userType="admin" />
-            </AuthLayout>
+         
+
+             <Route path="/auth/register" element={
+        
+          
+              <RegisterForm />
+  
+       
           } />
           
           {/* Dashboard Routes */}
@@ -54,6 +59,18 @@ const App = () => (
           
           {/* Admin Routes */}
           <Route path="/dashboard/admin" element={<AdminDashboard />} />
+          <Route path="/society/registration" element={<SocietyRegistration />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/analytics" element={<Analytics />} />
+          <Route path="/event" element={<EventsManagement />} />
+          <Route path="/engagement" element={<EngagementPage />} />
+          <Route path="/events" element={<EventsPage />} />
+
+
+
+
+
+
           
           {/* Catch-all route */}
           <Route path="*" element={<NotFound />} />

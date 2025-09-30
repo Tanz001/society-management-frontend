@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Eye, EyeOff } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
+import axios from "axios"; // ✅ add axios for API calls
 
 interface LoginFormProps {
   userType: "student" | "society" | "admin";
@@ -16,14 +17,28 @@ const LoginForm = ({ userType }: LoginFormProps) => {
     email: "",
     password: "",
   });
+  const [error, setError] = useState("");
   const navigate = useNavigate();
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setError("");
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Simulate authentication - in a real app, this would call an API
-    console.log("Login attempt:", { userType, ...formData });
-    
-    // Navigate to appropriate dashboard
+  try {
+    // ✅ Call your backend login API
+    const res = await axios.post("http://localhost:5000/student/login", {
+      email: formData.email,
+      password: formData.password,
+    });
+
+    // ✅ Save JWT token
+    localStorage.setItem("token", res.data.token);
+
+    // ✅ Save student/user data
+    localStorage.setItem("user", JSON.stringify(res.data.student));
+
+    console.log("Login successful:", res.data);
+
+    // ✅ Navigate based on user type
     switch (userType) {
       case "student":
         navigate("/dashboard/student");
@@ -35,27 +50,32 @@ const LoginForm = ({ userType }: LoginFormProps) => {
         navigate("/dashboard/admin");
         break;
     }
-  };
+  } catch (err: any) {
+    console.error("Login failed:", err.response?.data || err.message);
+    setError(err.response?.data?.message || "Login failed");
+  }
+};
+
 
   const userTypeConfig = {
     student: {
       title: "Student Login",
       description: "Access your student dashboard",
       buttonVariant: "university" as const,
-      registerPath: "/auth/student/register"
+      registerPath: "/auth/register",
     },
     society: {
-      title: "Society Owner Login", 
-      description: "Manage your society",
-      buttonVariant: "gold" as const,
-      registerPath: "/auth/society/register"
+      title: "Society Login",
+      description: "Access your society dashboard",
+      buttonVariant: "default" as const,
+      registerPath: "/auth/register-society",
     },
     admin: {
-      title: "Administrator Login",
-      description: "Access admin panel",
-      buttonVariant: "maroon" as const,
-      registerPath: "/auth/admin/register"
-    }
+      title: "Admin Login",
+      description: "Administrator access",
+      buttonVariant: "destructive" as const,
+      registerPath: "",
+    },
   };
 
   const config = userTypeConfig[userType];
@@ -71,7 +91,9 @@ const LoginForm = ({ userType }: LoginFormProps) => {
               type="email"
               placeholder="Enter your email"
               value={formData.email}
-              onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, email: e.target.value }))
+              }
               required
               className="mt-1"
             />
@@ -85,7 +107,9 @@ const LoginForm = ({ userType }: LoginFormProps) => {
                 type={showPassword ? "text" : "password"}
                 placeholder="Enter your password"
                 value={formData.password}
-                onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, password: e.target.value }))
+                }
                 required
                 className="pr-10"
               />
@@ -94,25 +118,42 @@ const LoginForm = ({ userType }: LoginFormProps) => {
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute inset-y-0 right-0 pr-3 flex items-center text-muted-foreground hover:text-foreground"
               >
-                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
               </button>
             </div>
           </div>
         </div>
 
-        <Button type="submit" variant={config.buttonVariant} size="lg" className="w-full">
+        {error && <p className="text-red-600 text-sm">{error}</p>}
+
+        <Button
+          type="submit"
+          variant={config.buttonVariant}
+          size="lg"
+          className="w-full"
+        >
           Sign In
         </Button>
 
         <div className="text-center space-y-2">
-          <Link to="/auth/forgot-password" className="text-sm text-university-navy hover:underline">
+          <Link
+            to="/auth/forgot-password"
+            className="text-sm text-university-navy hover:underline"
+          >
             Forgot your password?
           </Link>
-          
+
           {userType !== "admin" && (
             <div className="text-sm text-muted-foreground">
-              Don't have an account?{" "}
-              <Link to={config.registerPath} className="text-university-navy hover:underline font-medium">
+              Don&apos;t have an account?{" "}
+              <Link
+                to={config.registerPath}
+                className="text-university-navy hover:underline font-medium"
+              >
                 Sign up
               </Link>
             </div>

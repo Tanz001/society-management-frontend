@@ -12,11 +12,13 @@ import { ArrowLeft, ArrowRight, Upload, Plus, X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import axios from "axios";
+import { toast } from "@/components/ui/use-toast";
 
 const formSchema = z.object({
-  name: z.string().min(3, "Society name must be at least 3 characters"),
-  description: z.string().min(50, "Description must be at least 50 characters"),
+  name: z.string().min(3, "Society name must be at least 3 characters").nonempty("Society name is required"),
+  description: z.string(),
   category: z.string().min(1, "Please select a category"),
   location: z.string().min(1, "Location is required"),
   advisor: z.string().min(1, "Faculty advisor is required"),
@@ -27,48 +29,190 @@ const formSchema = z.object({
     description: z.string(),
     date: z.string(),
   })).optional(),
-  tags: z.array(z.string()).min(1, "Add at least one tag"),
+  terms: z.boolean().optional(),
 });
 
 const SocietyRegistration = () => {
   const [currentStep, setCurrentStep] = useState(1);
-  const [newTag, setNewTag] = useState("");
-  const [tags, setTags] = useState<string[]>([]);
   const [achievements, setAchievements] = useState<string[]>([]);
   const [events, setEvents] = useState<Array<{title: string, description: string, date: string}>>([]);
+  const [formData, setFormData] = useState<z.infer<typeof formSchema>>({
+    name: "",
+    description: "",
+    category: "",
+    location: "",
+    advisor: "",
+    purpose: "",
+    achievements: [],
+    events: [],
+    terms: false,
+  });
   
   const totalSteps = 5;
   const progress = (currentStep / totalSteps) * 100;
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      name: "",
-      description: "",
-      category: "",
-      location: "",
-      advisor: "",
-      purpose: "",
-      achievements: [],
-      events: [],
-      tags: [],
-    },
+    defaultValues: formData,  // Use our saved form data
+    shouldUnregister: false,   // 👈 keep values across steps
+    mode: "onChange",          // Validate on change
+    reValidateMode: "onChange", // Re-validate on change
+    criteriaMode: "all",      // Show all validation errors
   });
+  const navigate = useNavigate();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [societyLogo, setSocietyLogo] = useState<File | null>(null);
+  const [coverPhoto, setCoverPhoto] = useState<File | null>(null);
 
-  const onSubmit = (values: z.infer<typeof formSchema>) => {
-    console.log(values);
-    // Handle form submission
-  };
-
-  const addTag = () => {
-    if (newTag.trim() && !tags.includes(newTag.trim())) {
-      setTags([...tags, newTag.trim()]);
-      setNewTag("");
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'cover') => {
+    if (event.target.files) {
+      switch (type) {
+        case 'logo':
+          setSocietyLogo(event.target.files[0]);
+          break;
+        case 'cover':
+          setCoverPhoto(event.target.files[0]);
+          break;
+      }
     }
   };
 
-  const removeTag = (tagToRemove: string) => {
-    setTags(tags.filter(tag => tag !== tagToRemove));
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    console.log("Form submission started...........");
+    try {
+      setIsSubmitting(true);
+      console.log("Form values:", values);
+
+      // Get user ID from localStorage
+      const userStr = localStorage.getItem('user');
+      console.log("Raw user data from localStorage:", userStr);
+      
+      if (!userStr) {
+        throw new Error("No user data found in localStorage");
+      }
+
+      let userId;
+      try {
+        const user = JSON.parse(userStr);
+        console.log("Parsed user data:", user);
+        
+        if (!user.id) {
+          throw new Error("User ID not found in parsed user data");
+        }
+
+        userId = user.id;
+        console.log("userId:", userId);
+      } catch (error) {
+        console.error("Error parsing user data:", error);
+        toast({
+          title: "Error",
+          description: "User not authenticated. Please login again.",
+          variant: "destructive",
+        });
+        navigate('/auth/login');
+        return;
+      }
+
+      // Validate required files
+      if (!societyLogo || !coverPhoto) {
+        toast({
+          title: "Error",
+          description: "Both society logo and cover photo are required",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Create FormData to handle file uploads
+      const formData = new FormData();
+      console.log("onSubmit received values:", values);
+      console.log("Name field:", values.name);
+      // Add user ID
+      formData.append('userId', userId);
+
+      // Add all the form values
+      formData.append('name', values.name);
+      formData.append('description', values.description);
+      console.log("Description:", values.description);
+      formData.append('category', values.category);
+      formData.append('location', values.location);
+      formData.append('advisor', values.advisor);
+      formData.append('purpose', values.purpose);
+      formData.append('terms', values.terms.toString());
+
+      // Add arrays as JSON strings
+      formData.append('achievements', JSON.stringify(achievements));
+      formData.append('events', JSON.stringify(events));
+
+      // Add files if they exist
+      formData.append('societyLogo', societyLogo);
+      formData.append('coverPhoto', coverPhoto);
+
+      console.log('Submitting form data:', {
+        userId,
+        name: values.name,
+        category: values.category,
+        achievements: achievements.length,
+        events: events.length,
+        hasLogo: !!societyLogo,
+        hasCover: !!coverPhoto
+      });
+
+      console.log("Preparing to send request to backend");
+      console.log("FormData contents:", {
+        userId: formData.get('userId'),
+        name: formData.get('name'),
+        category: formData.get('category'),
+        hasLogo: !!formData.get('societyLogo'),
+        hasCover: !!formData.get('coverPhoto')
+      });
+
+      const token = localStorage.getItem('token');
+      console.log("Auth token available:", !!token);
+
+      // Send the data to the backend
+      try {
+        const response = await axios.post(
+          "http://localhost:5000/society/register",
+          formData,
+          {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+              'Authorization': `Bearer ${token}`,
+              'Accept': 'application/json',
+            },
+            withCredentials: true
+          }
+        );
+
+        console.log("Backend response:", response);
+
+        if (response.status === 201) {
+          toast({
+            title: "Success!",
+            description: "Your society has been registered successfully.",
+            variant: "default",
+          });
+          navigate('/dashboard/student');
+        }
+      } catch (axiosError: any) {
+        console.error('Axios error details:', {
+          response: axiosError.response?.data,
+          status: axiosError.response?.status,
+          headers: axiosError.response?.headers
+        });
+        throw axiosError;
+      }
+    } catch (error: any) {
+      console.error('Error submitting society registration:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to register society. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const addAchievement = () => {
@@ -99,8 +243,116 @@ const SocietyRegistration = () => {
     setEvents(events.filter((_, i) => i !== index));
   };
 
-  const nextStep = () => {
-    if (currentStep < totalSteps) {
+  const validateCurrentStep = async () => {
+    let fieldsToValidate: (keyof z.infer<typeof formSchema>)[] = [];
+    
+    switch (currentStep) {
+      case 1:
+        fieldsToValidate = ['name', 'description', 'category', 'location', 'advisor'];
+        // Get all required field values
+        const values = form.getValues();
+        console.log("Step 1 validation - Current values:", values);
+
+        // Validate name
+        if (!values.name || values.name.length < 3) {
+          form.setError('name', {
+            type: 'manual',
+            message: !values.name ? 'Society name is required' : 'Society name must be at least 3 characters'
+          });
+          return false;
+        }
+
+        // Description validation removed
+
+        // Validate category
+        if (!values.category) {
+          form.setError('category', {
+            type: 'manual',
+            message: 'Category is required'
+          });
+          return false;
+        }
+
+        // Validate location
+        if (!values.location) {
+          form.setError('location', {
+            type: 'manual',
+            message: 'Location is required'
+          });
+          return false;
+        }
+
+        // Validate advisor
+        if (!values.advisor) {
+          form.setError('advisor', {
+            type: 'manual',
+            message: 'Faculty advisor is required'
+          });
+          return false;
+        }
+        break;
+
+      case 2:
+        fieldsToValidate = ['purpose'];
+        const purpose = form.getValues('purpose');
+        if (!purpose || purpose.length < 30) {
+          form.setError('purpose', {
+            type: 'manual',
+            message: !purpose ? 'Purpose is required' : 'Purpose must be at least 30 characters'
+          });
+          return false;
+        }
+        break;
+
+      case 3:
+        // Achievements are optional
+        return true;
+
+      case 4:
+        // Events are optional
+        return true;
+
+      case 5:
+        // Terms validation removed
+        return true;
+    }
+
+    // If we get here, basic validation passed
+    const result = await form.trigger(fieldsToValidate);
+    if (!result) {
+      console.log("Validation failed, current errors:", form.formState.errors);
+      return false;
+    }
+
+    const currentValues = form.getValues();
+    console.log("Validation passed, current values:", currentValues);
+    return true;
+  };
+
+ 
+  const nextStep = async () => {
+    const isValid = await validateCurrentStep();
+    
+    if (isValid && currentStep < totalSteps) {
+      // Get ALL current form values before moving to next step
+      const currentValues = form.getValues();
+      console.log("Current form values:", currentValues);
+      console.log("Description:", currentValues.description);
+      
+      // Save ALL form data including achievements and events
+      const updatedFormData = {
+        ...formData, // Keep existing data
+        ...currentValues, // Merge with current values
+        achievements: achievements,
+        events: events,
+      };
+      setFormData(updatedFormData);
+      console.log("Updated form data:", updatedFormData);
+      
+      // Reset form with updated values to ensure React Hook Form keeps them
+      form.reset(updatedFormData, { keepValues: true, keepDefaultValues: false });
+      
+      // Move to next step
       setCurrentStep(currentStep + 1);
     }
   };
@@ -121,19 +373,8 @@ const SocietyRegistration = () => {
               <p className="text-muted-foreground">Tell us about your society</p>
             </div>
             
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Society Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g., Computer Science Society" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+           
+            
 
             <FormField
               control={form.control}
@@ -153,6 +394,38 @@ const SocietyRegistration = () => {
               )}
             />
 
+<FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => {
+                console.log("Name field value:", field.value);
+                return (
+                  <FormItem>
+                    <FormLabel>Society Name</FormLabel>
+                    <FormControl>
+                      <Input 
+                        name="name"
+                        placeholder="e.g., Computer Science Society"
+                        onChange={(e) => {
+                          field.onChange(e);
+                          console.log("Name changed to:", e.target.value);
+                          // Explicitly update the form
+                          form.setValue("name", e.target.value, { 
+                            shouldValidate: true,
+                            shouldDirty: true,
+                            shouldTouch: true
+                          });
+                        }}
+                        value={field.value}
+                        onBlur={field.onBlur}
+                        ref={field.ref}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
+            />
             <div className="grid md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -237,28 +510,6 @@ const SocietyRegistration = () => {
               )}
             />
 
-            <div>
-              <FormLabel>Tags</FormLabel>
-              <div className="flex gap-2 mt-2 mb-4">
-                <Input
-                  placeholder="Add tags..."
-                  value={newTag}
-                  onChange={(e) => setNewTag(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
-                />
-                <Button type="button" onClick={addTag} variant="outline">
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {tags.map((tag, index) => (
-                  <Badge key={index} variant="secondary" className="flex items-center gap-1">
-                    {tag}
-                    <X className="h-3 w-3 cursor-pointer" onClick={() => removeTag(tag)} />
-                  </Badge>
-                ))}
-              </div>
-            </div>
           </div>
         );
 
@@ -357,11 +608,27 @@ const SocietyRegistration = () => {
               <Card className="p-6 border-dashed border-2 border-muted-foreground/25 hover:border-university-gold transition-colors">
                 <div className="text-center">
                   <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                  <h3 className="font-medium mb-2">Society Logo</h3>
+                  <h3 className="font-medium mb-2">Society Logo <span className="text-red-500">*</span></h3>
                   <p className="text-sm text-muted-foreground mb-4">
                     Upload your society's logo (PNG, JPG)
                   </p>
-                  <Button variant="outline" size="sm">
+                  {societyLogo && (
+                    <p className="text-sm text-green-600 mb-2">
+                      ✓ Logo selected: {societyLogo.name}
+                    </p>
+                  )}
+                  <Input
+                    type="file"
+                    accept="image/png,image/jpeg"
+                    onChange={(e) => handleFileChange(e, 'logo')}
+                    className="hidden"
+                    id="society-logo"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => document.getElementById('society-logo')?.click()}
+                  >
                     Choose File
                   </Button>
                 </div>
@@ -370,39 +637,57 @@ const SocietyRegistration = () => {
               <Card className="p-6 border-dashed border-2 border-muted-foreground/25 hover:border-university-gold transition-colors">
                 <div className="text-center">
                   <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                  <h3 className="font-medium mb-2">Cover Photo</h3>
+                  <h3 className="font-medium mb-2">Cover Photo <span className="text-red-500">*</span></h3>
                   <p className="text-sm text-muted-foreground mb-4">
                     Upload a cover photo for your society
                   </p>
-                  <Button variant="outline" size="sm">
+                  {coverPhoto && (
+                    <p className="text-sm text-green-600 mb-2">
+                      ✓ Cover photo selected: {coverPhoto.name}
+                    </p>
+                  )}
+                  <Input
+                    type="file"
+                    accept="image/png,image/jpeg"
+                    onChange={(e) => handleFileChange(e, 'cover')}
+                    className="hidden"
+                    id="cover-photo"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => document.getElementById('cover-photo')?.click()}
+                  >
                     Choose File
                   </Button>
                 </div>
               </Card>
 
-              <Card className="p-6 border-dashed border-2 border-muted-foreground/25 hover:border-university-gold transition-colors md:col-span-2">
-                <div className="text-center">
-                  <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                  <h3 className="font-medium mb-2">Additional Documents</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Upload constitution, certificates, or other documents
-                  </p>
-                  <Button variant="outline" size="sm">
-                    Choose Files
-                  </Button>
-                </div>
-              </Card>
             </div>
 
             <div className="mt-8 p-4 bg-muted/30 rounded-lg">
-              <div className="flex items-start space-x-3">
-                <Checkbox id="terms" />
-                <label htmlFor="terms" className="text-sm leading-relaxed">
-                  I confirm that all information provided is accurate and I agree to the university's 
-                  society registration terms and conditions. I understand that false information may 
-                  result in rejection of this application.
-                </label>
-              </div>
+              <FormField
+                control={form.control}
+                name="terms"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 p-4">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>
+                        I confirm that all information provided is accurate and I agree to the university's 
+                        society registration terms and conditions. I understand that false information may 
+                        result in rejection of this application.
+                      </FormLabel>
+                      <FormMessage />
+                    </div>
+                  </FormItem>
+                )}
+              />
             </div>
           </div>
         );
@@ -444,7 +729,9 @@ const SocietyRegistration = () => {
       <section className="py-12 px-4">
         <div className="container mx-auto max-w-2xl">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)}>
+            <form  onSubmit={form.handleSubmit(onSubmit, (errors) => {
+    console.log("❌ Validation errors:", errors);
+  })}>
               <Card className="p-8 shadow-card">
                 {renderStep()}
                 
@@ -460,8 +747,14 @@ const SocietyRegistration = () => {
                   </Button>
                   
                   {currentStep === totalSteps ? (
-                    <Button type="submit" variant="university" className="px-8">
-                      Submit Application
+                      <Button 
+                      type="submit"
+                      variant="university" 
+                      className="px-8"
+                      disabled={isSubmitting}
+                      // onClick={async () => onSubmit(form.getValues())}
+                    >
+                      {isSubmitting ? "Submitting..." : "Submit Application"}
                     </Button>
                   ) : (
                     <Button type="button" onClick={nextStep} variant="university">

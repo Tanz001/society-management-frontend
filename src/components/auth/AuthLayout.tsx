@@ -58,8 +58,8 @@ const AuthLayout = ({ children, title, subtitle }: AuthLayoutProps) => {
 
           {/* Form Header */}
           <div className="text-center">
-            <h1 className="text-3xl font-bold text-university-navy mb-2">{title}</h1>
-            <p className="text-muted-foreground">{subtitle}</p>
+            <h1 className="text-3xl font-bold text-university-navy mb-2">Login to Continue</h1>
+            <p className="text-muted-foreground">Use your email and password</p>
           </div>
 
           {/* Form Content */}

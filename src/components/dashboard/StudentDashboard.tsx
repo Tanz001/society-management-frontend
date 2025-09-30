@@ -178,7 +178,7 @@ const StudentDashboard = () => {
                 Discover Societies ({filteredSocieties.length})
               </h2>
               <Button variant="gold" asChild>
-                <Link to="/societies/create">Create Society</Link>
+                <Link to="/society/register">Create Society</Link>
               </Button>
             </div>
 
