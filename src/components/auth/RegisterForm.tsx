@@ -14,7 +14,7 @@ const RegisterForm = () => {
     lastName: "",
     email: "",
     phone: "",
-    RollNO: "",
+    rollNo: "",
     university: "",
     major: "",
     degree: "",
@@ -158,9 +158,9 @@ const RegisterForm = () => {
                 </label>
                 <Input
                   placeholder="0000-XX-0000"
-                  value={studentData.RollNO}
+                  value={studentData.rollNo}
                   onChange={(e) =>
-                    setStudentData({ ...studentData, RollNO: e.target.value })
+                    setStudentData({ ...studentData, rollNo: e.target.value })
                   }
                   required
                 />

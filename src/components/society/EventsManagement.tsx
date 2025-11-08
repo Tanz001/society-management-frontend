@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Plus, 
@@ -18,9 +19,65 @@ import {
   BarChart3
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import axios from "axios";
+import EventRequestForm from "./EventRequestForm";
 
 const EventsManagement = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [isCreateEventModalOpen, setIsCreateEventModalOpen] = useState(false);
+  const [societyInfo, setSocietyInfo] = useState<any>(null);
+  const [loadingSociety, setLoadingSociety] = useState(true);
+
+  // Fetch society data
+  useEffect(() => {
+    const fetchSocietyData = async () => {
+      const storedUser = localStorage.getItem("user");
+      if (!storedUser) {
+        console.log("No user data available");
+        setLoadingSociety(false);
+        return;
+      }
+
+      try {
+        const userData = JSON.parse(storedUser);
+        const userId = userData.id;
+        
+        if (!userId) {
+          console.log("No user ID found in user data");
+          setLoadingSociety(false);
+          return;
+        }
+
+        setLoadingSociety(true);
+        const response = await axios.post(
+          "http://localhost:5000/society/society/data",
+          { user_id: userId },
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          }
+        );
+
+        if (response.data.success) {
+          const societyData = response.data.society && response.data.society.length > 0 
+            ? response.data.society[0] 
+            : null;
+          setSocietyInfo(societyData);
+        } else {
+          console.error("Failed to fetch society data:", response.data.message);
+        }
+      } catch (error: any) {
+        console.error("Error fetching society data:", error.response?.data || error.message);
+        // Don't set societyInfo to null on error - allow user to still try
+        // The error will be shown in the modal
+      } finally {
+        setLoadingSociety(false);
+      }
+    };
+
+    fetchSocietyData();
+  }, []);
 
   const events = [
     {
@@ -90,20 +147,37 @@ const EventsManagement = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="gradient-primary text-white py-8 px-4">
+      <header className="gradient-primary text-white py-4 md:py-8 px-4">
         <div className="container mx-auto max-w-6xl">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold mb-2">Events Management</h1>
-              <p className="text-white/90">Create and manage society events</p>
+              <h1 className="text-xl md:text-3xl font-bold mb-2">Events Management</h1>
+              <p className="text-white/90 text-sm md:text-base hidden md:block">Create and manage society events</p>
             </div>
-            <Button variant="hero">
+          </div>
+        </div>
+      </header>
+
+      {/* Create Event Button */}
+      <section className="py-4 md:py-6 px-4 border-b">
+        <div className="container mx-auto max-w-6xl">
+          <div className="flex justify-center md:justify-start">
+            <Button 
+              variant="university" 
+              size="lg"
+              onClick={() => {
+                console.log("Create Event button clicked");
+                console.log("Society info:", societyInfo);
+                console.log("Loading society:", loadingSociety);
+                setIsCreateEventModalOpen(true);
+              }}
+            >
               <Plus className="h-4 w-4 mr-2" />
               Create Event
             </Button>
           </div>
         </div>
-      </header>
+      </section>
 
       {/* Stats Overview */}
       <section className="py-8 px-4 border-b">
@@ -309,6 +383,115 @@ const EventsManagement = () => {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Create Event Modal */}
+      <Dialog open={isCreateEventModalOpen} onOpenChange={(open) => {
+        console.log("Dialog onOpenChange called with:", open);
+        setIsCreateEventModalOpen(open);
+      }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Create Event Request</DialogTitle>
+            <DialogDescription>
+              Fill out the form below to submit an event request for approval
+            </DialogDescription>
+          </DialogHeader>
+          {loadingSociety ? (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-university-navy mx-auto mb-4"></div>
+              <p className="text-muted-foreground">Loading society information...</p>
+            </div>
+          ) : !societyInfo || !societyInfo.society_id ? (
+            <div className="space-y-4 py-4">
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <p className="text-sm text-yellow-800 mb-2">
+                  <strong>Unable to load society information.</strong>
+                </p>
+                <p className="text-xs text-yellow-700 mb-3">
+                  The backend API encountered an error. You can still submit an event request if you know your Society ID.
+                </p>
+                <div className="bg-white rounded p-3 border border-yellow-300">
+                  <p className="text-xs font-medium text-gray-700 mb-2">Alternative Options:</p>
+                  <ul className="text-xs text-gray-600 space-y-1 list-disc list-inside">
+                    <li>Contact your system administrator to fix the backend API error</li>
+                    <li>Go to your Society Dashboard to submit the event request from there</li>
+                    <li>Check if you have access to another endpoint to get your Society ID</li>
+                  </ul>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setIsCreateEventModalOpen(false)}>
+                  Close
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    // Retry fetching society data
+                    const fetchSocietyData = async () => {
+                      const storedUser = localStorage.getItem("user");
+                      if (!storedUser) return;
+                      
+                      try {
+                        const userData = JSON.parse(storedUser);
+                        const userId = userData.id;
+                        if (!userId) return;
+                        
+                        setLoadingSociety(true);
+                        const response = await axios.post(
+                          "http://localhost:5000/society/society/data",
+                          { user_id: userId },
+                          {
+                            headers: {
+                              Authorization: `Bearer ${localStorage.getItem("token")}`,
+                            },
+                          }
+                        );
+                        
+                        if (response.data.success) {
+                          const societyData = response.data.society && response.data.society.length > 0 
+                            ? response.data.society[0] 
+                            : null;
+                          setSocietyInfo(societyData);
+                        }
+                      } catch (error: any) {
+                        console.error("Retry failed:", error);
+                      } finally {
+                        setLoadingSociety(false);
+                      }
+                    };
+                    fetchSocietyData();
+                  }}
+                >
+                  Retry
+                </Button>
+              </div>
+            </div>
+          ) : (() => {
+            const userData = JSON.parse(localStorage.getItem("user") || "{}");
+            if (!userData.id) {
+              return (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground mb-4">User information not found. Please log in again.</p>
+                  <Button variant="outline" onClick={() => setIsCreateEventModalOpen(false)}>
+                    Close
+                  </Button>
+                </div>
+              );
+            }
+            return (
+              <EventRequestForm
+                societyId={societyInfo.society_id}
+                userId={userData.id}
+                showCard={false}
+                onSubmitSuccess={() => {
+                  setIsCreateEventModalOpen(false);
+                  // Optionally refresh events list here if you add that functionality
+                }}
+              />
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

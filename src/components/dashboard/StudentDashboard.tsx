@@ -1,84 +1,52 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, Filter, BookOpen, Calendar, Users, Bell } from "lucide-react";
+import { MobileSidebar, MobileNav } from "@/components/ui/mobile-sidebar";
+import { ResponsiveHeader } from "@/components/ui/responsive-header";
+import { Search, Filter, BookOpen, Calendar, Users, Bell, Menu, User, Plus } from "lucide-react";
 import SocietyCard from "@/components/societies/SocietyCard";
 import { Link } from "react-router-dom";
+import axios from "axios";
 
 const StudentDashboard = () => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [societies, setSocieties] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  // Mock data - in a real app, this would come from an API
-  const societies = [
-    {
-      id: "1",
-      name: "Computer Science Society",
-      description: "A community for computer science students to learn, collaborate, and innovate together. We organize coding workshops, tech talks, and hackathons.",
-      category: "Academic",
-      memberCount: 245,
-      rating: 4.8,
-      location: "Engineering Building",
-      upcomingEvents: 3,
-      tags: ["Programming", "AI", "Web Development", "Networking"]
-    },
-    {
-      id: "2", 
-      name: "Drama Club",
-      description: "Express your creativity through theater and performance. We welcome everyone from beginners to experienced actors and stage crew.",
-      category: "Arts",
-      memberCount: 89,
-      rating: 4.6,
-      location: "Arts Center",
-      upcomingEvents: 2,
-      tags: ["Theater", "Acting", "Stage Design", "Creative Writing"]
-    },
-    {
-      id: "3",
-      name: "Environmental Action Group",
-      description: "Join us in making a positive impact on our planet. We organize campus cleanups, sustainability workshops, and eco-friendly initiatives.",
-      category: "Social Impact",
-      memberCount: 156,
-      rating: 4.9,
-      location: "Student Center",
-      upcomingEvents: 5,
-      tags: ["Sustainability", "Climate Action", "Volunteering", "Green Tech"]
-    },
-    {
-      id: "4",
-      name: "International Students Association",
-      description: "A welcoming community for international students and those interested in global cultures, languages, and international exchange.",
-      category: "Cultural",
-      memberCount: 198,
-      rating: 4.7,
-      location: "International House",
-      upcomingEvents: 4,
-      tags: ["Culture", "Languages", "Exchange", "Friendship"]
-    },
-    {
-      id: "5",
-      name: "Business & Entrepreneurship Society",
-      description: "Develop your business acumen and entrepreneurial skills. We host guest speakers, startup competitions, and networking events.",
-      category: "Professional",
-      memberCount: 312,
-      rating: 4.8,
-      location: "Business School",
-      upcomingEvents: 6,
-      tags: ["Business", "Startups", "Networking", "Finance"]
-    },
-    {
-      id: "6",
-      name: "Photography Club",
-      description: "Capture the world through your lens. Learn photography techniques, share your work, and explore the campus and city together.",
-      category: "Arts",
-      memberCount: 127,
-      rating: 4.5,
-      location: "Media Studio",
-      upcomingEvents: 2,
-      tags: ["Photography", "Digital Art", "Editing", "Travel"]
+  // Function to get active societies
+  const getActiveSocieties = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const token = localStorage.getItem("token");
+      if (!token) {
+        throw new Error("No authentication token found");
+      }
+
+      const response = await axios.get("http://localhost:5000/user/active/societies", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      console.log("Active societies fetched:", response.data);
+      setSocieties(response.data.societies || response.data);
+    } catch (err) {
+      console.error("Error fetching active societies:", err);
+      setError(err.response?.data?.message || err.message || "Failed to fetch societies");
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
+
+  // Load active societies on component mount
+  useEffect(() => {
+    getActiveSocieties();
+  }, []);
 
   const categories = ["All", "Academic", "Arts", "Social Impact", "Cultural", "Professional", "Sports"];
   const [selectedCategory, setSelectedCategory] = useState("All");
@@ -86,68 +54,87 @@ const StudentDashboard = () => {
   const filteredSocieties = societies.filter(society => {
     const matchesSearch = society.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          society.description.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === "All" || society.category === selectedCategory;
+    const matchesCategory = selectedCategory === "All" || society.category.toLowerCase() === selectedCategory.toLowerCase();
     return matchesSearch && matchesCategory;
   });
 
+  // Navigation items for mobile sidebar
+  const navigationItems = [
+    {
+      label: "Dashboard",
+      icon: <BookOpen className="h-4 w-4" />,
+      href: "/dashboard",
+      variant: "active" as "active" | "default" | "secondary"
+    },
+    {
+      label: "Profile",
+      icon: <User className="h-4 w-4" />,
+      href: "/profile",
+      variant: "default" as "active" | "default" | "secondary"
+    },
+    {
+      label: "Create Society",
+      icon: <Plus className="h-4 w-4" />,
+      href: "/society/register",
+      variant: "secondary" as "active" | "default" | "secondary"
+    }
+  ];
+
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="gradient-primary text-white py-6 px-4">
-        <div className="container mx-auto max-w-7xl">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <BookOpen className="h-8 w-8" />
-              <div>
-                <h1 className="text-2xl font-bold">Student Dashboard</h1>
-                <p className="text-white/80">Discover amazing societies and events</p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Button variant="outline" size="sm" className="text-white border-white hover:bg-white/20">
-                <Bell className="h-4 w-4 mr-2" />
-                Notifications
-              </Button>
-              <Button variant="gold" size="sm" asChild>
-                <Link to="/profile">Profile</Link>
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
+      {/* Responsive Header */}
+      <ResponsiveHeader
+        title="Student Dashboard"
+        subtitle="Discover amazing societies and events"
+        leftContent={
+          <MobileSidebar trigger={
+            <Button variant="ghost" size="sm" className="md:hidden text-white hover:bg-white/20">
+              <Menu className="h-5 w-5" />
+              <span className="sr-only">Open menu</span>
+            </Button>
+          }>
+            <MobileNav items={navigationItems} />
+          </MobileSidebar>
+        }
+        rightContent={
+          <Button variant="gold" size="sm" asChild className="hidden sm:flex">
+            <Link to="/profile">Profile</Link>
+          </Button>
+        }
+      />
 
       {/* Quick Stats */}
-      <section className="py-8 px-4 bg-muted/30">
+      <section className="py-4 md:py-8 px-4 bg-muted/30">
         <div className="container mx-auto max-w-7xl">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card className="p-4 text-center shadow-card">
-              <Users className="h-8 w-8 mx-auto mb-2 text-university-navy" />
-              <div className="text-2xl font-bold text-university-navy">3</div>
-              <div className="text-sm text-muted-foreground">Joined Societies</div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+            <Card className="p-3 md:p-4 text-center shadow-card">
+              <Users className="h-6 w-6 md:h-8 md:w-8 mx-auto mb-2 text-university-navy" />
+              <div className="text-lg md:text-2xl font-bold text-university-navy">3</div>
+              <div className="text-xs md:text-sm text-muted-foreground">Joined Societies</div>
             </Card>
-            <Card className="p-4 text-center shadow-card">
-              <Calendar className="h-8 w-8 mx-auto mb-2 text-university-gold" />
-              <div className="text-2xl font-bold text-university-navy">7</div>
-              <div className="text-sm text-muted-foreground">Upcoming Events</div>
+            <Card className="p-3 md:p-4 text-center shadow-card">
+              <Calendar className="h-6 w-6 md:h-8 md:w-8 mx-auto mb-2 text-university-gold" />
+              <div className="text-lg md:text-2xl font-bold text-university-navy">7</div>
+              <div className="text-xs md:text-sm text-muted-foreground">Upcoming Events</div>
             </Card>
-            <Card className="p-4 text-center shadow-card">
-              <BookOpen className="h-8 w-8 mx-auto mb-2 text-university-maroon" />
-              <div className="text-2xl font-bold text-university-navy">12</div>
-              <div className="text-sm text-muted-foreground">Posts This Week</div>
+            <Card className="p-3 md:p-4 text-center shadow-card">
+              <BookOpen className="h-6 w-6 md:h-8 md:w-8 mx-auto mb-2 text-university-maroon" />
+              <div className="text-lg md:text-2xl font-bold text-university-navy">12</div>
+              <div className="text-xs md:text-sm text-muted-foreground">Posts This Week</div>
             </Card>
-            <Card className="p-4 text-center shadow-card">
-              <Filter className="h-8 w-8 mx-auto mb-2 text-university-navy" />
-              <div className="text-2xl font-bold text-university-navy">156</div>
-              <div className="text-sm text-muted-foreground">Available Societies</div>
+            <Card className="p-3 md:p-4 text-center shadow-card">
+              <Filter className="h-6 w-6 md:h-8 md:w-8 mx-auto mb-2 text-university-navy" />
+              <div className="text-lg md:text-2xl font-bold text-university-navy">{societies.length}</div>
+              <div className="text-xs md:text-sm text-muted-foreground">Available Societies</div>
             </Card>
           </div>
         </div>
       </section>
 
       {/* Search and Filter */}
-      <section className="py-8 px-4">
+      <section className="py-4 md:py-8 px-4">
         <div className="container mx-auto max-w-7xl">
-          <div className="flex flex-col md:flex-row gap-4 mb-8">
+          <div className="flex flex-col gap-4 mb-6 md:mb-8">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
@@ -157,13 +144,14 @@ const StudentDashboard = () => {
                 className="pl-10"
               />
             </div>
-            <div className="flex gap-2 flex-wrap">
+            <div className="flex gap-2 flex-wrap overflow-x-auto pb-2">
               {categories.map((category) => (
                 <Button
                   key={category}
                   variant={selectedCategory === category ? "university" : "outline"}
                   size="sm"
                   onClick={() => setSelectedCategory(category)}
+                  className="flex-shrink-0"
                 >
                   {category}
                 </Button>
@@ -173,20 +161,62 @@ const StudentDashboard = () => {
 
           {/* Societies Grid */}
           <div className="mb-8">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-semibold text-university-navy">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <h2 className="text-xl md:text-2xl font-semibold text-university-navy">
                 Discover Societies ({filteredSocieties.length})
               </h2>
-              <Button variant="gold" asChild>
-                <Link to="/society/register">Create Society</Link>
-              </Button>
+              <div className="flex gap-2 flex-wrap">
+                <Button variant="outline" onClick={getActiveSocieties} disabled={loading} size="sm" className="flex-shrink-0">
+                  {loading ? "Loading..." : "Refresh"}
+                </Button>
+                <Button variant="gold" asChild size="sm" className="flex-shrink-0">
+                  <Link to="/society/register">Create Society</Link>
+                </Button>
+              </div>
             </div>
 
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredSocieties.map((society) => (
-                <SocietyCard key={society.id} society={society} />
-              ))}
-            </div>
+            {/* Loading State */}
+            {loading && (
+              <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-university-navy mx-auto mb-4"></div>
+                <p className="text-lg text-muted-foreground">Loading societies...</p>
+              </div>
+            )}
+
+            {/* Error State */}
+            {error && (
+              <div className="text-center py-12">
+                <div className="text-red-500 mb-4">
+                  <Filter className="h-12 w-12 mx-auto mb-2" />
+                  <p className="text-lg font-semibold">Error Loading Societies</p>
+                  <p className="text-sm text-muted-foreground">{error}</p>
+                </div>
+                <Button onClick={getActiveSocieties} variant="outline">
+                  Try Again
+                </Button>
+              </div>
+            )}
+
+            {/* Societies Grid */}
+            {!loading && !error && (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredSocieties.length > 0 ? (
+                  filteredSocieties.map((society) => (
+                    <SocietyCard key={society.society_id || society.id} society={society} />
+                  ))
+                ) : (
+                  <div className="col-span-full text-center py-12">
+                    <BookOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                    <h3 className="text-lg font-semibold text-university-navy mb-2">No Societies Found</h3>
+                    <p className="text-muted-foreground">
+                      {searchQuery || selectedCategory !== "All" 
+                        ? "Try adjusting your search or filter criteria." 
+                        : "No active societies are available at the moment."}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </section>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -65,6 +65,23 @@ const SocietyRegistration = () => {
   const [societyLogo, setSocietyLogo] = useState<File | null>(null);
   const [coverPhoto, setCoverPhoto] = useState<File | null>(null);
 
+  // ✅ Check authentication state on component load
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    const user = localStorage.getItem("user");
+    
+    console.log("SocietyRegistration - Authentication check:");
+    console.log("Token exists:", !!token);
+    console.log("User exists:", !!user);
+    console.log("Token value:", token);
+    console.log("User value:", user);
+    
+    if (!token || !user) {
+      console.error("User not authenticated, redirecting to login");
+      navigate("/");
+    }
+  }, [navigate]);
+
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'cover') => {
     if (event.target.files) {
       switch (type) {
@@ -77,31 +94,35 @@ const SocietyRegistration = () => {
       }
     }
   };
-
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     console.log("Form submission started...........");
+  
     try {
       setIsSubmitting(true);
-      console.log("Form values:", values);
-
-      const userStr = localStorage.getItem('user');
-      console.log("Raw user data from localStorage:", userStr);
-
+  
+      // ✅ Get user data
+      const userStr = localStorage.getItem("user");
+      console.log("User data from localStorage:", userStr);
+      
       if (!userStr) {
+        console.error("No user data found in localStorage");
         throw new Error("No user data found in localStorage");
       }
-
+  
       let userId;
       try {
         const user = JSON.parse(userStr);
-        console.log("Parsed user data:", user);
-
-        if (!user.id) {
+        console.log("Parsed user data:", user); // Debug log
+        
+        // Try different possible field names for user ID
+        userId = user.id || user._id || user.userId || user.studentId;
+        
+        if (!userId) {
+          console.error("User ID not found. Available fields:", Object.keys(user));
           throw new Error("User ID not found in parsed user data");
         }
-
-        userId = user.id;
-        console.log("userId:", userId);
+        
+        console.log("Found user ID:", userId);
       } catch (error) {
         console.error("Error parsing user data:", error);
         toast({
@@ -109,11 +130,11 @@ const SocietyRegistration = () => {
           description: "User not authenticated. Please login again.",
           variant: "destructive",
         });
-        navigate('/auth/login');
+        navigate("/");
         return;
       }
-
-      // Validate required files
+  
+      // ✅ File validation
       if (!societyLogo || !coverPhoto) {
         toast({
           title: "Error",
@@ -122,84 +143,105 @@ const SocietyRegistration = () => {
         });
         return;
       }
+  
+      // ✅ Description validation
+      if (values.description.length < 50) {
+        toast({
+          title: "Error",
+          description: "Description must be at least 50 characters",
+          variant: "destructive",
+        });
+        return;
+      }
+  
+      // Validate all required fields
+      if (!values.name || !values.description || !values.category || 
+          !values.location || !values.advisor || !values.purpose) {
+        throw new Error("All basic fields are required");
+      }
 
-      // Create FormData to handle file uploads (renamed to avoid confusion)
+      // Filter arrays before sending
+      const filteredAchievements = achievements.filter(
+        (achievement) => achievement && achievement.trim().length > 0
+      );
+      const filteredEvents = events.filter(
+        (event) =>
+          event.title && event.title.trim() &&
+          event.description && event.description.trim() &&
+          event.date && event.date.trim()
+      );
+
+      // Create FormData for mixed content (files + data)
       const payload = new FormData();
-      console.log("onSubmit received values:", values);
-      console.log("Name field:", values.name);
-
-      payload.append('userId', userId);
-      payload.append('name', values.name);
-      payload.append('description', values.description); // guaranteed present
-      payload.append('category', values.category);
-      payload.append('location', values.location);
-      payload.append('advisor', values.advisor);
-      payload.append('purpose', values.purpose);
-      payload.append('terms', (values.terms ?? false).toString());
-
-      payload.append('achievements', JSON.stringify(achievements));
-      payload.append('events', JSON.stringify(events));
-
-      payload.append('societyLogo', societyLogo);
-      payload.append('coverPhoto', coverPhoto);
-
-      console.log('Submitting form data:', {
-        userId,
+      
+      // Append all text fields
+      Object.entries({
         name: values.name,
+        description: values.description,
         category: values.category,
-        achievements: achievements.length,
-        events: events.length,
-        hasLogo: !!societyLogo,
-        hasCover: !!coverPhoto
+        location: values.location,
+        advisor: values.advisor,
+        purpose: values.purpose,
+        user_id: userId.toString(),
+        terms: (values.terms ?? false).toString(),
+        achievements: JSON.stringify(filteredAchievements),
+        events: JSON.stringify(filteredEvents)
+      }).forEach(([key, value]) => {
+        payload.append(key, value);
       });
 
-      const token = localStorage.getItem('token');
-      console.log("Auth token available:", !!token);
+      // Append files
+      payload.append("societyLogo", societyLogo);
+      payload.append("coverPhoto", coverPhoto);
+  
+      // ✅ Debug log FormData
+      for (const pair of payload.entries()) {
+        console.log(`${pair[0]}:`, pair[1]);
+      }
+  
+       // ✅ Send request
+       const token = localStorage.getItem("token");
+       console.log("tokennnnnnnnnnnnnnn",token)
+       if (!token) {
+         throw new Error("No authentication token found");
+       }
 
-      try {
-        const response = await axios.post(
-          "http://localhost:5000/society/register",
-          payload,
-          {
-            headers: {
-              'Content-Type': 'multipart/form-data',
-              'Authorization': `Bearer ${token}`,
-              'Accept': 'application/json',
-            },
-            withCredentials: true
-          }
-        );
-
-        console.log("Backend response:", response);
-
-        if (response.status === 201) {
-          toast({
-            title: "Success!",
-            description: "Your society has been registered successfully.",
-            variant: "default",
-          });
-          navigate('/dashboard/student');
-        }
-      } catch (axiosError: any) {
-        console.error('Axios error details:', {
-          response: axiosError.response?.data,
-          status: axiosError.response?.status,
-          headers: axiosError.response?.headers
+       const response = await axios.post(
+         "http://localhost:5000/society/register",
+         payload,
+         {
+           headers: {
+             Authorization: `Bearer ${token}`, // Ensure proper Bearer token format
+             'Content-Type': 'multipart/form-data',
+           },
+           withCredentials: true,
+         }
+       );
+  
+      // ✅ Success
+      if (response.status === 201) {
+        toast({
+          title: "Success!",
+          description: "Your society has been registered successfully.",
+          variant: "default",
         });
-        throw axiosError;
+        navigate("/dashboard/student");
       }
     } catch (error: any) {
-      console.error('Error submitting society registration:', error);
+      console.error("Error submitting society registration:", error);
       toast({
         title: "Error",
-        description: error.message || "Failed to register society. Please try again.",
+        description:
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to register society. Please try again.",
         variant: "destructive",
       });
     } finally {
       setIsSubmitting(false);
     }
   };
-
+  
   const addAchievement = () => {
     setAchievements([...achievements, ""]);
   };
@@ -294,9 +336,24 @@ const SocietyRegistration = () => {
         return true;
 
       case 4:
+        // Allow moving to step 5 without validation
         return true;
 
       case 5:
+        // Only validate files if submitting the form
+        const isSubmitting = form.formState.isSubmitting;
+        if (!isSubmitting) {
+          return true;
+        }
+        
+        if (!societyLogo || !coverPhoto) {
+          toast({
+            title: "Error",
+            description: "Both society logo and cover photo are required",
+            variant: "destructive",
+          });
+          return false;
+        }
         return true;
     }
 
@@ -360,23 +417,6 @@ const SocietyRegistration = () => {
               <p className="text-muted-foreground">Tell us about your society</p>
             </div>
 
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Short Description</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Brief description of your society..."
-                      className="min-h-24"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
 
             <FormField
               control={form.control}
@@ -409,6 +449,25 @@ const SocietyRegistration = () => {
                 );
               }}
             />
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Short Description</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Brief description of your society..."
+                      className="min-h-24"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+          
             <div className="grid md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -656,7 +715,12 @@ const SocietyRegistration = () => {
                     <FormControl>
                       <Checkbox
                         checked={field.value}
-                        onCheckedChange={field.onChange}
+                        onCheckedChange={(checked) => {
+                          // Use setTimeout to avoid the flushSync warning
+                          setTimeout(() => {
+                            field.onChange(checked);
+                          }, 0);
+                        }}
                       />
                     </FormControl>
                     <div className="space-y-1 leading-none">
@@ -709,41 +773,41 @@ const SocietyRegistration = () => {
       <section className="py-12 px-4">
         <div className="container mx-auto max-w-2xl">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit, (errors) => {
-              console.log("❌ Validation errors:", errors);
-            })}>
-              <Card className="p-8 shadow-card">
-                {renderStep()}
+            <Card className="p-8 shadow-card">
+              {renderStep()}
+            </Card>
 
-                <div className="flex justify-between mt-8 pt-6 border-t">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={prevStep}
-                    disabled={currentStep === 1}
-                  >
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Previous
-                  </Button>
+            <div className="flex justify-between mt-8 pt-6 border-t">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={prevStep}
+                disabled={currentStep === 1}
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Previous
+              </Button>
 
-                  {currentStep === totalSteps ? (
-                    <Button
-                      type="submit"
-                      variant="university"
-                      className="px-8"
-                      disabled={isSubmitting}
-                    >
-                      {isSubmitting ? "Submitting..." : "Submit Application"}
-                    </Button>
-                  ) : (
-                    <Button type="button" onClick={nextStep} variant="university">
-                      Next
-                      <ArrowRight className="h-4 w-4 ml-2" />
-                    </Button>
-                  )}
-                </div>
-              </Card>
-            </form>
+              {currentStep === totalSteps ? (
+                <Button
+                  type="button"
+                  onClick={() => {
+                    if (isSubmitting) return;
+                    form.handleSubmit(onSubmit)();
+                  }}
+                  variant="university"
+                  className="px-8"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? "Submitting..." : "Submit Application"}
+                </Button>
+              ) : (
+                <Button type="button" onClick={nextStep} variant="university">
+                  Next
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+              )}
+            </div>
           </Form>
         </div>
       </section>

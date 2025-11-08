@@ -104,20 +104,28 @@ const Analytics = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="gradient-primary text-white py-8 px-4">
+      <header className="gradient-primary text-white py-4 md:py-8 px-4">
         <div className="container mx-auto max-w-6xl">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold mb-2">Society Analytics</h1>
-              <p className="text-white/90">Track your society's growth and engagement</p>
+              <h1 className="text-xl md:text-3xl font-bold mb-2">Society Analytics</h1>
+              <p className="text-white/90 text-sm md:text-base hidden md:block">Track your society's growth and engagement</p>
             </div>
-            <Button variant="hero">
+          </div>
+        </div>
+      </header>
+
+      {/* Export Button */}
+      <section className="py-4 md:py-6 px-4 border-b">
+        <div className="container mx-auto max-w-6xl">
+          <div className="flex justify-center md:justify-start">
+            <Button variant="university" size="lg">
               <Download className="h-4 w-4 mr-2" />
               Export Report
             </Button>
           </div>
         </div>
-      </header>
+      </section>
 
       {/* Overview Stats */}
       <section className="py-8 px-4">

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,6 +19,60 @@ const LoginForm = ({ userType }: LoginFormProps) => {
   });
   const [error, setError] = useState("");
   const navigate = useNavigate();
+
+  // ✅ Check if user is already authenticated
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    const user = localStorage.getItem("user");
+    
+    console.log("LoginForm - Checking authentication state:");
+    console.log("Token exists:", !!token);
+    console.log("User exists:", !!user);
+    
+    if (token && user) {
+      try {
+        const userData = JSON.parse(user);
+        console.log("User admin status:", userData.admin);
+        console.log("User society owner status:", userData.society_owner);
+        
+        if (userData.admin === 1) {
+          // Normalize role to handle case sensitivity and whitespace
+          const normalizedRole = userData.role ? String(userData.role).trim().toLowerCase() : null;
+          console.log("User is admin with role:", normalizedRole);
+          // Redirect based on admin role
+          switch(normalizedRole) {
+            case 'society_board':
+              console.log("Redirecting to Society Board dashboard");
+              navigate("/dashboard/admin/board");
+              break;
+            case 'registrar':
+              console.log("Redirecting to Registrar dashboard");
+              navigate("/dashboard/admin/registrar");
+              break;
+            case 'vc':
+            case 'vice_chancellor':
+              console.log("Redirecting to VC dashboard");
+              navigate("/dashboard/admin/vc");
+              break;
+            default:
+              console.warn("⚠️ Unknown admin role in stored session. Role value:", normalizedRole);
+              navigate("/dashboard/admin");
+              break;
+          }
+        } else if (userData.society_owner === 1) {
+          console.log("User is society owner, redirecting to society dashboard");
+          navigate("/dashboard/society");
+        } else {
+          console.log("User is student, redirecting to student dashboard");
+          navigate("/dashboard/student");
+        }
+      } catch (error) {
+        console.error("Error parsing user data:", error);
+        // If parsing fails, default to student dashboard
+        navigate("/dashboard/student");
+      }
+    }
+  }, [navigate]);
 const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
   setError("");
@@ -37,21 +91,69 @@ const handleSubmit = async (e: React.FormEvent) => {
     localStorage.setItem("user", JSON.stringify(res.data.student));
 
     console.log("Login successful:", res.data);
+    console.log("Token saved:", res.data.token);
+    console.log("User data saved:", res.data.student);
+    console.log("Available fields in student data:", Object.keys(res.data.student));
+    console.log("User role from backend:", res.data.student.role);
+    console.log("Roll number in student data:", res.data.student.RollNO || res.data.student.RollNO || res.data.student.student_id);
+    
+    // ✅ Verify localStorage storage
+    console.log("Token in localStorage:", localStorage.getItem("token"));
+    console.log("User in localStorage:", localStorage.getItem("user"));
 
-    // ✅ Navigate based on user type
-    switch (userType) {
-      case "student":
-        navigate("/dashboard/student");
-        break;
-      case "society":
-        navigate("/dashboard/society");
-        break;
-      case "admin":
-        navigate("/dashboard/admin");
-        break;
+    // ✅ Check user role and redirect accordingly
+    const userData = res.data.student;
+    console.log("=== LOGIN DEBUG INFO ===");
+    console.log("Full userData object:", JSON.stringify(userData, null, 2));
+    console.log("User admin status:", userData.admin);
+    console.log("User role:", userData.role);
+    console.log("User role type:", typeof userData.role);
+    console.log("User role value (stringified):", JSON.stringify(userData.role));
+    console.log("User society owner status:", userData.society_owner);
+    console.log("All userData keys:", Object.keys(userData));
+    
+    if (userData.admin === 1) {
+      // Normalize role to handle case sensitivity and whitespace
+      const normalizedRole = userData.role ? String(userData.role).trim().toLowerCase() : null;
+      console.log("Normalized role:", normalizedRole);
+      console.log("User is admin with role:", normalizedRole);
+      
+      // Redirect based on admin role
+      switch(normalizedRole) {
+        case 'society_board':
+          console.log("Redirecting to Society Board dashboard");
+          navigate("/dashboard/admin/board");
+          break;
+        case 'registrar':
+          console.log("Redirecting to Registrar dashboard");
+          navigate("/dashboard/admin/registrar");
+          break;
+        case 'vc':
+        case 'vice_chancellor':
+          console.log("Redirecting to VC dashboard");
+          navigate("/dashboard/admin/vc");
+          break;
+        default:
+          console.warn("⚠️ Unknown admin role! Role value:", normalizedRole, "| Original value:", userData.role);
+          console.warn("⚠️ Redirecting to general admin dashboard. Please check backend response.");
+          navigate("/dashboard/admin");
+          break;
+      }
+    } else if (userData.society_owner === 1) {
+      console.log("User is society owner, redirecting to society dashboard");
+      navigate("/dashboard/society");
+    } else {
+      console.log("User is student, redirecting to student dashboard");
+      navigate("/dashboard/student");
     }
   } catch (err: any) {
     console.error("Login failed:", err.response?.data || err.message);
+    console.error("Full error object:", err);
+    
+    // Clear any existing auth data on login failure
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    
     setError(err.response?.data?.message || "Login failed");
   }
 };

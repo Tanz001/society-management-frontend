@@ -63,20 +63,20 @@ const EventsPage = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="gradient-primary text-white py-12 px-4">
+      <header className="gradient-primary text-white py-6 md:py-12 px-4">
         <div className="container mx-auto max-w-6xl">
           <div className="text-center">
-            <h1 className="text-4xl font-bold mb-4">University Events</h1>
-            <p className="text-white/90 text-lg">Discover exciting events happening across all societies</p>
+            <h1 className="text-2xl md:text-4xl font-bold mb-2 md:mb-4">University Events</h1>
+            <p className="text-white/90 text-sm md:text-lg">Discover exciting events happening across all societies</p>
           </div>
         </div>
       </header>
 
       {/* Search and Filters */}
-      <section className="py-8 px-4 border-b">
+      <section className="py-4 md:py-8 px-4 border-b">
         <div className="container mx-auto max-w-6xl">
-          <div className="flex flex-col md:flex-row gap-4 items-center">
-            <div className="relative flex-1">
+          <div className="flex flex-col gap-4">
+            <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search events..."
@@ -85,12 +85,12 @@ const EventsPage = () => {
                 className="pl-10"
               />
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm">
+            <div className="flex gap-2 overflow-x-auto pb-2">
+              <Button variant="outline" size="sm" className="flex-shrink-0">
                 <Filter className="h-4 w-4 mr-2" />
                 Filter
               </Button>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" className="flex-shrink-0">
                 <Calendar className="h-4 w-4 mr-2" />
                 Date Range
               </Button>
