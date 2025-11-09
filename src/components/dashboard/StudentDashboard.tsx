@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MobileSidebar, MobileNav } from "@/components/ui/mobile-sidebar";
 import { ResponsiveHeader } from "@/components/ui/responsive-header";
-import { Search, Filter, BookOpen, Calendar, Users, Bell, Menu, User, Plus } from "lucide-react";
+import { Search, Filter, BookOpen, Calendar, Users, Bell, Menu, User } from "lucide-react";
 import SocietyCard from "@/components/societies/SocietyCard";
 import { Link } from "react-router-dom";
 import axios from "axios";
@@ -15,6 +15,13 @@ const StudentDashboard = () => {
   const [societies, setSocieties] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [stats, setStats] = useState({
+    joinedSocieties: 0,
+    upcomingEvents: 0,
+    postsThisWeek: 0,
+    totalSocieties: 0
+  });
+  const [statsLoading, setStatsLoading] = useState(false);
 
   // Function to get active societies
   const getActiveSocieties = async () => {
@@ -43,9 +50,35 @@ const StudentDashboard = () => {
     }
   };
 
-  // Load active societies on component mount
+  // Function to get student stats
+  const getStudentStats = async () => {
+    try {
+      setStatsLoading(true);
+      const token = localStorage.getItem("token");
+      if (!token) {
+        throw new Error("No authentication token found");
+      }
+
+      const response = await axios.get("http://localhost:5000/user/stats", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.data.success) {
+        setStats(response.data.stats);
+      }
+    } catch (err) {
+      console.error("Error fetching stats:", err);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
+  // Load active societies and stats on component mount
   useEffect(() => {
     getActiveSocieties();
+    getStudentStats();
   }, []);
 
   const categories = ["All", "Academic", "Arts", "Social Impact", "Cultural", "Professional", "Sports"];
@@ -71,12 +104,6 @@ const StudentDashboard = () => {
       icon: <User className="h-4 w-4" />,
       href: "/profile",
       variant: "default" as "active" | "default" | "secondary"
-    },
-    {
-      label: "Create Society",
-      icon: <Plus className="h-4 w-4" />,
-      href: "/society/register",
-      variant: "secondary" as "active" | "default" | "secondary"
     }
   ];
 
@@ -109,22 +136,30 @@ const StudentDashboard = () => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
             <Card className="p-3 md:p-4 text-center shadow-card">
               <Users className="h-6 w-6 md:h-8 md:w-8 mx-auto mb-2 text-university-navy" />
-              <div className="text-lg md:text-2xl font-bold text-university-navy">3</div>
+              <div className="text-lg md:text-2xl font-bold text-university-navy">
+                {statsLoading ? "..." : stats.joinedSocieties}
+              </div>
               <div className="text-xs md:text-sm text-muted-foreground">Joined Societies</div>
             </Card>
             <Card className="p-3 md:p-4 text-center shadow-card">
               <Calendar className="h-6 w-6 md:h-8 md:w-8 mx-auto mb-2 text-university-gold" />
-              <div className="text-lg md:text-2xl font-bold text-university-navy">7</div>
+              <div className="text-lg md:text-2xl font-bold text-university-navy">
+                {statsLoading ? "..." : stats.upcomingEvents}
+              </div>
               <div className="text-xs md:text-sm text-muted-foreground">Upcoming Events</div>
             </Card>
             <Card className="p-3 md:p-4 text-center shadow-card">
               <BookOpen className="h-6 w-6 md:h-8 md:w-8 mx-auto mb-2 text-university-maroon" />
-              <div className="text-lg md:text-2xl font-bold text-university-navy">12</div>
+              <div className="text-lg md:text-2xl font-bold text-university-navy">
+                {statsLoading ? "..." : stats.postsThisWeek}
+              </div>
               <div className="text-xs md:text-sm text-muted-foreground">Posts This Week</div>
             </Card>
             <Card className="p-3 md:p-4 text-center shadow-card">
               <Filter className="h-6 w-6 md:h-8 md:w-8 mx-auto mb-2 text-university-navy" />
-              <div className="text-lg md:text-2xl font-bold text-university-navy">{societies.length}</div>
+              <div className="text-lg md:text-2xl font-bold text-university-navy">
+                {statsLoading ? "..." : stats.totalSocieties}
+              </div>
               <div className="text-xs md:text-sm text-muted-foreground">Available Societies</div>
             </Card>
           </div>
@@ -161,18 +196,10 @@ const StudentDashboard = () => {
 
           {/* Societies Grid */}
           <div className="mb-8">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <div className="mb-6">
               <h2 className="text-xl md:text-2xl font-semibold text-university-navy">
                 Discover Societies ({filteredSocieties.length})
               </h2>
-              <div className="flex gap-2 flex-wrap">
-                <Button variant="outline" onClick={getActiveSocieties} disabled={loading} size="sm" className="flex-shrink-0">
-                  {loading ? "Loading..." : "Refresh"}
-                </Button>
-                <Button variant="gold" asChild size="sm" className="flex-shrink-0">
-                  <Link to="/society/register">Create Society</Link>
-                </Button>
-              </div>
             </div>
 
             {/* Loading State */}

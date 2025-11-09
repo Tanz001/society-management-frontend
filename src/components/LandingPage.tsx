@@ -2,8 +2,10 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { GraduationCap, Users, Settings, BookOpen, Calendar, TrendingUp } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useState } from "react";
 
 const LandingPage = () => {
+  const [logoError, setLogoError] = useState(false);
   const userRoles = [
     {
       title: "Student",
@@ -44,7 +46,16 @@ const LandingPage = () => {
       <section className="gradient-hero py-24 px-4 text-center text-white">
         <div className="container mx-auto max-w-6xl">
           <div className="flex items-center justify-center mb-8">
-            <BookOpen className="h-16 w-16 mr-4" />
+            {!logoError ? (
+              <img 
+                src="/university-logo.png" 
+                alt="University Logo" 
+                className="h-20 w-20 mr-4 object-contain"
+                onError={() => setLogoError(true)}
+              />
+            ) : (
+              <BookOpen className="h-16 w-16 mr-4" />
+            )}
             <h1 className="text-5xl font-bold">University Societies</h1>
           </div>
           <p className="text-xl mb-8 text-white/90 max-w-2xl mx-auto">
@@ -115,7 +126,16 @@ const LandingPage = () => {
       <footer className="bg-university-navy text-white py-12 px-4">
         <div className="container mx-auto max-w-6xl text-center">
           <div className="flex items-center justify-center mb-4">
-            <BookOpen className="h-8 w-8 mr-3" />
+            {!logoError ? (
+              <img 
+                src="/university-logo.png" 
+                alt="University Logo" 
+                className="h-10 w-10 mr-3 object-contain"
+                onError={() => setLogoError(true)}
+              />
+            ) : (
+              <BookOpen className="h-8 w-8 mr-3" />
+            )}
             <span className="text-xl font-semibold">University Societies Platform</span>
           </div>
           <p className="text-white/70">

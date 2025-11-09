@@ -12,7 +12,7 @@ import { ArrowLeft, ArrowRight, Upload, Plus, X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
 import { toast } from "@/components/ui/use-toast";
 
@@ -61,7 +61,11 @@ const SocietyRegistration = () => {
   });
 
   const navigate = useNavigate();
+  const location = useLocation();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Get return path from location state, default to society dashboard
+  const returnPath = (location.state as any)?.returnTo || "/dashboard/society";
   const [societyLogo, setSocietyLogo] = useState<File | null>(null);
   const [coverPhoto, setCoverPhoto] = useState<File | null>(null);
 
@@ -749,11 +753,14 @@ const SocietyRegistration = () => {
         <div className="container mx-auto max-w-4xl">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <Button variant="ghost" size="sm" asChild className="text-white hover:bg-white/20">
-                <Link to="/dashboard/society">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back
-                </Link>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-white hover:bg-white/20"
+                onClick={() => navigate(returnPath)}
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back
               </Button>
               <div>
                 <h1 className="text-2xl font-bold">Society Registration</h1>

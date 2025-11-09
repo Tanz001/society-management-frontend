@@ -15,7 +15,6 @@ import {
   BookOpen, 
   Award, 
   Heart,
-  Share2,
   ArrowLeft,
   MessageSquare,
   Image as ImageIcon,
@@ -42,7 +41,6 @@ const SocietyDetail = () => {
   const [posts, setPosts] = useState([]);
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [postsError, setPostsError] = useState(null);
-  const [pollVotes, setPollVotes] = useState({}); // Track poll votes
   const [likedPosts, setLikedPosts] = useState({}); // Track liked posts
   const [commentingOn, setCommentingOn] = useState(null); // Track which post is being commented on
   const [newComment, setNewComment] = useState(""); // New comment text
@@ -84,13 +82,66 @@ const SocietyDetail = () => {
   };
 
   // Handle poll voting
-  const handlePollVote = (postId, optionIndex) => {
-    setPollVotes(prev => ({
-      ...prev,
-      [postId]: optionIndex
-    }));
-    // Here you would typically send the vote to the backend
-    console.log(`Voted for option ${optionIndex} in post ${postId}`);
+  const handlePollVote = async (postId, optionId, pollId) => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        console.error("No authentication token found");
+        return;
+      }
+
+      const response = await axios.post(
+        'http://localhost:5000/user/poll/vote',
+        {
+          option_id: optionId,
+          poll_id: pollId
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (response.data.success) {
+        // Refresh the post to get updated vote counts
+        if (society?.society_id) {
+          const user = JSON.parse(localStorage.getItem("user") || "{}");
+          const userId = user.id || user.user_id;
+          fetchSocietyPosts(society.society_id, userId);
+        }
+      }
+    } catch (error) {
+      console.error('Error voting on poll:', error);
+    }
+  };
+
+  // Fetch poll details for a post
+  const fetchPollDetails = async (pollId) => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        return null;
+      }
+
+      const response = await axios.get(
+        `http://localhost:5000/user/poll/${pollId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          }
+        }
+      );
+
+      if (response.data.success) {
+        return response.data.poll;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error fetching poll details:', error);
+      return null;
+    }
   };
 
   // Handle like/unlike functionality
@@ -187,7 +238,7 @@ const SocietyDetail = () => {
   };
 
   // Fetch posts for the society
-  const fetchSocietyPosts = async (societyId) => {
+  const fetchSocietyPosts = async (societyId, userId = null) => {
     try {
       setLoadingPosts(true);
       setPostsError(null);
@@ -199,9 +250,15 @@ const SocietyDetail = () => {
         throw new Error("No authentication token found");
       }
 
+      // Get user ID from localStorage if not provided
+      if (!userId) {
+        const user = JSON.parse(localStorage.getItem("user") || "{}");
+        userId = user.id || user.user_id;
+      }
+
       const response = await axios.post(
         `http://localhost:5000/society/posts`,
-        { society_id: societyId },
+        { society_id: societyId, user_id: userId },
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -391,24 +448,6 @@ const SocietyDetail = () => {
                 Join Society
                 </Link>
               </Button>
-              <div className="flex space-x-3">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="flex-1 text-white hover:bg-white/10 border border-white/20 rounded-lg px-4 py-2 transition-all duration-200 hover:border-white/40"
-                >
-                  <Heart className="h-4 w-4 mr-2" />
-                  Follow
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="flex-1 text-white hover:bg-white/10 border border-white/20 rounded-lg px-4 py-2 transition-all duration-200 hover:border-white/40"
-                >
-                  <Share2 className="h-4 w-4 mr-2" />
-                  Share
-                </Button>
-              </div>
             </div>
           </div>
         </div>
@@ -627,16 +666,16 @@ const SocietyDetail = () => {
 
                         {post.post_type === 'poll' && post.poll_data && (
                           <div className="space-y-3">
-                            <p className="text-muted-foreground leading-relaxed">{post.content}</p>
+                            <p className="text-muted-foreground leading-relaxed font-medium">{post.poll_data.question || post.content}</p>
                             {post.poll_data.options && post.poll_data.options.length > 0 && (() => {
-                              const userVote = pollVotes[post.post_id];
-                              const totalVotes = post.poll_data.options.reduce((sum, option) => sum + option.vote_count, 0);
+                              const totalVotes = post.poll_data.options.reduce((sum, option) => sum + (option.vote_count || 0), 0);
+                              const pollId = post.poll_data.poll_id || post.poll_id;
                               
                               return (
                                 <div className="space-y-3">
-                                  {post.poll_data.options.map((option, index) => {
-                                    const percentage = totalVotes > 0 ? (option.vote_count / totalVotes) * 100 : 0;
-                                    const isVoted = userVote === index;
+                                  {post.poll_data.options.map((option) => {
+                                    const percentage = totalVotes > 0 ? ((option.vote_count || 0) / totalVotes) * 100 : 0;
+                                    const isVoted = option.user_voted || false;
                                     
                                     return (
                                       <div 
@@ -644,7 +683,7 @@ const SocietyDetail = () => {
                                         className={`relative cursor-pointer rounded-lg border-2 p-3 transition-all duration-200 hover:bg-gray-50 ${
                                           isVoted ? 'border-university-navy bg-university-navy/5' : 'border-gray-200 hover:border-gray-300'
                                         }`}
-                                        onClick={() => handlePollVote(post.post_id, index)}
+                                        onClick={() => handlePollVote(post.post_id, option.option_id, pollId)}
                                       >
                                         <div className="flex items-center justify-between mb-2">
                                           <span className={`font-medium ${isVoted ? 'text-university-navy' : 'text-gray-900'}`}>
@@ -652,7 +691,7 @@ const SocietyDetail = () => {
                                           </span>
                                           <div className="flex items-center space-x-2">
                                             <span className="text-sm text-muted-foreground">
-                                              {option.vote_count} votes
+                                              {option.vote_count || 0} {option.vote_count === 1 ? 'vote' : 'votes'}
                                             </span>
                                             {isVoted && (
                                               <div className="w-2 h-2 bg-university-navy rounded-full"></div>
@@ -671,9 +710,9 @@ const SocietyDetail = () => {
                                   <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
                                     <div className="flex items-center space-x-2">
                                       <BarChart3 className="h-3 w-3" />
-                                      <span>{totalVotes} total votes</span>
+                                      <span>{totalVotes} {totalVotes === 1 ? 'total vote' : 'total votes'}</span>
                                     </div>
-                                    <span>{post.poll_data.options.length} options</span>
+                                    <span>{post.poll_data.options.length} {post.poll_data.options.length === 1 ? 'option' : 'options'}</span>
                                   </div>
                                 </div>
                               );

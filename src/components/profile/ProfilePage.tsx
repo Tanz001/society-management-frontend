@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,9 +14,6 @@ import {
   Calendar,
   Edit,
   LogOut,
-  Trophy,
-  Users,
-  Star,
   BookOpen,
   Clock,
   FileText,
@@ -31,6 +28,8 @@ const ProfilePage = () => {
   const [studentInfo, setStudentInfo] = useState<any>(null);
   const [membershipRequests, setMembershipRequests] = useState<any[]>([]);
   const [loadingRequests, setLoadingRequests] = useState(false);
+  const [joinedSocieties, setJoinedSocieties] = useState<any[]>([]);
+  const [loadingJoinedSocieties, setLoadingJoinedSocieties] = useState(false);
   const navigate = useNavigate();
 
   // 🔹 Load user from localStorage
@@ -62,13 +61,45 @@ const ProfilePage = () => {
     }
   }, [navigate]);
 
-  // 🔹 Fetch membership requests when student info is loaded
+  // 🔹 Fetch membership requests and joined societies when student info is loaded
   useEffect(() => {
     console.log("StudentInfo in useEffect:", studentInfo);
     if (studentInfo) {
       fetchMembershipRequests();
+      fetchJoinedSocieties();
     }
   }, [studentInfo]);
+
+  // 🔹 Fetch joined societies
+  const fetchJoinedSocieties = async () => {
+    setLoadingJoinedSocieties(true);
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        console.error("No token found");
+        return;
+      }
+
+      const response = await axios.get("http://localhost:5000/user/joined-societies", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.data.success) {
+        setJoinedSocieties(response.data.societies || []);
+        console.log("Joined societies fetched:", response.data.societies);
+      } else {
+        console.error("Failed to fetch joined societies:", response.data.message);
+        setJoinedSocieties([]);
+      }
+    } catch (error: any) {
+      console.error("Error fetching joined societies:", error.response?.data || error.message);
+      setJoinedSocieties([]);
+    } finally {
+      setLoadingJoinedSocieties(false);
+    }
+  };
 
   // 🔹 Handle input changes when editing
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -182,24 +213,7 @@ const ProfilePage = () => {
     );
   }
 
-  // 🔹 Example dummy data (replace with backend later)
-  const joinedSocieties = [
-    { id: 1, name: "Computer Science Society", role: "Member", joinDate: "Sept 2022", status: "Active", avatar: "CS" },
-    { id: 2, name: "Business Society", role: "Vice President", joinDate: "Jan 2023", status: "Active", avatar: "BS" },
-    { id: 3, name: "International Students Society", role: "Event Coordinator", joinDate: "Mar 2023", status: "Active", avatar: "IS" },
-  ];
 
-  const participatedEvents = [
-    { id: 1, name: "Tech Innovation Summit 2024", society: "Computer Science Society", date: "March 15, 2024", role: "Participant", certificate: true },
-    { id: 2, name: "Leadership Workshop", society: "Business Society", date: "February 28, 2024", role: "Organizer", certificate: true },
-    { id: 3, name: "Cultural Night Celebration", society: "International Students Society", date: "February 20, 2024", role: "Event Coordinator", certificate: false },
-  ];
-
-  const achievements = [
-    { title: "Outstanding Leadership", description: "Recognized for exceptional leadership in Business Society", date: "March 2024", icon: Trophy },
-    { title: "Community Builder", description: "Helped grow International Students Society membership by 40%", date: "February 2024", icon: Users },
-    { title: "Academic Excellence", description: "Maintained GPA above 3.8 for 4 consecutive semesters", date: "January 2024", icon: Star },
-  ];
 
   return (
     <div className="min-h-screen bg-background">
@@ -347,93 +361,70 @@ const ProfilePage = () => {
                 </div>
               </div>
             </Card>
-
-            {/* Achievements */}
-            <Card className="p-6 shadow-card">
-              <h3 className="font-semibold text-university-navy mb-4">Recent Achievements</h3>
-              <div className="space-y-4">
-                {achievements.slice(0, 3).map((achievement, index) => {
-                  const Icon = achievement.icon;
-                  return (
-                    <div key={index} className="flex items-start space-x-3">
-                      <div className="bg-university-gold/10 p-2 rounded-lg">
-                        <Icon className="h-4 w-4 text-university-gold" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium text-sm">{achievement.title}</p>
-                        <p className="text-xs text-muted-foreground">{achievement.description}</p>
-                        <p className="text-xs text-muted-foreground mt-1">{achievement.date}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </Card>
           </div>
 
           {/* Right Content */}
           <div className="lg:col-span-2">
             <Tabs defaultValue="societies" className="space-y-6">
-              <TabsList className="grid grid-cols-3 w-full">
+              <TabsList className="grid grid-cols-2 w-full">
                 <TabsTrigger value="societies">My Societies</TabsTrigger>
-                <TabsTrigger value="events">Events</TabsTrigger>
                 <TabsTrigger value="requests">My Requests</TabsTrigger>
               </TabsList>
 
               {/* Societies */}
               <TabsContent value="societies" className="space-y-4">
-                {joinedSocieties.map((society) => (
-                  <Card key={society.id} className="p-6 shadow-card">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-4">
-                        <Avatar>
-                          <AvatarImage src="" />
-                          <AvatarFallback className="bg-university-navy text-white">
-                            {society.avatar}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <h3 className="font-semibold text-university-navy">{society.name}</h3>
-                          <p className="text-sm text-muted-foreground">
-                            {society.role} • Joined {society.joinDate}
-                          </p>
-                        </div>
-                      </div>
-                      <Badge variant={society.status === "Active" ? "default" : "secondary"}>
-                        {society.status}
-                      </Badge>
-                    </div>
+                {loadingJoinedSocieties ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-university-navy mx-auto mb-4"></div>
+                    <p className="text-muted-foreground">Loading your societies...</p>
+                  </div>
+                ) : joinedSocieties.length === 0 ? (
+                  <Card className="p-8 text-center shadow-card">
+                    <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="font-semibold text-university-navy mb-2">No Joined Societies</h3>
+                    <p className="text-sm text-muted-foreground">
+                      You haven't joined any societies yet. Explore and join societies from the dashboard.
+                    </p>
                   </Card>
-                ))}
-              </TabsContent>
-
-              {/* Events */}
-              <TabsContent value="events" className="space-y-4">
-                {participatedEvents.map((event) => (
-                  <Card key={event.id} className="p-6 shadow-card">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-university-navy mb-1">{event.name}</h3>
-                        <p className="text-sm text-muted-foreground mb-2">{event.society}</p>
-                        <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                          <div className="flex items-center">
-                            <Calendar className="h-3 w-3 mr-1" />
-                            {event.date}
+                ) : (
+                  joinedSocieties.map((society) => (
+                    <Card key={society.request_id || society.society_id} className="p-6 shadow-card">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                          <Avatar>
+                            <AvatarImage 
+                              src={society.society_logo ? `http://localhost:5000/${society.society_logo}` : ""} 
+                            />
+                            <AvatarFallback className="bg-university-navy text-white">
+                              {society.society_name?.substring(0, 2).toUpperCase() || "SC"}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <h3 className="font-semibold text-university-navy">{society.society_name}</h3>
+                            <p className="text-sm text-muted-foreground">
+                              Member • Joined {society.processed_at ? new Date(society.processed_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'N/A'}
+                            </p>
+                            {society.category && (
+                              <Badge variant="outline" className="mt-1 text-xs">
+                                {society.category}
+                              </Badge>
+                            )}
                           </div>
-                          <Badge variant="outline" className="text-xs">
-                            {event.role}
-                          </Badge>
+                        </div>
+                        <div className="flex flex-col items-end gap-2">
+                          <Badge variant="default">Active</Badge>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            asChild
+                          >
+                            <Link to={`/society/${society.society_id}`}>View</Link>
+                          </Button>
                         </div>
                       </div>
-                      {event.certificate && (
-                        <Badge variant="secondary">
-                          <Trophy className="h-3 w-3 mr-1" />
-                          Certificate
-                        </Badge>
-                      )}
-                    </div>
-                  </Card>
-                ))}
+                    </Card>
+                  ))
+                )}
               </TabsContent>
 
               {/* My Requests */}

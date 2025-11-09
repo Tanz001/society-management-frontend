@@ -345,7 +345,7 @@ const fetchSocietiesForVC = async () => {
                 <Crown className="h-6 w-6 mr-2" />
                 Vice Chancellor Dashboard
               </h1>
-              <p className="text-white/80">Final Review - Societies Approved by Registrar</p>
+             {/* <p className="text-white/80">Final Review - Societies Approved by Registrar</p> */}
             </div>
             <div className="flex items-center space-x-3">
               <Button 

@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode, useState } from "react";
 import { BookOpen } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -10,13 +10,24 @@ interface AuthLayoutProps {
 }
 
 const AuthLayout = ({ children, title, subtitle }: AuthLayoutProps) => {
+  const [logoError, setLogoError] = useState(false);
+  const [mobileLogoError, setMobileLogoError] = useState(false);
   return (
     <div className="min-h-screen grid lg:grid-cols-2">
       {/* Left Side - Branding */}
       <div className="hidden lg:flex gradient-hero text-white p-12 flex-col justify-between">
         <div>
           <Link to="/" className="flex items-center mb-8 hover:opacity-80 transition-smooth">
-            <BookOpen className="h-10 w-10 mr-3" />
+            {!logoError ? (
+              <img 
+                src="/university-logo.png" 
+                alt="University Logo" 
+                className="h-12 w-12 mr-3 object-contain"
+                onError={() => setLogoError(true)}
+              />
+            ) : (
+              <BookOpen className="h-10 w-10 mr-3" />
+            )}
             <span className="text-2xl font-bold">University Societies</span>
           </Link>
           
@@ -51,7 +62,16 @@ const AuthLayout = ({ children, title, subtitle }: AuthLayoutProps) => {
           {/* Mobile Branding */}
           <div className="lg:hidden text-center">
             <Link to="/" className="inline-flex items-center mb-8 hover:opacity-80 transition-smooth">
-              <BookOpen className="h-8 w-8 mr-2 text-university-navy" />
+              {!mobileLogoError ? (
+                <img 
+                  src="/university-logo.png" 
+                  alt="University Logo" 
+                  className="h-10 w-10 mr-2 object-contain"
+                  onError={() => setMobileLogoError(true)}
+                />
+              ) : (
+                <BookOpen className="h-8 w-8 mr-2 text-university-navy" />
+              )}
               <span className="text-xl font-bold text-university-navy">University Societies</span>
             </Link>
           </div>

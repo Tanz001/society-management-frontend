@@ -27,8 +27,21 @@ import {
   Activity,
   Mail,
   Phone,
-  Clock
+  Clock,
+  ThumbsUp,
+  MessageCircle,
+  Send,
+  Loader2,
+  Image as ImageIcon,
+  Video,
+  Download,
+  BarChart3 as BarChartIcon,
+  MapPin
 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Progress } from "@/components/ui/progress";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import EventRequestForm from "./EventRequestForm";
@@ -46,6 +59,16 @@ const SocietyDashboard = () => {
   const [accountNumber, setAccountNumber] = useState("");
   const [accountTitle, setAccountTitle] = useState("");
   const [eventRequestsRefreshKey, setEventRequestsRefreshKey] = useState(0);
+  const [posts, setPosts] = useState<any[]>([]);
+  const [loadingPosts, setLoadingPosts] = useState(false);
+  const [events, setEvents] = useState<any[]>([]);
+  const [loadingEvents, setLoadingEvents] = useState(false);
+  const [likedPosts, setLikedPosts] = useState<{[key: number]: boolean}>({});
+  const [likingPost, setLikingPost] = useState<number | null>(null);
+  const [commentingOn, setCommentingOn] = useState<number | null>(null);
+  const [newComment, setNewComment] = useState("");
+  const [submittingComment, setSubmittingComment] = useState(false);
+  const [comments, setComments] = useState<{[key: number]: any[]}>({});
 
   // Logout function
   const handleLogout = () => {
@@ -99,6 +122,9 @@ const SocietyDashboard = () => {
           fetchMembershipRequests(societyData.society_id);
           // Fetch settings using the society ID from the response
           fetchMembershipSettings(societyData.society_id);
+          // Fetch posts and events
+          fetchSocietyPosts(societyData.society_id);
+          fetchSocietyEvents(societyData.society_id);
         }
       } else {
         console.error("Failed to fetch society data:", response.data.message);
@@ -280,74 +306,165 @@ const SocietyDashboard = () => {
   };
 
 
+  // Fetch posts for the society
+  const fetchSocietyPosts = async (societyId: number) => {
+    try {
+      setLoadingPosts(true);
+      const token = localStorage.getItem("token");
+      if (!token) return;
+
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      const userId = user.id || user.user_id;
+
+      const response = await axios.post(
+        "http://localhost:5000/society/posts",
+        { society_id: societyId, user_id: userId },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.data.success) {
+        const postsData = response.data.posts || response.data.data || [];
+        setPosts(postsData);
+        
+        // Initialize comments and likes state
+        const commentsState: {[key: number]: any[]} = {};
+        const likedPostsState: {[key: number]: boolean} = {};
+        
+        postsData.forEach((post: any) => {
+          if (post.comments && post.comments.length > 0) {
+            commentsState[post.post_id] = post.comments;
+          }
+          if (post.is_liked_by_user !== undefined) {
+            likedPostsState[post.post_id] = post.is_liked_by_user;
+          }
+        });
+        
+        setComments(commentsState);
+        setLikedPosts(likedPostsState);
+      }
+    } catch (error) {
+      console.error("Error fetching posts:", error);
+    } finally {
+      setLoadingPosts(false);
+    }
+  };
+
+  // Fetch events for the society
+  const fetchSocietyEvents = async (societyId: number) => {
+    try {
+      setLoadingEvents(true);
+      const token = localStorage.getItem("token");
+      if (!token) return;
+
+      const response = await axios.post(
+        "http://localhost:5000/society/events",
+        { society_id: societyId },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.data.success) {
+        setEvents(response.data.events || []);
+      }
+    } catch (error) {
+      console.error("Error fetching events:", error);
+    } finally {
+      setLoadingEvents(false);
+    }
+  };
+
+  // Handle like/unlike functionality
+  const handleLike = async (postId: number) => {
+    if (likingPost === postId) return;
+    
+    try {
+      setLikingPost(postId);
+      
+      const response = await axios.post('http://localhost:5000/user/like/toggle', {
+        post_id: postId
+      }, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.data.success) {
+        setPosts(prev => prev.map(post => 
+          post.post_id === postId 
+            ? { 
+                ...post, 
+                like_count: response.data.like_count,
+                is_liked_by_user: response.data.is_liked_by_user 
+              }
+            : post
+        ));
+
+        setLikedPosts(prev => ({
+          ...prev,
+          [postId]: response.data.is_liked_by_user
+        }));
+      }
+    } catch (error) {
+      console.error('Error toggling like:', error);
+    } finally {
+      setLikingPost(null);
+    }
+  };
+
+  // Handle comment submission
+  const handleComment = async (postId: number) => {
+    if (!newComment.trim() || submittingComment) return;
+    
+    try {
+      setSubmittingComment(true);
+      
+      const response = await axios.post('http://localhost:5000/user/comment/add', {
+        post_id: postId,
+        comment_text: newComment.trim()
+      }, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.data.success) {
+        setPosts(prev => prev.map(post => 
+          post.post_id === postId 
+            ? { ...post, comment_count: response.data.comment_count }
+            : post
+        ));
+
+        if (response.data.new_comment) {
+          setComments(prev => ({
+            ...prev,
+            [postId]: [response.data.new_comment, ...(prev[postId] || [])]
+          }));
+        }
+
+        setNewComment("");
+      }
+    } catch (error) {
+      console.error('Error adding comment:', error);
+    } finally {
+      setSubmittingComment(false);
+    }
+  };
+
   // Fetch data when component loads
   useEffect(() => {
     // Fetch society data first, which will trigger fetching members and requests
     fetchSocietyData();
   }, []);
 
-  // Mock data
-  const societyData = {
-    name: "Computer Science Society",
-    status: "Active",
-    memberCount: 245,
-    pendingRequests: 12,
-    upcomingEvents: 3,
-    totalPosts: 28,
-    thisMonthGrowth: 18,
-    engagementRate: 4.2,
-  };
-
-  const recentPosts = [
-    {
-      id: 1,
-      title: "Welcome New Members!",
-      content: "We're excited to welcome 23 new members to our society this semester...",
-      timestamp: "2 days ago",
-      likes: 34,
-      comments: 8,
-      views: 156
-    },
-    {
-      id: 2,
-      title: "Hackathon Registration Open",
-      content: "Registration is now open for our Spring Hackathon. Limited spots available...",
-      timestamp: "5 days ago",
-      likes: 67,
-      comments: 15,
-      views: 203
-    }
-  ];
-
-  const upcomingEvents = [
-    {
-      title: "JavaScript Workshop Series",
-      date: "2024-03-20",
-      time: "6:00 PM",
-      attendees: 45,
-      status: "Published"
-    },
-    {
-      title: "AI & Machine Learning Seminar",
-      date: "2024-03-25",
-      time: "5:30 PM",
-      attendees: 78,
-      status: "Published"
-    },
-    {
-      title: "Spring Hackathon 2024",
-      date: "2024-04-10",
-      time: "9:00 AM",
-      attendees: 120,
-      status: "Draft"
-    }
-  ];
-
-  const memberRequests = [
-    { name: "Alice Johnson", email: "alice@university.edu", program: "Computer Science", year: "3rd Year" },
-    { name: "Bob Chen", email: "bob@university.edu", program: "Software Engineering", year: "2nd Year" },
-    { name: "Carol Davis", email: "carol@university.edu", program: "Information Technology", year: "4th Year" }
-  ];
 
   // Navigation items for mobile sidebar
   const navigationItems = [
@@ -384,24 +501,14 @@ const SocietyDashboard = () => {
     {
       label: "Posts",
       icon: <FileText className="h-4 w-4" />,
-      href: "/society/post/create",
-      state: {
-        society_id: societyInfo?.society_id,
-        society_name: societyInfo?.name
-      },
-      variant: "secondary" as "active" | "default" | "secondary"
+      onClick: () => setActiveTab("posts"),
+      variant: (activeTab === "posts" ? "active" : "default") as "active" | "default" | "secondary"
     },
     {
       label: "Events",
       icon: <Calendar className="h-4 w-4" />,
-      href: "/event",
-      variant: "secondary" as "active" | "default" | "secondary"
-    },
-    {
-      label: "Analytics",
-      icon: <BarChart3 className="h-4 w-4" />,
-      href: "/analytics",
-      variant: "secondary" as "active" | "default" | "secondary"
+      onClick: () => setActiveTab("events"),
+      variant: (activeTab === "events" ? "active" : "default") as "active" | "default" | "secondary"
     }
   ];
 
@@ -409,10 +516,10 @@ const SocietyDashboard = () => {
     <div className="min-h-screen bg-background">
       {/* Responsive Header */}
       <ResponsiveHeader
-        title={loadingSociety ? "Loading..." : societyInfo?.name || societyData.name}
-        subtitle={`${membershipRequests.filter(req => req.status === 'approved').length || societyData.memberCount} members`}
+        title={loadingSociety ? "Loading..." : societyInfo?.name || "Society Dashboard"}
+        subtitle={`${membershipRequests.filter(req => req.status === 'approved').length} members`}
         badge={{
-          text: societyInfo?.status || societyData.status,
+          text: societyInfo?.status || "Active",
           variant: "secondary"
         }}
         leftContent={
@@ -484,25 +591,16 @@ const SocietyDashboard = () => {
               Event Requests
             </Button>
             <Button 
-              variant="outline"
-              asChild
+              variant={activeTab === "posts" ? "university" : "outline"}
+              onClick={() => setActiveTab("posts")}
             >
-              <Link to="/society/post/create"
-               state={{   society_id: societyInfo?.society_id,
-                society_name:societyInfo?.name
-                }}>Posts</Link>
+              Posts
             </Button>
             <Button 
-              variant="outline"
-              asChild
+              variant={activeTab === "events" ? "university" : "outline"}
+              onClick={() => setActiveTab("events")}
             >
-              <Link to="/event">Events</Link>
-            </Button>
-            <Button 
-              variant="outline"
-              asChild
-            >
-              <Link to="/analytics">Analytics</Link>
+              Events
             </Button>
           </div>
 
@@ -524,16 +622,10 @@ const SocietyDashboard = () => {
                     <div className="min-w-0 flex-1">
                       <p className="text-xs md:text-sm text-muted-foreground">Total Members</p>
                       <p className="text-lg md:text-2xl font-bold text-university-navy">
-                        {membershipRequests.filter(req => req.status === 'approved').length || societyData.memberCount}
+                        {membershipRequests.filter(req => req.status === 'approved').length}
                       </p>
                     </div>
                     <Users className="h-6 w-6 md:h-8 md:w-8 text-university-navy flex-shrink-0" />
-                  </div>
-                  <div className="flex items-center mt-2 text-xs md:text-sm">
-                    <TrendingUp className="h-3 w-3 text-green-500 mr-1" />
-                    <span className="text-green-500">
-                      +{societyInfo?.thisMonthGrowth || societyData.thisMonthGrowth} this month
-                    </span>
                   </div>
                 </Card>
 
@@ -555,12 +647,11 @@ const SocietyDashboard = () => {
                     <div className="min-w-0 flex-1">
                       <p className="text-xs md:text-sm text-muted-foreground">Upcoming Events</p>
                       <p className="text-lg md:text-2xl font-bold text-university-navy">
-                        {societyInfo?.upcomingEvents || societyData.upcomingEvents}
+                        {events.filter(e => new Date(e.event_date) >= new Date()).length}
                       </p>
                     </div>
                     <Calendar className="h-6 w-6 md:h-8 md:w-8 text-university-maroon flex-shrink-0" />
                   </div>
-                  <p className="text-xs md:text-sm text-muted-foreground mt-2">Next 30 days</p>
                 </Card>
 
                 <Card className="p-4 md:p-6 shadow-card">
@@ -568,12 +659,11 @@ const SocietyDashboard = () => {
                     <div className="min-w-0 flex-1">
                       <p className="text-xs md:text-sm text-muted-foreground">Total Posts</p>
                       <p className="text-lg md:text-2xl font-bold text-university-navy">
-                        {societyInfo?.totalPosts || societyData.totalPosts}
+                        {posts.length}
                       </p>
                     </div>
                     <MessageSquare className="h-6 w-6 md:h-8 md:w-8 text-university-navy flex-shrink-0" />
                   </div>
-                  <p className="text-xs md:text-sm text-muted-foreground mt-2">All time</p>
                 </Card>
               </div>
 
@@ -583,69 +673,77 @@ const SocietyDashboard = () => {
                 <Card className="p-4 md:p-6 shadow-card">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-semibold text-university-navy text-sm md:text-base">Recent Posts</h3>
-                    <Button variant="outline" size="sm" asChild className="hidden sm:flex">
-                      <Link to="/society/posts">View All</Link>
-                    </Button>
-                    <Button variant="outline" size="sm" asChild className="sm:hidden">
-                      <Link to="/society/posts">View</Link>
+                    <Button variant="outline" size="sm" onClick={() => setActiveTab("posts")}>
+                      View All
                     </Button>
                   </div>
                   <div className="space-y-4">
-                    {recentPosts.map((post) => (
-                      <div key={post.id} className="border-b pb-4 last:border-0">
-                        <h4 className="font-medium text-sm mb-1">{post.title}</h4>
-                        <p className="text-xs text-muted-foreground mb-2 line-clamp-2">
-                          {post.content}
-                        </p>
-                        <div className="flex items-center justify-between text-xs text-muted-foreground">
-                          <span>{post.timestamp}</span>
-                          <div className="flex items-center space-x-3">
-                            <div className="flex items-center">
-                              <Eye className="h-3 w-3 mr-1" />
-                              {post.views}
-                            </div>
-                            <div className="flex items-center">
-                              <Heart className="h-3 w-3 mr-1" />
-                              {post.likes}
-                            </div>
-                            <div className="flex items-center">
-                              <MessageSquare className="h-3 w-3 mr-1" />
-                              {post.comments}
+                    {loadingPosts ? (
+                      <div className="text-center py-4">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-university-navy mx-auto"></div>
+                      </div>
+                    ) : posts.length === 0 ? (
+                      <p className="text-xs text-muted-foreground text-center py-4">No posts yet</p>
+                    ) : (
+                      posts.slice(0, 3).map((post) => (
+                        <div key={post.post_id} className="border-b pb-4 last:border-0">
+                          <h4 className="font-medium text-sm mb-1">{post.title}</h4>
+                          <p className="text-xs text-muted-foreground mb-2 line-clamp-2">
+                            {post.content}
+                          </p>
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span>{new Date(post.created_at).toLocaleDateString()}</span>
+                            <div className="flex items-center space-x-3">
+                              <div className="flex items-center">
+                                <Heart className="h-3 w-3 mr-1" />
+                                {post.like_count || 0}
+                              </div>
+                              <div className="flex items-center">
+                                <MessageSquare className="h-3 w-3 mr-1" />
+                                {post.comment_count || 0}
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      ))
+                    )}
                   </div>
                 </Card>
 
                 <Card className="p-4 md:p-6 shadow-card">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-semibold text-university-navy text-sm md:text-base">Upcoming Events</h3>
-                    <Button variant="outline" size="sm" asChild className="hidden sm:flex">
-                      <Link to="/society/events">Manage All</Link>
-                    </Button>
-                    <Button variant="outline" size="sm" asChild className="sm:hidden">
-                      <Link to="/society/events">Manage</Link>
+                    <Button variant="outline" size="sm" onClick={() => setActiveTab("events")}>
+                      View All
                     </Button>
                   </div>
                   <div className="space-y-4">
-                    {upcomingEvents.map((event, index) => (
-                      <div key={index} className="border-b pb-4 last:border-0">
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-medium text-sm">{event.title}</h4>
-                          <Badge variant={event.status === 'Published' ? 'default' : 'secondary'} className="text-xs">
-                            {event.status}
-                          </Badge>
-                        </div>
-                        <p className="text-xs text-muted-foreground mb-1">
-                          {event.date} • {event.time}
-                        </p>
-                        <p className="text-xs text-university-gold">
-                          {event.attendees} registered
-                        </p>
+                    {loadingEvents ? (
+                      <div className="text-center py-4">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-university-navy mx-auto"></div>
                       </div>
-                    ))}
+                    ) : events.filter(e => new Date(e.event_date) >= new Date()).length === 0 ? (
+                      <p className="text-xs text-muted-foreground text-center py-4">No upcoming events</p>
+                    ) : (
+                      events
+                        .filter(e => new Date(e.event_date) >= new Date())
+                        .slice(0, 3)
+                        .map((event, index) => (
+                        <div key={event.id || index} className="border-b pb-4 last:border-0">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-medium text-sm">{event.title}</h4>
+                            <Badge variant="default" className="text-xs">
+                              {event.status}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mb-1">
+                            {new Date(event.event_date).toLocaleDateString()}
+                            {event.event_time && ` • ${event.event_time}`}
+                            {event.venue && ` • ${event.venue}`}
+                          </p>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </Card>
               </div>
@@ -977,6 +1075,439 @@ const SocietyDashboard = () => {
                   </>
                 );
               })()}
+            </div>
+          )}
+
+          {activeTab === "posts" && (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <h2 className="text-xl md:text-2xl font-semibold text-university-navy">Society Posts</h2>
+                <Button 
+                  variant="university" 
+                  size="sm"
+                  onClick={() => navigate("/society/post/create", {
+                    state: {
+                      society_id: societyInfo?.society_id,
+                      society_name: societyInfo?.name
+                    }
+                  })}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Post
+                </Button>
+              </div>
+
+              {loadingPosts ? (
+                <div className="text-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-university-navy mx-auto mb-4"></div>
+                  <p className="text-muted-foreground">Loading posts...</p>
+                </div>
+              ) : posts.length === 0 ? (
+                <Card className="p-8 text-center shadow-card">
+                  <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="font-semibold text-university-navy mb-2">No Posts Yet</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Start engaging with your members by creating your first post!
+                  </p>
+                  <Button 
+                    variant="university"
+                    onClick={() => navigate("/society/post/create", {
+                      state: {
+                        society_id: societyInfo?.society_id,
+                        society_name: societyInfo?.name
+                      }
+                    })}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create First Post
+                  </Button>
+                </Card>
+              ) : (
+                <div className="space-y-6">
+                  {posts.map((post) => (
+                    <Card key={post.post_id} className="p-6 shadow-card">
+                      {/* Post Header */}
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center space-x-3">
+                          <Avatar>
+                            <AvatarFallback className="bg-university-navy text-white">
+                              {post.author_name ? post.author_name.charAt(0).toUpperCase() : 'A'}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <h4 className="font-semibold text-university-navy">
+                              {post.author_name || 'Anonymous'}
+                            </h4>
+                            <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+                              <Clock className="h-3 w-3" />
+                              <span>{new Date(post.created_at).toLocaleDateString()}</span>
+                              <Badge variant="outline" className="text-xs">
+                                {post.post_type}
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Post Content */}
+                      <div className="mb-4">
+                        <h3 className="font-semibold text-lg mb-2 text-university-navy">{post.title}</h3>
+                        
+                        {post.post_type === 'text' && (
+                          <p className="text-muted-foreground leading-relaxed">{post.content}</p>
+                        )}
+
+                        {post.post_type === 'photo' && post.media_files && post.media_files.length > 0 && (
+                          <div className="space-y-3">
+                            <p className="text-muted-foreground leading-relaxed">{post.content}</p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {post.media_files.map((file: any) => {
+                                let imageUrl = file.file_url;
+                                if (file.file_url && !file.file_url.startsWith('http')) {
+                                  imageUrl = `http://localhost:5000/${file.file_url.replace(/\\/g, '/').replace(/^.*?\/assets\//, 'assets/')}`;
+                                }
+                                return (
+                                  <img 
+                                    key={file.media_id}
+                                    src={imageUrl}
+                                    alt="Post"
+                                    className="w-full h-48 object-cover rounded-lg border"
+                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                  />
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {post.post_type === 'video' && post.media_files && post.media_files.length > 0 && (
+                          <div className="space-y-3">
+                            <p className="text-muted-foreground leading-relaxed">{post.content}</p>
+                            {post.media_files.map((file: any) => {
+                              let videoUrl = file.file_url;
+                              if (file.file_url && !file.file_url.startsWith('http')) {
+                                videoUrl = `http://localhost:5000/${file.file_url.replace(/\\/g, '/').replace(/^.*?\/assets\//, 'assets/')}`;
+                              }
+                              return (
+                                <video 
+                                  key={file.media_id}
+                                  src={videoUrl}
+                                  controls
+                                  className="w-full max-w-md rounded-lg border"
+                                />
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {post.post_type === 'document' && post.media_files && post.media_files.length > 0 && (
+                          <div className="space-y-3">
+                            <p className="text-muted-foreground leading-relaxed">{post.content}</p>
+                            {post.media_files.map((file: any) => {
+                              let fileUrl = file.file_url;
+                              if (file.file_url && !file.file_url.startsWith('http')) {
+                                fileUrl = `http://localhost:5000/${file.file_url.replace(/\\/g, '/').replace(/^.*?\/assets\//, 'assets/')}`;
+                              }
+                              return (
+                                <div key={file.media_id} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                                  <FileText className="h-5 w-5 text-university-navy" />
+                                  <span className="flex-1 text-sm text-muted-foreground truncate">
+                                    {file.file_url.split('/').pop()}
+                                  </span>
+                                  <Button size="sm" variant="outline" asChild>
+                                    <a href={fileUrl} target="_blank" rel="noopener noreferrer">
+                                      <Download className="h-3 w-3 mr-1" />
+                                      Download
+                                    </a>
+                                  </Button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {post.post_type === 'poll' && post.poll_data && (
+                          <div className="space-y-3">
+                            <p className="text-muted-foreground leading-relaxed font-medium">{post.poll_data.question || post.content}</p>
+                            {post.poll_data.options && post.poll_data.options.length > 0 && (() => {
+                              const totalVotes = post.poll_data.options.reduce((sum: number, option: any) => sum + (option.vote_count || 0), 0);
+                              const pollId = post.poll_data.poll_id || post.poll_id;
+                              
+                              return (
+                                <div className="space-y-3">
+                                  {post.poll_data.options.map((option: any) => {
+                                    const percentage = totalVotes > 0 ? ((option.vote_count || 0) / totalVotes) * 100 : 0;
+                                    const isVoted = option.user_voted || false;
+                                    
+                                    return (
+                                      <div 
+                                        key={option.option_id} 
+                                        className={`relative cursor-pointer rounded-lg border-2 p-3 transition-all duration-200 hover:bg-gray-50 ${
+                                          isVoted ? 'border-university-navy bg-university-navy/5' : 'border-gray-200 hover:border-gray-300'
+                                        }`}
+                                        onClick={() => {
+                                          const handlePollVote = async (postId: number, optionId: number, pollId: number) => {
+                                            try {
+                                              const token = localStorage.getItem("token");
+                                              if (!token) return;
+
+                                              const response = await axios.post(
+                                                'http://localhost:5000/user/poll/vote',
+                                                { option_id: optionId, poll_id: pollId },
+                                                {
+                                                  headers: {
+                                                    'Authorization': `Bearer ${token}`,
+                                                    'Content-Type': 'application/json'
+                                                  }
+                                                }
+                                              );
+
+                                              if (response.data.success && societyInfo?.society_id) {
+                                                const user = JSON.parse(localStorage.getItem("user") || "{}");
+                                                const userId = user.id || user.user_id;
+                                                fetchSocietyPosts(societyInfo.society_id);
+                                              }
+                                            } catch (error) {
+                                              console.error('Error voting on poll:', error);
+                                            }
+                                          };
+                                          handlePollVote(post.post_id, option.option_id, pollId);
+                                        }}
+                                      >
+                                        <div className="flex items-center justify-between mb-2">
+                                          <span className={`font-medium ${isVoted ? 'text-university-navy' : 'text-gray-900'}`}>
+                                            {option.option_text}
+                                          </span>
+                                          <div className="flex items-center space-x-2">
+                                            <span className="text-sm text-muted-foreground">
+                                              {option.vote_count || 0} {option.vote_count === 1 ? 'vote' : 'votes'}
+                                            </span>
+                                            {isVoted && (
+                                              <div className="w-2 h-2 bg-university-navy rounded-full"></div>
+                                            )}
+                                          </div>
+                                        </div>
+                                        <div className="relative">
+                                          <Progress 
+                                            value={percentage} 
+                                            className={`h-2 ${isVoted ? '[&>div]:bg-university-navy' : '[&>div]:bg-gray-300'}`} 
+                                          />
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                  <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
+                                    <div className="flex items-center space-x-2">
+                                      <BarChartIcon className="h-3 w-3" />
+                                      <span>{totalVotes} {totalVotes === 1 ? 'total vote' : 'total votes'}</span>
+                                    </div>
+                                    <span>{post.poll_data.options.length} {post.poll_data.options.length === 1 ? 'option' : 'options'}</span>
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Post Actions */}
+                      <div className="flex items-center space-x-6 pt-3 border-t border-gray-100">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className={`${post.is_liked_by_user === true || likedPosts[post.post_id] === true
+                            ? 'text-red-500 hover:text-red-600 bg-red-50 hover:bg-red-100' 
+                            : 'text-muted-foreground hover:text-university-navy hover:bg-university-navy/5'
+                          }`}
+                          onClick={() => handleLike(post.post_id)}
+                          disabled={likingPost === post.post_id}
+                        >
+                          {likingPost === post.post_id ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : post.is_liked_by_user === true || likedPosts[post.post_id] === true ? (
+                            <Heart className="h-4 w-4 mr-2 fill-current" />
+                          ) : (
+                            <ThumbsUp className="h-4 w-4 mr-2" />
+                          )}
+                          Like ({post.like_count || 0})
+                        </Button>
+                        
+                        <Dialog open={commentingOn === post.post_id} onOpenChange={(open) => {
+                          if (!open) {
+                            setCommentingOn(null);
+                            setNewComment("");
+                          } else {
+                            setCommentingOn(post.post_id);
+                          }
+                        }}>
+                          <DialogTrigger asChild>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="text-muted-foreground hover:text-university-navy hover:bg-university-navy/5"
+                            >
+                              <MessageCircle className="h-4 w-4 mr-2" />
+                              Comment ({post.comment_count || 0})
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="sm:max-w-2xl max-h-[80vh] flex flex-col">
+                            <DialogHeader>
+                              <DialogTitle>Comments ({post.comment_count || 0})</DialogTitle>
+                              <DialogDescription>
+                                Share your thoughts and see what others are saying.
+                              </DialogDescription>
+                            </DialogHeader>
+                            
+                            {/* Comments List */}
+                            <div className="flex-1 overflow-y-auto space-y-4 mb-4">
+                              {comments[post.post_id] && comments[post.post_id].length > 0 ? (
+                                comments[post.post_id].map((comment: any) => (
+                                  <div key={comment.id || comment.comment_id} className="flex space-x-3 p-3 bg-gray-50 rounded-lg">
+                                    <Avatar className="h-8 w-8">
+                                      <AvatarFallback className="bg-university-navy text-white text-xs">
+                                        {comment.author ? comment.author.split(' ').map((n: string) => n[0]).join('').toUpperCase() : 'U'}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center space-x-2 mb-1">
+                                        <span className="font-medium text-sm text-university-navy">
+                                          {comment.author || comment.commenter_name || 'Anonymous'}
+                                        </span>
+                                        <span className="text-xs text-muted-foreground">
+                                          {comment.created_at ? new Date(comment.created_at).toLocaleDateString('en-US', { 
+                                            month: 'short', 
+                                            day: 'numeric',
+                                            hour: '2-digit',
+                                            minute: '2-digit'
+                                          }) : ''}
+                                        </span>
+                                      </div>
+                                      <p className="text-sm text-gray-900 leading-relaxed">
+                                        {comment.text || comment.comment_text}
+                                      </p>
+                                    </div>
+                                  </div>
+                                ))
+                              ) : (
+                                <div className="text-center py-8 text-muted-foreground">
+                                  <MessageCircle className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                                  <p>No comments yet. Be the first to comment!</p>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Add Comment Section */}
+                            <div className="border-t pt-4">
+                              <div className="space-y-3">
+                                <Textarea
+                                  placeholder="Write your comment..."
+                                  value={newComment}
+                                  onChange={(e) => setNewComment(e.target.value)}
+                                  className="min-h-[80px] resize-none"
+                                />
+                                <div className="flex justify-between items-center">
+                                  <span className="text-xs text-muted-foreground">
+                                    {newComment.length}/500 characters
+                                  </span>
+                                  <div className="flex space-x-2">
+                                    <Button 
+                                      variant="outline" 
+                                      onClick={() => {
+                                        setCommentingOn(null);
+                                        setNewComment("");
+                                      }}
+                                    >
+                                      Cancel
+                                    </Button>
+                                    <Button 
+                                      onClick={() => handleComment(post.post_id)}
+                                      disabled={!newComment.trim() || submittingComment || newComment.length > 500}
+                                    >
+                                      {submittingComment ? (
+                                        <>
+                                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                          Posting...
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Send className="h-4 w-4 mr-2" />
+                                          Post Comment
+                                        </>
+                                      )}
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === "events" && (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <h2 className="text-xl md:text-2xl font-semibold text-university-navy">Society Events</h2>
+              </div>
+
+              {loadingEvents ? (
+                <div className="text-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-university-navy mx-auto mb-4"></div>
+                  <p className="text-muted-foreground">Loading events...</p>
+                </div>
+              ) : events.length === 0 ? (
+                <Card className="p-8 text-center shadow-card">
+                  <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="font-semibold text-university-navy mb-2">No Events Yet</h3>
+                  <p className="text-muted-foreground">
+                    No events have been created for this society yet.
+                  </p>
+                </Card>
+              ) : (
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {events.map((event) => (
+                    <Card key={event.id} className="p-6 shadow-card">
+                      <div className="flex items-start justify-between mb-3">
+                        <h3 className="font-semibold text-lg text-university-navy flex-1">{event.title}</h3>
+                        <Badge variant="default" className="text-xs">
+                          {event.status}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground mb-4 line-clamp-3">
+                        {event.description}
+                      </p>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex items-center text-muted-foreground">
+                          <Calendar className="h-4 w-4 mr-2" />
+                          <span>{new Date(event.event_date).toLocaleDateString('en-US', { 
+                            weekday: 'short',
+                            year: 'numeric', 
+                            month: 'short', 
+                            day: 'numeric' 
+                          })}</span>
+                        </div>
+                        {event.event_time && (
+                          <div className="flex items-center text-muted-foreground">
+                            <Clock className="h-4 w-4 mr-2" />
+                            <span>{event.event_time}</span>
+                          </div>
+                        )}
+                        {event.venue && (
+                          <div className="flex items-center text-muted-foreground">
+                            <MapPin className="h-4 w-4 mr-2" />
+                            <span>{event.venue}</span>
+                          </div>
+                        )}
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

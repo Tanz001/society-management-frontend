@@ -28,7 +28,7 @@ export function MobileSidebar({ children, trigger, className }: MobileSidebarPro
           </Button>
         )}
       </SheetTrigger>
-      <SheetContent side="left" className="w-[280px] sm:w-[320px] p-0">
+      <SheetContent side="left" className="w-[280px] sm:w-[320px] p-0 [&>button]:hidden">
         <div className="flex flex-col h-full">
           <div className="flex items-center justify-between p-4 border-b">
             <h2 className="text-lg font-semibold text-university-navy">Menu</h2>
