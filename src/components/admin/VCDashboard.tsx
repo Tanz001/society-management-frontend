@@ -20,7 +20,8 @@ import {
   Award,
   Crown,
   Edit,
-  MapPin
+  MapPin,
+  Download
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -76,6 +77,10 @@ const VCDashboard = () => {
   const [isEventStatusModalOpen, setIsEventStatusModalOpen] = useState(false);
   const [eventStatusNote, setEventStatusNote] = useState("");
   const [selectedEventStatus, setSelectedEventStatus] = useState<number>(0);
+  const [eventReports, setEventReports] = useState<any[]>([]);
+  const [loadingEventReports, setLoadingEventReports] = useState(false);
+  const [selectedReport, setSelectedReport] = useState<any | null>(null);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
   // Get current user info
   const getCurrentUser = () => {
@@ -132,6 +137,9 @@ const fetchSocietiesForVC = async () => {
       setSelectedSociety(response.data.data);
       setIsModalOpen(true);
       setReviewNote("");
+      
+      // Fetch allowed statuses based on the society's current status
+      await fetchStatuses(society.status_id);
     } catch (err: any) {
       console.error("Error fetching society details:", err);
       setError(err.response?.data?.message || "Failed to fetch society details");
@@ -190,12 +198,14 @@ const fetchSocietiesForVC = async () => {
   };
 
   // Fetch all statuses
-  const fetchStatuses = async () => {
+  // Fetch allowed statuses for VC based on current status
+  const fetchStatuses = async (currentStatusId: number = 6) => {
     try {
       const token = localStorage.getItem("token");
       if (!token) return;
 
-      const response = await axios.get("http://localhost:5000/admin/statuses", {
+      // VC can only set status 8 (Approve) or 9 (Reject) from status 6 (Approved by Registrar)
+      const response = await axios.get(`http://localhost:5000/admin/allowed-statuses?role=vc&current_status_id=${currentStatusId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -259,11 +269,13 @@ const fetchSocietiesForVC = async () => {
   };
 
   // Handle open event status change modal
-  const handleChangeEventStatus = (request: any) => {
+  const handleChangeEventStatus = async (request: any) => {
     setSelectedEventRequest(request);
-    setSelectedEventStatus(request.status_id);
+    setSelectedEventStatus(0); // Reset selection
     setEventStatusNote(request.note || "");
     setIsEventStatusModalOpen(true);
+    // Fetch allowed statuses based on the request's current status
+    await fetchStatuses(request.status_id);
   };
 
   // Handle event request status update
@@ -279,10 +291,12 @@ const fetchSocietiesForVC = async () => {
         throw new Error("User information not found");
       }
 
+      // VC can only approve (8) or reject (9) event requests
+      const action = selectedEventStatus === 8 ? 'approve' : 'reject';
       const response = await axios.put(
-        `http://localhost:5000/admin/event-requests/${selectedEventRequest.req_id}/status`,
+        `http://localhost:5000/admin/vc/event-requests/${selectedEventRequest.req_id}/review`,
         {
-          status_id: selectedEventStatus,
+          action,
           note: eventStatusNote,
           changed_by: currentUser.id
         },
@@ -323,8 +337,61 @@ const fetchSocietiesForVC = async () => {
   useEffect(() => {
     if (activeTab === "event-requests") {
       fetchAllEventRequests();
+    } else if (activeTab === "event-reports") {
+      fetchAllEventReports();
     }
   }, [activeTab]);
+
+  // Fetch all event reports
+  const fetchAllEventReports = async () => {
+    try {
+      setLoadingEventReports(true);
+      setError("");
+  
+      const token = localStorage.getItem("token");
+  
+      if (!token) {
+        throw new Error("No authentication token found");
+      }
+  
+      const response = await axios.get(
+        "http://localhost:5000/admin/event-reports",
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+  
+      console.log("Event reports fetched:", response.data);
+      setEventReports(response.data.data || []);
+    } catch (err: any) {
+      console.error("Error fetching event reports:", err);
+      setError(err.response?.data?.message || err.message || "Failed to fetch event reports");
+    } finally {
+      setLoadingEventReports(false);
+    }
+  };
+
+  // Handle view report details
+  const handleViewReport = async (reportId: number) => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem("token");
+      
+      const response = await axios.get(`http://localhost:5000/admin/event-reports/${reportId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      setSelectedReport(response.data.data);
+      setIsReportModalOpen(true);
+    } catch (err: any) {
+      console.error("Error fetching report details:", err);
+      setError(err.response?.data?.message || "Failed to fetch report details");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Logout function
   const handleLogout = () => {
@@ -410,6 +477,7 @@ const fetchSocietiesForVC = async () => {
             <TabsList className="mb-6">
               <TabsTrigger value="overview">Societies</TabsTrigger>
               <TabsTrigger value="event-requests">Event Requests</TabsTrigger>
+              <TabsTrigger value="event-reports">Event Reports</TabsTrigger>
             </TabsList>
 
             {/* Societies Tab */}
@@ -483,15 +551,22 @@ const fetchSocietiesForVC = async () => {
                       </div>
                     </div>
                     <div className="flex space-x-2 ml-4">
-                      <Button 
-                        size="sm" 
-                        variant="university"
-                        onClick={() => handleReviewClick(society)}
-                        disabled={loading}
-                      >
-                        <Eye className="h-3 w-3 mr-1" />
-                        Final Review
-                      </Button>
+                      {/* Only show Review button for Approved by Registrar (status 6) - VC's pending items */}
+                      {society.status_id === 6 ? (
+                        <Button 
+                          size="sm" 
+                          variant="university"
+                          onClick={() => handleReviewClick(society)}
+                          disabled={loading}
+                        >
+                          <Eye className="h-3 w-3 mr-1" />
+                          Final Review
+                        </Button>
+                      ) : (
+                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                          Tracked: {society.status_name}
+                        </Badge>
+                      )}
                     </div>
                   </div>
                 </Card>
@@ -573,15 +648,22 @@ const fetchSocietiesForVC = async () => {
                             <Eye className="h-3 w-3 mr-1" />
                             View Details
                           </Button>
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            onClick={() => handleChangeEventStatus(request)}
-                            disabled={loading}
-                          >
-                            <Edit className="h-3 w-3 mr-1" />
-                            Update Status
-                          </Button>
+                          {/* Only show Update Status button for Approved by Registrar (status 6) - VC's pending items */}
+                          {request.status_id === 6 ? (
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => handleChangeEventStatus(request)}
+                              disabled={loading}
+                            >
+                              <Edit className="h-3 w-3 mr-1" />
+                              Update Status
+                            </Button>
+                          ) : (
+                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-center">
+                              Tracked: {request.status_name}
+                            </Badge>
+                          )}
                         </div>
                       </div>
                     </Card>
@@ -597,9 +679,305 @@ const fetchSocietiesForVC = async () => {
                 </div>
               )}
             </TabsContent>
+
+            {/* Event Reports Tab */}
+            <TabsContent value="event-reports">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-semibold text-university-navy">Event Reports</h2>
+                <Button 
+                  variant="outline" 
+                  onClick={fetchAllEventReports}
+                  disabled={loadingEventReports}
+                >
+                  {loadingEventReports ? "Loading..." : "Refresh"}
+                </Button>
+              </div>
+
+              {loadingEventReports && eventReports.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-university-navy mx-auto mb-4"></div>
+                  <p className="text-muted-foreground">Loading event reports...</p>
+                </div>
+              ) : eventReports.length > 0 ? (
+                <div className="grid gap-6">
+                  {eventReports.map((report) => (
+                    <Card key={report.report_id} className="p-6 shadow-card hover:shadow-lg transition-shadow border-l-4 border-l-university-gold">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center mb-3 flex-wrap gap-2">
+                            <h3 className="text-xl font-semibold text-university-navy">{report.report_title}</h3>
+                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                              <FileText className="h-3 w-3 mr-1" />
+                              Report Submitted
+                            </Badge>
+                          </div>
+                          
+                          {report.report_description && (
+                            <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+                              {report.report_description}
+                            </p>
+                          )}
+
+                          <div className="grid md:grid-cols-2 gap-4 mb-4">
+                            <div className="space-y-2">
+                              <div className="flex items-center text-sm">
+                                <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
+                                <span className="text-muted-foreground">Event: </span>
+                                <span className="font-medium ml-1">{report.event_title}</span>
+                              </div>
+                              <div className="flex items-center text-sm">
+                                <Building className="h-4 w-4 mr-2 text-muted-foreground" />
+                                <span className="text-muted-foreground">Society: </span>
+                                <span className="font-medium ml-1">{report.society_name}</span>
+                              </div>
+                              {report.event_date && (
+                                <div className="flex items-center text-sm">
+                                  <Clock className="h-4 w-4 mr-2 text-muted-foreground" />
+                                  <span className="text-muted-foreground">Event Date: </span>
+                                  <span className="font-medium ml-1">{new Date(report.event_date).toLocaleDateString()}</span>
+                                </div>
+                              )}
+                            </div>
+                            <div className="space-y-2">
+                              <div className="flex items-center text-sm">
+                                <Users className="h-4 w-4 mr-2 text-muted-foreground" />
+                                <span className="text-muted-foreground">Submitted by: </span>
+                                <span className="font-medium ml-1">{report.firstName} {report.lastName}</span>
+                              </div>
+                              {report.RollNO && (
+                                <div className="flex items-center text-sm">
+                                  <FileText className="h-4 w-4 mr-2 text-muted-foreground" />
+                                  <span className="text-muted-foreground">Roll No: </span>
+                                  <span className="font-medium ml-1">{report.RollNO}</span>
+                                </div>
+                              )}
+                              <div className="flex items-center text-sm">
+                                <Clock className="h-4 w-4 mr-2 text-muted-foreground" />
+                                <span className="text-muted-foreground">Submitted: </span>
+                                <span className="font-medium ml-1">{new Date(report.submitted_at).toLocaleDateString()}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex flex-col space-y-2 ml-4">
+                          <Button 
+                            size="sm" 
+                            variant="university"
+                            onClick={() => handleViewReport(report.report_id)}
+                            disabled={loading}
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            View Report
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => {
+                              window.open(`http://localhost:5000/${report.report_file}`, '_blank');
+                            }}
+                          >
+                            <FileText className="h-4 w-4 mr-2" />
+                            Download
+                          </Button>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <h3 className="text-lg font-medium mb-2">No Event Reports Found</h3>
+                  <p className="text-muted-foreground">
+                    No event reports have been submitted yet.
+                  </p>
+                </div>
+              )}
+            </TabsContent>
           </Tabs>
         </div>
       </section>
+
+      {/* Event Report Detail Modal */}
+      <Dialog open={isReportModalOpen} onOpenChange={setIsReportModalOpen}>
+        <DialogContent className="max-w-4xl h-[95vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-university-navy">Event Report Details</DialogTitle>
+            <DialogDescription>
+              Complete information about the submitted event report
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedReport && (
+            <div className="space-y-6 overflow-y-auto h-full">
+              {/* Header Section */}
+              <div className="gradient-primary text-white p-6 rounded-lg">
+                <div className="flex items-start space-x-4">
+                  <div className="w-20 h-20 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <FileText className="h-12 w-12 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center mb-2 flex-wrap gap-2">
+                      <Badge variant="secondary" className="bg-white/20 text-white">
+                        {selectedReport.event_status}
+                      </Badge>
+                      {selectedReport.society_name && (
+                        <Badge variant="outline" className="text-white border-white">
+                          {selectedReport.society_name}
+                        </Badge>
+                      )}
+                    </div>
+                    <h2 className="text-2xl font-bold mb-2">{selectedReport.report_title}</h2>
+                    <p className="text-white/90 mb-4">{selectedReport.event_title}</p>
+                    <div className="flex items-center flex-wrap gap-4 text-sm">
+                      <div className="flex items-center space-x-1">
+                        <Calendar className="h-4 w-4" />
+                        <span>{selectedReport.event_date ? new Date(selectedReport.event_date).toLocaleDateString() : 'N/A'}</span>
+                      </div>
+                      {selectedReport.event_time && (
+                        <div className="flex items-center space-x-1">
+                          <Clock className="h-4 w-4" />
+                          <span>{selectedReport.event_time}</span>
+                        </div>
+                      )}
+                      {selectedReport.venue && (
+                        <div className="flex items-center space-x-1">
+                          <MapPin className="h-4 w-4" />
+                          <span>{selectedReport.venue}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Report Information */}
+              <div className="grid md:grid-cols-2 gap-4">
+                <Card className="p-4">
+                  <h3 className="font-semibold mb-3 text-university-navy">Report Information</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Report Title:</span>
+                      <span className="font-medium">{selectedReport.report_title}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Submitted:</span>
+                      <span className="font-medium">{new Date(selectedReport.submitted_at).toLocaleString()}</span>
+                    </div>
+                    {selectedReport.updated_at && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Last Updated:</span>
+                        <span className="font-medium">{new Date(selectedReport.updated_at).toLocaleString()}</span>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+
+                <Card className="p-4">
+                  <h3 className="font-semibold mb-3 text-university-navy">Submitted By</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Name:</span>
+                      <span className="font-medium">
+                        {selectedReport.firstName} {selectedReport.lastName}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Email:</span>
+                      <span className="font-medium">{selectedReport.email}</span>
+                    </div>
+                    {selectedReport.RollNO && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Roll No:</span>
+                        <span className="font-medium">{selectedReport.RollNO}</span>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              </div>
+
+              {/* Report Description */}
+              {selectedReport.report_description && (
+                <Card className="p-4">
+                  <h3 className="font-semibold mb-3 text-university-navy">Report Description</h3>
+                  <p className="text-muted-foreground leading-relaxed">{selectedReport.report_description}</p>
+                </Card>
+              )}
+
+              {/* Event Details */}
+              <Card className="p-4">
+                <h3 className="font-semibold mb-3 text-university-navy">Event Details</h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Event Title:</span>
+                    <span className="font-medium">{selectedReport.event_title}</span>
+                  </div>
+                  {selectedReport.event_description && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Description:</span>
+                      <span className="font-medium">{selectedReport.event_description}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Event Date:</span>
+                    <span className="font-medium">{selectedReport.event_date ? new Date(selectedReport.event_date).toLocaleDateString() : 'N/A'}</span>
+                  </div>
+                  {selectedReport.event_time && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Event Time:</span>
+                      <span className="font-medium">{selectedReport.event_time}</span>
+                    </div>
+                  )}
+                  {selectedReport.venue && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Venue:</span>
+                      <span className="font-medium">{selectedReport.venue}</span>
+                    </div>
+                  )}
+                  {selectedReport.society_name && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Society:</span>
+                      <span className="font-medium">{selectedReport.society_name}</span>
+                    </div>
+                  )}
+                </div>
+              </Card>
+
+              {/* Report File */}
+              <Card className="p-4 bg-blue-50 border-blue-200">
+                <h3 className="font-semibold mb-3 text-university-navy">Report File</h3>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <FileText className="h-8 w-8 text-blue-600" />
+                    <div>
+                      <p className="font-medium text-university-navy">
+                        {selectedReport.report_file.split('/').pop()}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Click download to view the full report</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="university"
+                    onClick={() => {
+                      window.open(`http://localhost:5000/${selectedReport.report_file}`, '_blank');
+                    }}
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    Download Report
+                  </Button>
+                </div>
+              </Card>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end space-x-3 pt-4 border-t">
+                <Button variant="outline" onClick={() => setIsReportModalOpen(false)}>
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Society Review Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>

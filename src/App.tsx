@@ -13,6 +13,8 @@ import SocietyDashboard from "@/components/society/SocietyDashboard";
 import CreatePost from "@/components/society/CreatePost";
 import AdminDashboard from "@/components/admin/AdminDashboard";
 import BoardDashboard from "@/components/admin/BoardDashboard";
+import BoardSecretaryDashboard from "@/components/admin/BoardSecretaryDashboard";
+import BoardPresidentDashboard from "@/components/admin/BoardPresidentDashboard";
 import RegistrarDashboard from "@/components/admin/RegistrarDashboard";
 import VCDashboard from "@/components/admin/VCDashboard";
 import NotFound from "./pages/NotFound";
@@ -104,6 +106,18 @@ const App = () => (
           <Route path="/dashboard/admin/board" element={
             <ProtectedRoute requireAuth>
               <BoardDashboard />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/dashboard/admin/board-secretary" element={
+            <ProtectedRoute requireAuth>
+              <BoardSecretaryDashboard />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/dashboard/admin/board-president" element={
+            <ProtectedRoute requireAuth>
+              <BoardPresidentDashboard />
             </ProtectedRoute>
           } />
           

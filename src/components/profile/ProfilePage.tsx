@@ -21,6 +21,7 @@ import {
   XCircle,
   AlertCircle,
   User,
+  ArrowLeft,
 } from "lucide-react";
 
 const ProfilePage = () => {
@@ -220,6 +221,16 @@ const ProfilePage = () => {
       {/* Header */}
       <header className="gradient-primary text-white py-4 md:py-8 px-4">
         <div className="container mx-auto max-w-6xl">
+          <div className="flex items-center justify-start mb-4 md:mb-6">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-white hover:bg-white/20"
+              onClick={() => navigate(-1)}
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+          </div>
           <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6">
             <Avatar className="h-16 w-16 md:h-24 md:w-24">
               <AvatarImage src={studentInfo.avatar || ""} />

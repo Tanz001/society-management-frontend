@@ -46,6 +46,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import EventRequestForm from "./EventRequestForm";
 import EventRequestsList from "./EventRequestsList";
+import EventReportUpload from "./EventReportUpload";
 
 const SocietyDashboard = () => {
   const [activeTab, setActiveTab] = useState("overview");
@@ -69,6 +70,8 @@ const SocietyDashboard = () => {
   const [newComment, setNewComment] = useState("");
   const [submittingComment, setSubmittingComment] = useState(false);
   const [comments, setComments] = useState<{[key: number]: any[]}>({});
+  const [selectedEventForReport, setSelectedEventForReport] = useState<{id: number, title: string} | null>(null);
+  const [isReportUploadOpen, setIsReportUploadOpen] = useState(false);
 
   // Logout function
   const handleLogout = () => {
@@ -371,7 +374,31 @@ const SocietyDashboard = () => {
       );
 
       if (response.data.success) {
-        setEvents(response.data.events || []);
+        const responseEvents = response.data.events || [];
+
+        const transformedEvents = responseEvents.map((event: any) => {
+          // For backward compatibility: some endpoints return `source_table`
+          // If that's missing, infer based on available fields
+          const sourceTable = event.source_table || (event.event_time !== null || event.event_time !== undefined ? 'event_req' : 'events');
+
+          let statusId = event.status_id;
+          let statusName = event.status_name;
+
+          // If coming from `events` table, ensure status defaults to 10/Complete
+          if (sourceTable === 'events') {
+            statusId = statusId ?? 10;
+            statusName = statusName ?? 'Active';
+          }
+
+          return {
+            ...event,
+            source_table: sourceTable,
+            status_id: statusId,
+            status_name: statusName,
+          };
+        });
+
+        setEvents(transformedEvents);
       }
     } catch (error) {
       console.error("Error fetching events:", error);
@@ -1471,17 +1498,20 @@ const SocietyDashboard = () => {
               ) : (
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {events.map((event) => (
-                    <Card key={event.id} className="p-6 shadow-card">
+                    <Card key={event.id} className="p-6 shadow-card hover:shadow-lg transition-shadow">
                       <div className="flex items-start justify-between mb-3">
                         <h3 className="font-semibold text-lg text-university-navy flex-1">{event.title}</h3>
-                        <Badge variant="default" className="text-xs">
-                          {event.status}
+                        <Badge 
+                          variant={event.status_id === 11 ? "default" : event.status_id === 10 ? "secondary" : "outline"} 
+                          className="text-xs"
+                        >
+                          {event.status_name || event.status}
                         </Badge>
                       </div>
                       <p className="text-sm text-muted-foreground mb-4 line-clamp-3">
                         {event.description}
                       </p>
-                      <div className="space-y-2 text-sm">
+                      <div className="space-y-2 text-sm mb-4">
                         <div className="flex items-center text-muted-foreground">
                           <Calendar className="h-4 w-4 mr-2" />
                           <span>{new Date(event.event_date).toLocaleDateString('en-US', { 
@@ -1504,6 +1534,27 @@ const SocietyDashboard = () => {
                           </div>
                         )}
                       </div>
+                      {/* Complete Event Button - Only show for Active events (status_id = 10) */}
+                      {event.status_id === 10 && event.source_table === 'event_req' && (
+                        <Button
+                          variant="university"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => {
+                            setSelectedEventForReport({ id: event.id, title: event.title });
+                            setIsReportUploadOpen(true);
+                          }}
+                        >
+                          <FileText className="h-4 w-4 mr-2" />
+                          Complete Event
+                        </Button>
+                      )}
+                      {event.status_id === 11 && (
+                        <div className="flex items-center justify-center text-sm text-green-600 bg-green-50 rounded-lg p-2">
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          Report Submitted
+                        </div>
+                      )}
                     </Card>
                   ))}
                 </div>
@@ -1664,6 +1715,25 @@ const SocietyDashboard = () => {
           )}
         </div>
       </section>
+
+      {/* Event Report Upload Dialog */}
+      {selectedEventForReport && (
+        <EventReportUpload
+          eventId={selectedEventForReport.id}
+          eventTitle={selectedEventForReport.title}
+          isOpen={isReportUploadOpen}
+          onClose={() => {
+            setIsReportUploadOpen(false);
+            setSelectedEventForReport(null);
+          }}
+          onSuccess={() => {
+            // Refresh events list after successful upload
+            if (societyInfo?.society_id) {
+              fetchSocietyEvents(societyInfo.society_id);
+            }
+          }}
+        />
+      )}
     </div>
   );
 };

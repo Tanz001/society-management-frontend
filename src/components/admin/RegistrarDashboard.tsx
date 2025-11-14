@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import AdminEventReportsSection from "@/components/admin/AdminEventReportsSection";
 import { 
   Users, 
   Building, 
@@ -37,6 +38,7 @@ interface Society {
   advisor: string;
   purpose: string;
   society_logo: string;
+  logo_path?: string;
   cover_photo: string;
   status_id: number;
   status_name: string;
@@ -128,12 +130,14 @@ const RegistrarDashboard = () => {
   };
   
   // Fetch all statuses
-  const fetchStatuses = async () => {
+  // Fetch allowed statuses for Registrar based on current status
+  const fetchStatuses = async (currentStatusId: number = 4) => {
     try {
       const token = localStorage.getItem("token");
       if (!token) return;
 
-      const response = await axios.get("http://localhost:5000/admin/statuses", {
+      // Registrar can only set status 6 (Approve) or 7 (Reject) from status 4 (Approved by Board President)
+      const response = await axios.get(`http://localhost:5000/admin/allowed-statuses?role=registrar&current_status_id=${currentStatusId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -157,6 +161,9 @@ const RegistrarDashboard = () => {
       setSelectedSociety(response.data.data);
       setIsModalOpen(true);
       setReviewNote("");
+      
+      // Fetch allowed statuses based on the society's current status
+      await fetchStatuses(society.status_id);
     } catch (err: any) {
       console.error("Error fetching society details:", err);
       setError(err.response?.data?.message || "Failed to fetch society details");
@@ -166,11 +173,13 @@ const RegistrarDashboard = () => {
   };
 
   // Handle open status change modal
-  const handleChangeStatus = (society: Society) => {
+  const handleChangeStatus = async (society: Society) => {
     setSelectedSociety(society);
-    setSelectedStatus(society.status_id);
+    setSelectedStatus(0); // Reset selection
     setStatusNote("");
     setIsStatusModalOpen(true);
+    // Fetch allowed statuses based on the society's current status
+    await fetchStatuses(society.status_id);
   };
 
   // Handle status update
@@ -313,11 +322,13 @@ const RegistrarDashboard = () => {
   };
 
   // Handle open event status change modal
-  const handleChangeEventStatus = (request: any) => {
+  const handleChangeEventStatus = async (request: any) => {
     setSelectedEventRequest(request);
-    setSelectedEventStatus(request.status_id);
+    setSelectedEventStatus(0); // Reset selection
     setEventStatusNote(request.note || "");
     setIsEventStatusModalOpen(true);
+    // Fetch allowed statuses based on the request's current status
+    await fetchStatuses(request.status_id);
   };
 
   // Handle event request status update
@@ -333,10 +344,12 @@ const RegistrarDashboard = () => {
         throw new Error("User information not found");
       }
 
+      // Registrar can only approve (6) or reject (7) event requests
+      const action = selectedEventStatus === 6 ? 'approve' : 'reject';
       const response = await axios.put(
-        `http://localhost:5000/admin/event-requests/${selectedEventRequest.req_id}/status`,
+        `http://localhost:5000/admin/registrar/event-requests/${selectedEventRequest.req_id}/review`,
         {
-          status_id: selectedEventStatus,
+          action,
           note: eventStatusNote,
           changed_by: currentUser.id
         },
@@ -434,10 +447,11 @@ const RegistrarDashboard = () => {
       <section className="py-8 px-4">
         <div className="container mx-auto max-w-7xl">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="societies">All Societies</TabsTrigger>
             <TabsTrigger value="event-requests">Event Requests</TabsTrigger>
+            <TabsTrigger value="event-reports">Event Reports</TabsTrigger>
           </TabsList>
 
             <TabsContent value="overview" className="space-y-6">
@@ -523,6 +537,10 @@ const RegistrarDashboard = () => {
                   </Button>
                 </div>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="event-reports">
+              <AdminEventReportsSection isActive={activeTab === "event-reports"} />
             </TabsContent>
 
             <TabsContent value="societies" className="space-y-6">
@@ -679,15 +697,22 @@ const RegistrarDashboard = () => {
                             <Eye className="h-3 w-3 mr-1" />
                             View Details
                           </Button>
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            onClick={() => handleChangeStatus(society)}
-                            disabled={loading}
-                          >
-                            <Edit className="h-3 w-3 mr-1" />
-                            Change Status
-                          </Button>
+                          {/* Only show Change Status button for Approved by Board President (status 4) - Registrar's pending items */}
+                          {society.status_id === 4 ? (
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => handleChangeStatus(society)}
+                              disabled={loading}
+                            >
+                              <Edit className="h-3 w-3 mr-1" />
+                              Change Status
+                            </Button>
+                          ) : (
+                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                              Tracked: {society.status_name}
+                            </Badge>
+                          )}
                         </div>
                       </div>
                     </Card>
@@ -837,15 +862,22 @@ const RegistrarDashboard = () => {
                             <Eye className="h-3 w-3 mr-1" />
                             View Details
                           </Button>
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            onClick={() => handleChangeEventStatus(request)}
-                            disabled={loading}
-                          >
-                            <Edit className="h-3 w-3 mr-1" />
-                            Update Status
-                          </Button>
+                          {/* Only show Update Status button for Approved by Board President (status 4) - Registrar's pending items */}
+                          {request.status_id === 4 ? (
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => handleChangeEventStatus(request)}
+                              disabled={loading}
+                            >
+                              <Edit className="h-3 w-3 mr-1" />
+                              Update Status
+                            </Button>
+                          ) : (
+                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-center">
+                              Tracked: {request.status_name}
+                            </Badge>
+                          )}
                         </div>
                       </div>
                     </Card>

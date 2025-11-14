@@ -35,33 +35,38 @@ const LoginForm = ({ userType }: LoginFormProps) => {
         console.log("User admin status:", userData.admin);
         console.log("User society owner status:", userData.society_owner);
         
+        // Check role_name for routing (more reliable than role_id)
         if (userData.admin === 1) {
-          // Normalize role to handle case sensitivity and whitespace
-          const normalizedRole = userData.role ? String(userData.role).trim().toLowerCase() : null;
-          console.log("User is admin with role:", normalizedRole);
-          // Redirect based on admin role
-          switch(normalizedRole) {
-            case 'society_board':
-              console.log("Redirecting to Society Board dashboard");
-              navigate("/dashboard/admin/board");
-              break;
-            case 'registrar':
-              console.log("Redirecting to Registrar dashboard");
-              navigate("/dashboard/admin/registrar");
-              break;
-            case 'vc':
-            case 'vice_chancellor':
-              console.log("Redirecting to VC dashboard");
-              navigate("/dashboard/admin/vc");
-              break;
-            default:
-              console.warn("⚠️ Unknown admin role in stored session. Role value:", normalizedRole);
-              navigate("/dashboard/admin");
-              break;
+          const roleName = userData.role_name ? String(userData.role_name).trim().toLowerCase() : null;
+          const roleId = userData.role_id;
+          console.log("User is admin with role_id:", roleId, "role_name:", roleName);
+          
+          // Redirect based on role_name (from roles table)
+          if (roleName === 'board_secretary') {
+            console.log("Redirecting to Board Secretary dashboard");
+            navigate("/dashboard/admin/board-secretary");
+          } else if (roleName === 'board_president') {
+            console.log("Redirecting to Board President dashboard");
+            navigate("/dashboard/admin/board-president");
+          } else if (roleName === 'registrar') {
+            console.log("Redirecting to Registrar dashboard");
+            navigate("/dashboard/admin/registrar");
+          } else if (roleName === 'vc' || roleName === 'vice_chancellor') {
+            console.log("Redirecting to VC dashboard");
+            navigate("/dashboard/admin/vc");
+          } else if (roleName === 'admin') {
+            console.log("Redirecting to Admin dashboard");
+            navigate("/dashboard/admin");
+          } else {
+            console.warn("⚠️ Unknown admin role. Role ID:", roleId, "Role name:", roleName);
+            navigate("/dashboard/admin");
           }
         } else if (userData.society_owner === 1) {
           console.log("User is society owner, redirecting to society dashboard");
           navigate("/dashboard/society");
+        } else if (userData.role_name === 'advisor') {
+          console.log("User is advisor, redirecting to advisor dashboard");
+          navigate("/dashboard/student"); // Or create advisor dashboard if needed
         } else {
           console.log("User is student, redirecting to student dashboard");
           navigate("/dashboard/student");
@@ -112,36 +117,38 @@ const handleSubmit = async (e: React.FormEvent) => {
     console.log("User society owner status:", userData.society_owner);
     console.log("All userData keys:", Object.keys(userData));
     
+    // Check role_name for routing (more reliable than role_id)
     if (userData.admin === 1) {
-      // Normalize role to handle case sensitivity and whitespace
-      const normalizedRole = userData.role ? String(userData.role).trim().toLowerCase() : null;
-      console.log("Normalized role:", normalizedRole);
-      console.log("User is admin with role:", normalizedRole);
+      const roleName = userData.role_name ? String(userData.role_name).trim().toLowerCase() : null;
+      const roleId = userData.role_id;
+      console.log("User is admin with role_id:", roleId, "role_name:", roleName);
       
-      // Redirect based on admin role
-      switch(normalizedRole) {
-        case 'society_board':
-          console.log("Redirecting to Society Board dashboard");
-          navigate("/dashboard/admin/board");
-          break;
-        case 'registrar':
-          console.log("Redirecting to Registrar dashboard");
-          navigate("/dashboard/admin/registrar");
-          break;
-        case 'vc':
-        case 'vice_chancellor':
-          console.log("Redirecting to VC dashboard");
-          navigate("/dashboard/admin/vc");
-          break;
-        default:
-          console.warn("⚠️ Unknown admin role! Role value:", normalizedRole, "| Original value:", userData.role);
-          console.warn("⚠️ Redirecting to general admin dashboard. Please check backend response.");
-          navigate("/dashboard/admin");
-          break;
+      // Redirect based on role_name (from roles table)
+      if (roleName === 'board_secretary') {
+        console.log("Redirecting to Board Secretary dashboard");
+        navigate("/dashboard/admin/board-secretary");
+      } else if (roleName === 'board_president') {
+        console.log("Redirecting to Board President dashboard");
+        navigate("/dashboard/admin/board-president");
+      } else if (roleName === 'registrar') {
+        console.log("Redirecting to Registrar dashboard");
+        navigate("/dashboard/admin/registrar");
+      } else if (roleName === 'vc' || roleName === 'vice_chancellor') {
+        console.log("Redirecting to VC dashboard");
+        navigate("/dashboard/admin/vc");
+      } else if (roleName === 'admin') {
+        console.log("Redirecting to Admin dashboard");
+        navigate("/dashboard/admin");
+      } else {
+        console.warn("⚠️ Unknown admin role. Role ID:", roleId, "Role name:", roleName);
+        navigate("/dashboard/admin");
       }
     } else if (userData.society_owner === 1) {
       console.log("User is society owner, redirecting to society dashboard");
       navigate("/dashboard/society");
+    } else if (userData.role_name === 'advisor') {
+      console.log("User is advisor, redirecting to advisor dashboard");
+      navigate("/dashboard/student"); // Or create advisor dashboard if needed
     } else {
       console.log("User is student, redirecting to student dashboard");
       navigate("/dashboard/student");
@@ -183,11 +190,13 @@ const handleSubmit = async (e: React.FormEvent) => {
   const config = userTypeConfig[userType];
 
   return (
-    <Card className="p-6 shadow-card">
+    <Card className="p-8 shadow-lg border-2 border-gray-100 hover:shadow-xl transition-shadow duration-300">
       <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="space-y-4">
-          <div>
-            <Label htmlFor="email">Email Address</Label>
+        <div className="space-y-5">
+          <div className="space-y-2">
+            <Label htmlFor="email" className="text-sm font-semibold text-university-navy">
+              Email Address
+            </Label>
             <Input
               id="email"
               type="email"
@@ -197,13 +206,15 @@ const handleSubmit = async (e: React.FormEvent) => {
                 setFormData((prev) => ({ ...prev, email: e.target.value }))
               }
               required
-              className="mt-1"
+              className="h-12 text-base border-2 focus:border-university-navy transition-colors"
             />
           </div>
 
-          <div>
-            <Label htmlFor="password">Password</Label>
-            <div className="relative mt-1">
+          <div className="space-y-2">
+            <Label htmlFor="password" className="text-sm font-semibold text-university-navy">
+              Password
+            </Label>
+            <div className="relative">
               <Input
                 id="password"
                 type={showPassword ? "text" : "password"}
@@ -213,38 +224,42 @@ const handleSubmit = async (e: React.FormEvent) => {
                   setFormData((prev) => ({ ...prev, password: e.target.value }))
                 }
                 required
-                className="pr-10"
+                className="h-12 text-base border-2 pr-12 focus:border-university-navy transition-colors"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center text-muted-foreground hover:text-foreground"
+                className="absolute inset-y-0 right-0 pr-4 flex items-center text-muted-foreground hover:text-university-navy transition-colors"
               >
                 {showPassword ? (
-                  <EyeOff className="h-4 w-4" />
+                  <EyeOff className="h-5 w-5" />
                 ) : (
-                  <Eye className="h-4 w-4" />
+                  <Eye className="h-5 w-5" />
                 )}
               </button>
             </div>
           </div>
         </div>
 
-        {error && <p className="text-red-600 text-sm">{error}</p>}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+            <p className="text-red-600 text-sm font-medium">{error}</p>
+          </div>
+        )}
 
         <Button
           type="submit"
           variant={config.buttonVariant}
           size="lg"
-          className="w-full"
+          className="w-full h-12 text-base font-semibold shadow-md hover:shadow-lg transition-shadow"
         >
           Sign In
         </Button>
 
-        <div className="text-center space-y-2">
+        <div className="text-center space-y-3 pt-2">
           <Link
             to="/auth/forgot-password"
-            className="text-sm text-university-navy hover:underline"
+            className="text-sm text-university-navy hover:text-university-gold font-medium transition-colors inline-block"
           >
             Forgot your password?
           </Link>
@@ -254,7 +269,7 @@ const handleSubmit = async (e: React.FormEvent) => {
               Don&apos;t have an account?{" "}
               <Link
                 to={config.registerPath}
-                className="text-university-navy hover:underline font-medium"
+                className="text-university-navy hover:text-university-gold font-semibold transition-colors"
               >
                 Sign up
               </Link>
