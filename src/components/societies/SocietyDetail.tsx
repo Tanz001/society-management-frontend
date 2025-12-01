@@ -4,9 +4,6 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { 
   Users, 
   Calendar, 
@@ -25,9 +22,7 @@ import {
   Clock,
   User,
   ThumbsUp,
-  MessageCircle,
   Download,
-  Send,
   Loader2
 } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
@@ -42,11 +37,12 @@ const SocietyDetail = () => {
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [postsError, setPostsError] = useState(null);
   const [likedPosts, setLikedPosts] = useState({}); // Track liked posts
-  const [commentingOn, setCommentingOn] = useState(null); // Track which post is being commented on
-  const [newComment, setNewComment] = useState(""); // New comment text
-  const [submittingComment, setSubmittingComment] = useState(false);
+  // Comment functionality temporarily disabled
+  // const [commentingOn, setCommentingOn] = useState(null);
+  // const [newComment, setNewComment] = useState("");
+  // const [submittingComment, setSubmittingComment] = useState(false);
   const [likingPost, setLikingPost] = useState(null); // Track which post is being liked
-  const [comments, setComments] = useState({}); // Store comments for each post
+  // const [comments, setComments] = useState({});
 
   // Helper function to safely parse JSON or comma-separated strings
   const parseStringOrArray = (data) => {
@@ -187,55 +183,54 @@ const SocietyDetail = () => {
   };
 
 
-  // Handle comment submission
-  const handleComment = async (postId) => {
-    if (!newComment.trim() || submittingComment) return;
-    
-    try {
-      setSubmittingComment(true);
-      
-      const response = await axios.post('http://localhost:5000/user/comment/add', {
-        post_id: postId,
-        comment_text: newComment.trim()
-      }, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
-        }
-      });
+  // Comment functionality temporarily disabled
+  // const handleComment = async (postId) => {
+  //   if (!newComment.trim() || submittingComment) return;
+  //   
+  //   try {
+  //     setSubmittingComment(true);
+  //     
+  //     const response = await axios.post('http://localhost:5000/user/comment/add', {
+  //       post_id: postId,
+  //       comment_text: newComment.trim()
+  //     }, {
+  //       headers: {
+  //         'Authorization': `Bearer ${localStorage.getItem('token')}`,
+  //         'Content-Type': 'application/json'
+  //       }
+  //     });
+  //
+  //     if (response.data.success) {
+  //       // Update the post's comment count
+  //       setPosts(prev => prev.map(post => 
+  //         post.post_id === postId 
+  //           ? { ...post, comment_count: response.data.comment_count }
+  //           : post
+  //       ));
+  //
+  //       // Add the new comment to the comments list
+  //       if (response.data.new_comment) {
+  //         setComments(prev => ({
+  //           ...prev,
+  //           [postId]: [response.data.new_comment, ...(prev[postId] || [])]
+  //         }));
+  //       }
+  //
+  //       // Clear comment but keep modal open to show the new comment
+  //       setNewComment("");
+  //     }
+  //   } catch (error) {
+  //     console.error('Error adding comment:', error);
+  //     // You could add a toast notification here
+  //   } finally {
+  //     setSubmittingComment(false);
+  //   }
+  // };
 
-      if (response.data.success) {
-        // Update the post's comment count
-        setPosts(prev => prev.map(post => 
-          post.post_id === postId 
-            ? { ...post, comment_count: response.data.comment_count }
-            : post
-        ));
-
-        // Add the new comment to the comments list
-        if (response.data.new_comment) {
-          setComments(prev => ({
-            ...prev,
-            [postId]: [response.data.new_comment, ...(prev[postId] || [])]
-          }));
-        }
-
-        // Clear comment but keep modal open to show the new comment
-        setNewComment("");
-      }
-    } catch (error) {
-      console.error('Error adding comment:', error);
-      // You could add a toast notification here
-    } finally {
-      setSubmittingComment(false);
-    }
-  };
-
-  // Handle opening comment modal
-  const handleOpenComments = (postId) => {
-    setCommentingOn(postId);
-    // Comments are already loaded from the posts data, no need to fetch
-  };
+  // const handleOpenComments = (postId) => {
+  //   setCommentingOn(postId);
+  //   // Comments are already loaded from the posts data, no need to fetch
+  // };
 
   // Fetch posts for the society
   const fetchSocietyPosts = async (societyId, userId = null) => {
@@ -272,19 +267,19 @@ const SocietyDetail = () => {
         setPosts(postsData);
         
         // Initialize comments state from post data
-        const commentsState = {};
+        // const commentsState = {};
         const likedPostsState = {};
         
         postsData.forEach(post => {
-          if (post.comments && post.comments.length > 0) {
-            commentsState[post.post_id] = post.comments;
-          }
+          // if (post.comments && post.comments.length > 0) {
+          //   commentsState[post.post_id] = post.comments;
+          // }
           if (post.is_liked_by_user !== undefined) {
             likedPostsState[post.post_id] = post.is_liked_by_user;
           }
         });
         
-        setComments(commentsState);
+        // setComments(commentsState);
         setLikedPosts(likedPostsState);
       } else {
         setPostsError(response.data.message || "Failed to fetch posts");
@@ -397,8 +392,8 @@ const SocietyDetail = () => {
             </Button>
           </div>
           
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="md:col-span-2">
+          <div className="space-y-6">
+            <div>
               <div className="flex items-center mb-2">
                 <Badge variant="secondary" className="bg-white/20 text-white capitalize">
                   {society.category}
@@ -421,10 +416,6 @@ const SocietyDetail = () => {
                 )}
                 <h1 className="text-4xl font-bold">{society.name}</h1>
               </div>
-              <p className="text-xl text-white/90 leading-relaxed">
-                {society.description}
-              </p>
-              
               <div className="flex items-center space-x-6 mt-6">
                 <div className="flex items-center space-x-2">
                   <MapPin className="h-5 w-5" />
@@ -439,10 +430,7 @@ const SocietyDetail = () => {
                   <span>Created: {new Date(society.created_at).toLocaleDateString()}</span>
                 </div>
               </div>
-            </div>
-            
-            <div className="space-y-4">
-              <Button variant="university" size="lg" className="w-full" asChild>
+              <Button variant="university" size="lg" className="w-full md:w-auto mt-6" asChild>
                 <Link to={`/membership/register/${id}`}>
                 <Users className="h-5 w-5 mr-2" />
                 Join Society
@@ -458,6 +446,19 @@ const SocietyDetail = () => {
         <div className="container mx-auto max-w-6xl grid md:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="md:col-span-2 space-y-8">
+            {/* Description Section */}
+            <Card className="p-6 shadow-card">
+              <h2 className="text-2xl font-semibold mb-4 text-university-navy flex items-center">
+                <FileText className="h-6 w-6 mr-2" />
+                Society Description
+              </h2>
+              <div className="prose prose-gray max-w-none">
+                <p className="text-muted-foreground leading-relaxed">
+                  {society.description || "No description has been provided yet."}
+                </p>
+              </div>
+            </Card>
+
             {/* Purpose Section */}
             <Card className="p-6 shadow-card">
               <h2 className="text-2xl font-semibold mb-4 text-university-navy flex items-center">
@@ -466,7 +467,7 @@ const SocietyDetail = () => {
               </h2>
               <div className="prose prose-gray max-w-none">
                 <p className="text-muted-foreground leading-relaxed">
-                  {society.purpose}
+                  {society.purpose || "Purpose details coming soon."}
                 </p>
               </div>
             </Card>
@@ -757,6 +758,7 @@ const SocietyDetail = () => {
                           Like ({post.like_count || 0})
                         </Button>
                         
+                        {/*
                         <Dialog open={commentingOn === post.post_id} onOpenChange={(open) => {
                           if (!open) {
                             setCommentingOn(null);
@@ -783,7 +785,6 @@ const SocietyDetail = () => {
                               </DialogDescription>
                             </DialogHeader>
                             
-                            {/* Comments List */}
                             <div className="flex-1 overflow-y-auto space-y-4 mb-4">
                               {comments[post.post_id] && comments[post.post_id].length > 0 ? (
                                 comments[post.post_id].map((comment) => (
@@ -821,7 +822,6 @@ const SocietyDetail = () => {
                               )}
                             </div>
 
-                            {/* Add Comment Section */}
                             <div className="border-t pt-4">
                               <div className="space-y-3">
                                 <Textarea
@@ -866,6 +866,7 @@ const SocietyDetail = () => {
                             </div>
                           </DialogContent>
                         </Dialog>
+                        */}
                       </div>
                     </div>
                   ))}

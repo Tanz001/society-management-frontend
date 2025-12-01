@@ -251,14 +251,14 @@ const ProfilePage = () => {
       <section className="py-4 md:py-6 px-4 border-b">
         <div className="container mx-auto max-w-6xl">
           <div className="flex justify-center md:justify-start gap-3">
-            <Button
+            {/* <Button
               variant="university"
               onClick={isEditing ? handleSave : () => setIsEditing(true)}
               size="lg"
             >
               <Edit className="h-4 w-4 mr-2" />
               {isEditing ? "Save Changes" : "Edit Profile"}
-            </Button>
+            </Button> */}
             <Button 
               variant="outline" 
               className="text-red-600 border-red-600 hover:bg-red-50"

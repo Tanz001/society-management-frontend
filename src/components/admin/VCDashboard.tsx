@@ -437,7 +437,7 @@ const fetchSocietiesForVC = async () => {
             <Card className="p-6 shadow-card">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Awaiting Final Approval</p>
+                  <p className="text-sm text-muted-foreground">Awaiting Approval</p>
                   <p className="text-2xl font-bold text-university-navy">{societies.length}</p>
                 </div>
                 <AlertTriangle className="h-8 w-8 text-university-maroon" />
@@ -484,7 +484,7 @@ const fetchSocietiesForVC = async () => {
             <TabsContent value="overview">
               {/* Actions */}
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-semibold text-university-navy">Societies Ready for Final Approval</h2>
+                <h2 className="text-2xl font-semibold text-university-navy">Societies Ready for Approval</h2>
                 <Button 
                   variant="outline" 
                   onClick={fetchSocietiesForVC}
@@ -560,7 +560,7 @@ const fetchSocietiesForVC = async () => {
                           disabled={loading}
                         >
                           <Eye className="h-3 w-3 mr-1" />
-                          Final Review
+                         Review
                         </Button>
                       ) : (
                         <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
@@ -575,7 +575,7 @@ const fetchSocietiesForVC = async () => {
           ) : (
             <div className="text-center py-12">
               <Crown className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-              <h3 className="text-lg font-medium mb-2">No Pending Final Approvals</h3>
+              <h3 className="text-lg font-medium mb-2">No Pending Approvals</h3>
               <p className="text-muted-foreground">There are no societies waiting for Vice Chancellor approval.</p>
             </div>
           )}
@@ -983,9 +983,9 @@ const fetchSocietiesForVC = async () => {
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="max-w-4xl h-[95vh] overflow-hidden">
           <DialogHeader>
-            <DialogTitle>Vice Chancellor Final Review</DialogTitle>
+            <DialogTitle>Vice Chancellor Review</DialogTitle>
             <DialogDescription>
-              Make the final decision on this registrar-approved society application
+              Make the decision on this registrar-approved society application
             </DialogDescription>
           </DialogHeader>
 
@@ -1044,7 +1044,7 @@ const fetchSocietiesForVC = async () => {
                   </div>
                   <div className="flex items-center space-x-2">
                     <Crown className="h-4 w-4 text-university-gold" />
-                    <span className="font-medium">Awaiting Vice Chancellor Final Approval</span>
+                    <span className="font-medium">Awaiting Vice Chancellor Approval</span>
                   </div>
                 </div>
               </Card>
@@ -1124,7 +1124,7 @@ const fetchSocietiesForVC = async () => {
               <Card className="p-4">
                 <h3 className="font-semibold mb-3 text-university-navy">Vice Chancellor Decision Note (Optional)</h3>
                 <Textarea
-                  placeholder="Add any final notes or comments for this decision..."
+                  placeholder="Add any notes or comments for this decision..."
                   value={reviewNote}
                   onChange={(e) => setReviewNote(e.target.value)}
                   rows={3}
@@ -1142,7 +1142,7 @@ const fetchSocietiesForVC = async () => {
                   disabled={actionLoading}
                 >
                   <XCircle className="h-4 w-4 mr-2" />
-                  {actionLoading ? "Processing..." : "Final Rejection"}
+                  {actionLoading ? "Processing..." : "Rejection"}
                 </Button>
                 <Button 
                   variant="university" 
@@ -1151,7 +1151,7 @@ const fetchSocietiesForVC = async () => {
                   className="bg-green-600 hover:bg-green-700"
                 >
                   <CheckCircle className="h-4 w-4 mr-2" />
-                  {actionLoading ? "Processing..." : "Grant Final Approval"}
+                  {actionLoading ? "Processing..." : "Grant Approval"}
                 </Button>
               </div>
             </div>

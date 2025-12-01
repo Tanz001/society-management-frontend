@@ -27,7 +27,8 @@ import {
   X,
   LogOut,
   Trash2,
-  UserPlus
+  UserPlus,
+  ShieldCheck
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -539,6 +540,24 @@ const AdminDashboard = () => {
                   <p className="text-sm text-muted-foreground mt-2">Requiring attention</p>
                 </Card>
               </div>
+
+              {/* Role Access Quick Link */}
+              <Card className="p-6 shadow-card flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                  <h3 className="text-xl font-semibold text-university-navy flex items-center gap-2">
+                    <ShieldCheck className="h-5 w-5 text-university-gold" />
+                    Role Based Access
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Assign system roles and advisor responsibilities for faculty members.
+                  </p>
+                </div>
+                <Button variant="university" asChild>
+                  <Link to="/dashboard/admin/role-access">
+                    Manage Access
+                  </Link>
+                </Button>
+              </Card>
 
 
               {/* Pending Society Applications - Full Width */}
