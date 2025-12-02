@@ -17,6 +17,9 @@ import BoardSecretaryDashboard from "@/components/admin/BoardSecretaryDashboard"
 import BoardPresidentDashboard from "@/components/admin/BoardPresidentDashboard";
 import RegistrarDashboard from "@/components/admin/RegistrarDashboard";
 import VCDashboard from "@/components/admin/VCDashboard";
+import TransportOfficeDashboard from "@/components/admin/TransportOfficeDashboard";
+import ProtocolOfficeDashboard from "@/components/admin/ProtocolOfficeDashboard";
+import RoleAccess from "@/components/admin/RoleAccess";
 import NotFound from "./pages/NotFound";
 import RegisterForm from "./components/auth/RegisterForm";
 import ProfilePage from "./components/profile/ProfilePage";
@@ -133,6 +136,25 @@ const App = () => (
             </ProtectedRoute>
           } />
           
+          {/* Transport Office and Protocol Office Routes */}
+          <Route path="/dashboard/admin/transport-office" element={
+            <ProtectedRoute requireAuth>
+              <TransportOfficeDashboard />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/dashboard/admin/protocol-office" element={
+            <ProtectedRoute requireAuth>
+              <ProtocolOfficeDashboard />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/dashboard/admin/role-access" element={
+            <ProtectedRoute requireAuth>
+              <RoleAccess />
+            </ProtectedRoute>
+          } />
+          
           <Route path="/society/registration" element={
             <ProtectedRoute requireAuth>
               <SocietyRegistration />
@@ -168,12 +190,6 @@ const App = () => (
               <EventsPage />
             </ProtectedRoute>
           } />
-
-
-
-
-
-
           
           <Route path="/membership/register" element={
             <ProtectedRoute requireAuth>

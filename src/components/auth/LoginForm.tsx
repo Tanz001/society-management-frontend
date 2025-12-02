@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Eye, EyeOff } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import axios from "axios"; // ✅ add axios for API calls
+import axios from "axios";
 
 interface LoginFormProps {
   userType: "student" | "society" | "admin";
@@ -20,7 +20,7 @@ const LoginForm = ({ userType }: LoginFormProps) => {
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
-  // ✅ Check if user is already authenticated
+  // Check if user is already authenticated
   useEffect(() => {
     const token = localStorage.getItem("token");
     const user = localStorage.getItem("user");
@@ -35,13 +35,13 @@ const LoginForm = ({ userType }: LoginFormProps) => {
         console.log("User admin status:", userData.admin);
         console.log("User society owner status:", userData.society_owner);
         
-        // Check role_name for routing (more reliable than role_id)
+        // Check role_name for routing
         if (userData.admin === 1) {
           const roleName = userData.role_name ? String(userData.role_name).trim().toLowerCase() : null;
           const roleId = userData.role_id;
           console.log("User is admin with role_id:", roleId, "role_name:", roleName);
           
-          // Redirect based on role_name (from roles table)
+          // Redirect based on role_name
           if (roleName === 'board_secretary') {
             console.log("Redirecting to Board Secretary dashboard");
             navigate("/dashboard/admin/board-secretary");
@@ -54,6 +54,12 @@ const LoginForm = ({ userType }: LoginFormProps) => {
           } else if (roleName === 'vc' || roleName === 'vice_chancellor') {
             console.log("Redirecting to VC dashboard");
             navigate("/dashboard/admin/vc");
+          } else if (roleName === 'transport_office') {
+            console.log("Redirecting to Transport Office dashboard");
+            navigate("/dashboard/admin/transport-office");
+          } else if (roleName === 'protocol_office') {
+            console.log("Redirecting to Protocol Office dashboard");
+            navigate("/dashboard/admin/protocol-office");
           } else if (roleName === 'admin') {
             console.log("Redirecting to Admin dashboard");
             navigate("/dashboard/admin");
@@ -66,105 +72,109 @@ const LoginForm = ({ userType }: LoginFormProps) => {
           navigate("/dashboard/society");
         } else if (userData.role_name === 'advisor') {
           console.log("User is advisor, redirecting to advisor dashboard");
-          navigate("/dashboard/student"); // Or create advisor dashboard if needed
+          navigate("/dashboard/student");
         } else {
           console.log("User is student, redirecting to student dashboard");
           navigate("/dashboard/student");
         }
       } catch (error) {
         console.error("Error parsing user data:", error);
-        // If parsing fails, default to student dashboard
         navigate("/dashboard/student");
       }
     }
   }, [navigate]);
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setError("");
 
-  try {
-    // ✅ Call your backend login API
-    const res = await axios.post("http://localhost:5000/student/login", {
-      email: formData.email,
-      password: formData.password,
-    });
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
 
-    // ✅ Save JWT token
-    localStorage.setItem("token", res.data.token);
+    try {
+      // Call backend login API
+      const res = await axios.post("http://localhost:5000/student/login", {
+        email: formData.email,
+        password: formData.password,
+      });
 
-    // ✅ Save student/user data
-    localStorage.setItem("user", JSON.stringify(res.data.student));
+      // Save JWT token
+      localStorage.setItem("token", res.data.token);
 
-    console.log("Login successful:", res.data);
-    console.log("Token saved:", res.data.token);
-    console.log("User data saved:", res.data.student);
-    console.log("Available fields in student data:", Object.keys(res.data.student));
-    console.log("User role from backend:", res.data.student.role);
-    console.log("Roll number in student data:", res.data.student.RollNO || res.data.student.RollNO || res.data.student.student_id);
-    
-    // ✅ Verify localStorage storage
-    console.log("Token in localStorage:", localStorage.getItem("token"));
-    console.log("User in localStorage:", localStorage.getItem("user"));
+      // Save student/user data
+      localStorage.setItem("user", JSON.stringify(res.data.student));
 
-    // ✅ Check user role and redirect accordingly
-    const userData = res.data.student;
-    console.log("=== LOGIN DEBUG INFO ===");
-    console.log("Full userData object:", JSON.stringify(userData, null, 2));
-    console.log("User admin status:", userData.admin);
-    console.log("User role:", userData.role);
-    console.log("User role type:", typeof userData.role);
-    console.log("User role value (stringified):", JSON.stringify(userData.role));
-    console.log("User society owner status:", userData.society_owner);
-    console.log("All userData keys:", Object.keys(userData));
-    
-    // Check role_name for routing (more reliable than role_id)
-    if (userData.admin === 1) {
-      const roleName = userData.role_name ? String(userData.role_name).trim().toLowerCase() : null;
-      const roleId = userData.role_id;
-      console.log("User is admin with role_id:", roleId, "role_name:", roleName);
+      console.log("Login successful:", res.data);
+      console.log("Token saved:", res.data.token);
+      console.log("User data saved:", res.data.student);
+      console.log("Available fields in student data:", Object.keys(res.data.student));
+      console.log("User role from backend:", res.data.student.role);
       
-      // Redirect based on role_name (from roles table)
-      if (roleName === 'board_secretary') {
-        console.log("Redirecting to Board Secretary dashboard");
-        navigate("/dashboard/admin/board-secretary");
-      } else if (roleName === 'board_president') {
-        console.log("Redirecting to Board President dashboard");
-        navigate("/dashboard/admin/board-president");
-      } else if (roleName === 'registrar') {
-        console.log("Redirecting to Registrar dashboard");
-        navigate("/dashboard/admin/registrar");
-      } else if (roleName === 'vc' || roleName === 'vice_chancellor') {
-        console.log("Redirecting to VC dashboard");
-        navigate("/dashboard/admin/vc");
-      } else if (roleName === 'admin') {
-        console.log("Redirecting to Admin dashboard");
-        navigate("/dashboard/admin");
-      } else {
-        console.warn("⚠️ Unknown admin role. Role ID:", roleId, "Role name:", roleName);
-        navigate("/dashboard/admin");
-      }
-    } else if (userData.society_owner === 1) {
-      console.log("User is society owner, redirecting to society dashboard");
-      navigate("/dashboard/society");
-    } else if (userData.role_name === 'advisor') {
-      console.log("User is advisor, redirecting to advisor dashboard");
-      navigate("/dashboard/student"); // Or create advisor dashboard if needed
-    } else {
-      console.log("User is student, redirecting to student dashboard");
-      navigate("/dashboard/student");
-    }
-  } catch (err: any) {
-    console.error("Login failed:", err.response?.data || err.message);
-    console.error("Full error object:", err);
-    
-    // Clear any existing auth data on login failure
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    
-    setError(err.response?.data?.message || "Login failed");
-  }
-};
+      // Verify localStorage storage
+      console.log("Token in localStorage:", localStorage.getItem("token"));
+      console.log("User in localStorage:", localStorage.getItem("user"));
 
+      // Check user role and redirect accordingly
+      const userData = res.data.student;
+      console.log("=== LOGIN DEBUG INFO ===");
+      console.log("Full userData object:", JSON.stringify(userData, null, 2));
+      console.log("User admin status:", userData.admin);
+      console.log("User role:", userData.role);
+      console.log("User role type:", typeof userData.role);
+      console.log("User role value (stringified):", JSON.stringify(userData.role));
+      console.log("User society owner status:", userData.society_owner);
+      console.log("All userData keys:", Object.keys(userData));
+      
+      // Check role_name for routing
+      if (userData.admin === 1) {
+        const roleName = userData.role_name ? String(userData.role_name).trim().toLowerCase() : null;
+        const roleId = userData.role_id;
+        console.log("User is admin with role_id:", roleId, "role_name:", roleName);
+        
+        // Redirect based on role_name
+        if (roleName === 'board_secretary') {
+          console.log("Redirecting to Board Secretary dashboard");
+          navigate("/dashboard/admin/board-secretary");
+        } else if (roleName === 'board_president') {
+          console.log("Redirecting to Board President dashboard");
+          navigate("/dashboard/admin/board-president");
+        } else if (roleName === 'registrar') {
+          console.log("Redirecting to Registrar dashboard");
+          navigate("/dashboard/admin/registrar");
+        } else if (roleName === 'vc' || roleName === 'vice_chancellor') {
+          console.log("Redirecting to VC dashboard");
+          navigate("/dashboard/admin/vc");
+        } else if (roleName === 'transport_office') {
+          console.log("Redirecting to Transport Office dashboard");
+          navigate("/dashboard/admin/transport-office");
+        } else if (roleName === 'protocol_office') {
+          console.log("Redirecting to Protocol Office dashboard");
+          navigate("/dashboard/admin/protocol-office");
+        } else if (roleName === 'admin') {
+          console.log("Redirecting to Admin dashboard");
+          navigate("/dashboard/admin");
+        } else {
+          console.warn("⚠️ Unknown admin role. Role ID:", roleId, "Role name:", roleName);
+          navigate("/dashboard/admin");
+        }
+      } else if (userData.society_owner === 1) {
+        console.log("User is society owner, redirecting to society dashboard");
+        navigate("/dashboard/society");
+      } else if (userData.role_name === 'advisor') {
+        console.log("User is advisor, redirecting to advisor dashboard");
+        navigate("/dashboard/student");
+      } else {
+        console.log("User is student, redirecting to student dashboard");
+        navigate("/dashboard/student");
+      }
+    } catch (err: any) {
+      console.error("Login failed:", err.response?.data || err.message);
+      console.error("Full error object:", err);
+      
+      // Clear any existing auth data on login failure
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      
+      setError(err.response?.data?.message || "Login failed");
+    }
+  };
 
   const userTypeConfig = {
     student: {
