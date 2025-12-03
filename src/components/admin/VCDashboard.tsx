@@ -103,7 +103,7 @@ const fetchSocietiesForVC = async () => {
     if (!token) throw new Error("No authentication token found");
 
     const response = await axios.post(
-      "http://localhost:5000/admin/societies-by-role",
+      `${import.meta.env.VITE_API_URL}/admin/societies-by-role`,
       { role: "vc" },
       {
         headers: {
@@ -130,7 +130,7 @@ const fetchSocietiesForVC = async () => {
       const token = localStorage.getItem("token");
       
       // Fetch detailed society information
-      const response = await axios.get(`http://localhost:5000/admin/societies/${society.society_id}`, {
+      const response = await axios.get(`${import.meta.env.VITE_API_URL}/admin/societies/${society.society_id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -162,7 +162,7 @@ const fetchSocietiesForVC = async () => {
       }
 
       const response = await axios.put(
-        `http://localhost:5000/admin/vc/societies/${selectedSociety.society_id}/review`,
+        `${import.meta.env.VITE_API_URL}/admin/vc/societies/${selectedSociety.society_id}/review`,
         {
           action,
           note: reviewNote,
@@ -205,7 +205,7 @@ const fetchSocietiesForVC = async () => {
       if (!token) return;
 
       // VC can only set status 8 (Approve) or 9 (Reject) from status 6 (Approved by Registrar)
-      const response = await axios.get(`http://localhost:5000/admin/allowed-statuses?role=vc&current_status_id=${currentStatusId}`, {
+      const response = await axios.get(`${import.meta.env.VITE_API_URL}/admin/allowed-statuses?role=vc&current_status_id=${currentStatusId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -227,7 +227,7 @@ const fetchSocietiesForVC = async () => {
       }
   
       const response = await axios.post(
-        "http://localhost:5000/admin/event-requests",  // ✅ POST
+        `${import.meta.env.VITE_API_URL}/admin/event-requests`,  // ✅ POST
         { role: currentUser?.role },                   // ✅ send role in body
         {
           headers: {
@@ -254,7 +254,7 @@ const fetchSocietiesForVC = async () => {
       setLoading(true);
       const token = localStorage.getItem("token");
       
-      const response = await axios.get(`http://localhost:5000/admin/event-requests/${reqId}`, {
+      const response = await axios.get(`${import.meta.env.VITE_API_URL}/admin/event-requests/${reqId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -294,7 +294,7 @@ const fetchSocietiesForVC = async () => {
       // VC can only approve (8) or reject (9) event requests
       const action = selectedEventStatus === 8 ? 'approve' : 'reject';
       const response = await axios.put(
-        `http://localhost:5000/admin/vc/event-requests/${selectedEventRequest.req_id}/review`,
+        `${import.meta.env.VITE_API_URL}/admin/vc/event-requests/${selectedEventRequest.req_id}/review`,
         {
           action,
           note: eventStatusNote,
@@ -355,7 +355,7 @@ const fetchSocietiesForVC = async () => {
       }
   
       const response = await axios.get(
-        "http://localhost:5000/admin/event-reports",
+        `${import.meta.env.VITE_API_URL}/admin/event-reports`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -379,7 +379,7 @@ const fetchSocietiesForVC = async () => {
       setLoading(true);
       const token = localStorage.getItem("token");
       
-      const response = await axios.get(`http://localhost:5000/admin/event-reports/${reportId}`, {
+      const response = await axios.get(`${import.meta.env.VITE_API_URL}/admin/event-reports/${reportId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -516,7 +516,7 @@ const fetchSocietiesForVC = async () => {
                       <div className="w-16 h-16 bg-university-navy/10 rounded-lg flex items-center justify-center">
                         {society.society_logo ? (
                           <img 
-                            src={`http://localhost:5000/${society.society_logo}`}
+                            src={`${import.meta.env.VITE_API_URL}/${society.society_logo}`}
                             alt={society.name}
                             className="w-12 h-12 rounded-lg object-cover"
                           />
@@ -773,7 +773,7 @@ const fetchSocietiesForVC = async () => {
                             size="sm" 
                             variant="outline"
                             onClick={() => {
-                              window.open(`http://localhost:5000/${report.report_file}`, '_blank');
+                              window.open(`${import.meta.env.VITE_API_URL}/${report.report_file}`, '_blank');
                             }}
                           >
                             <FileText className="h-4 w-4 mr-2" />
@@ -959,7 +959,7 @@ const fetchSocietiesForVC = async () => {
                   <Button
                     variant="university"
                     onClick={() => {
-                      window.open(`http://localhost:5000/${selectedReport.report_file}`, '_blank');
+                      window.open(`${import.meta.env.VITE_API_URL}/${selectedReport.report_file}`, '_blank');
                     }}
                   >
                     <FileText className="h-4 w-4 mr-2" />
@@ -997,7 +997,7 @@ const fetchSocietiesForVC = async () => {
                   <div className="w-20 h-20 bg-white/20 rounded-lg flex items-center justify-center">
                     {selectedSociety.society_logo ? (
                       <img 
-                        src={`http://localhost:5000/${selectedSociety.society_logo}`}
+                        src={`${import.meta.env.VITE_API_URL}/${selectedSociety.society_logo}`}
                         alt={selectedSociety.name}
                         className="w-16 h-16 rounded-lg object-cover"
                       />

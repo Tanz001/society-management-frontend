@@ -89,6 +89,7 @@ const EventReportUpload = ({ eventId, eventTitle, isOpen, onClose, onSuccess }: 
     }
 
     try {
+       const API_URL = import.meta.env.VITE_API_URL;
       setUploading(true);
       const token = localStorage.getItem("token");
       
@@ -104,7 +105,7 @@ const EventReportUpload = ({ eventId, eventTitle, isOpen, onClose, onSuccess }: 
       formData.append("report_file", selectedFile);
 
       const response = await axios.post(
-        "http://localhost:5000/society/event-report/upload",
+        `${API_URL}/society/event-report/upload`,
         formData,
         {
           headers: {

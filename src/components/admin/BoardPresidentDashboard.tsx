@@ -111,6 +111,7 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
     // Fetch pending societies for Board President
     const fetchPendingSocieties = async () => {
       try {
+         const API_URL = import.meta.env.VITE_API_URL;
         setLoading(true);
         setError("");
     
@@ -118,7 +119,7 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
         if (!token) throw new Error("No authentication token found");
     
         const response = await axios.post(
-          "http://localhost:5000/admin/societies-by-role",
+          `${API_URL}/admin/societies-by-role`,
           { role: "board_president" },
           {
             headers: {
@@ -140,11 +141,12 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
     // Handle society review
     const handleReviewClick = async (society: Society) => {
       try {
+         const API_URL = import.meta.env.VITE_API_URL;
         setLoading(true);
         const token = localStorage.getItem("token");
         
         // Fetch detailed society information
-        const response = await axios.get(`http://localhost:5000/admin/societies/${society.society_id}`, {
+        const response = await axios.get(`${API_URL}/admin/societies/${society.society_id}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -167,6 +169,7 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
       if (!selectedSociety) return;
 
       try {
+         const API_URL = import.meta.env.VITE_API_URL;
         setActionLoading(true);
         const token = localStorage.getItem("token");
         const currentUser = getCurrentUser();
@@ -176,7 +179,7 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
         }
 
         const response = await axios.put(
-          `http://localhost:5000/admin/board-president/societies/${selectedSociety.society_id}/review`,
+          `${API_URL}/admin/board-president/societies/${selectedSociety.society_id}/review`,
           {
             action,
             note: reviewNote,
@@ -211,11 +214,12 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
     // Fetch allowed statuses for Board President based on current status
     const fetchStatuses = async (currentStatusId: number = 2) => {
       try {
+         const API_URL = import.meta.env.VITE_API_URL;
         const token = localStorage.getItem("token");
         if (!token) return;
 
         // Board President can only set status 4 (Approve) or 5 (Reject) from status 2 (Approved by Board Secretary)
-        const response = await axios.get(`http://localhost:5000/admin/allowed-statuses?role=board_president&current_status_id=${currentStatusId}`, {
+        const response = await axios.get(`${API_URL}/admin/allowed-statuses?role=board_president&current_status_id=${currentStatusId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -238,9 +242,10 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
           throw new Error("No authentication token found");
         }
     
-        const response = await axios.post(
-          "http://localhost:5000/admin/event-requests",
-          { role: "board_president" },
+     const response = await axios.post(
+  `${import.meta.env.VITE_API_URL}/admin/event-requests`,
+  { role: "board_president" },
+
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -261,10 +266,11 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
     // Handle view event request details
     const handleViewEventRequest = async (reqId: number) => {
       try {
+         const API_URL = import.meta.env.VITE_API_URL;
         setLoading(true);
         const token = localStorage.getItem("token");
         
-        const response = await axios.get(`http://localhost:5000/admin/event-requests/${reqId}`, {
+        const response = await axios.get(`${API_URL}/admin/event-requests/${reqId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -293,6 +299,7 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
       if (!selectedEventRequest || !selectedEventStatus) return;
 
       try {
+         const API_URL = import.meta.env.VITE_API_URL;
         setActionLoading(true);
         const token = localStorage.getItem("token");
         const currentUser = getCurrentUser();
@@ -304,7 +311,7 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
         // Board President can only approve (4) or reject (5) event requests
         const action = selectedEventStatus === 4 ? 'approve' : 'reject';
         const response = await axios.put(
-          `http://localhost:5000/admin/board-president/event-requests/${selectedEventRequest.req_id}/review`,
+          `${API_URL}/admin/board-president/event-requests/${selectedEventRequest.req_id}/review`,
           {
             action,
             note: eventStatusNote,
@@ -470,7 +477,8 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
                         <div className="w-16 h-16 bg-university-navy/10 rounded-lg flex items-center justify-center">
                           {society.society_logo ? (
                             <img 
-                              src={`http://localhost:5000/${society.society_logo}`}
+                              src={`${import.meta.env.VITE_API_URL}/${society.society_logo}`}
+
                               alt={society.name}
                               className="w-12 h-12 rounded-lg object-cover"
                             />
@@ -657,7 +665,8 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
                     <div className="w-20 h-20 bg-white/20 rounded-lg flex items-center justify-center">
                       {selectedSociety.society_logo ? (
                         <img 
-                          src={`http://localhost:5000/${selectedSociety.society_logo}`}
+                        src={`${import.meta.env.VITE_API_URL}/${selectedSociety.society_logo}`}
+
                           alt={selectedSociety.name}
                           className="w-16 h-16 rounded-lg object-cover"
                         />

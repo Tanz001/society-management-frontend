@@ -62,6 +62,7 @@ const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
 
     setLoading(true);
     try {
+       const API_URL = import.meta.env.VITE_API_URL;
       const token = localStorage.getItem("token");
       if (!token) {
         toast.error("Authentication required");
@@ -69,7 +70,7 @@ const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
       }
 
       const response = await axios.post(
-        "http://localhost:5000/society/event-request/list",
+        `${API_URL}/society/event-request/list`,
         { society_id: societyId },
         {
           headers: {
@@ -101,6 +102,7 @@ const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
   const fetchStatusHistory = async (eventReqId: number) => {
     setLoadingHistory(true);
     try {
+       const API_URL = import.meta.env.VITE_API_URL;
       const token = localStorage.getItem("token");
       if (!token) {
         toast.error("Authentication required");
@@ -108,7 +110,7 @@ const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
       }
 
       const response = await axios.get(
-        `http://localhost:5000/society/event-request/${eventReqId}/history`,
+        `${API_URL}/society/event-request/${eventReqId}/history`,
         {
           headers: {
             Authorization: `Bearer ${token}`,

@@ -90,7 +90,11 @@ const LoginForm = ({ userType }: LoginFormProps) => {
 
     try {
       // Call backend login API
-      const res = await axios.post("http://localhost:5000/student/login", {
+    const API_URL = import.meta.env.VITE_API_URL;
+
+      console.log("Daniyal");
+
+      const res = await axios.post(`${API_URL}/student/login`, {
         email: formData.email,
         password: formData.password,
       });

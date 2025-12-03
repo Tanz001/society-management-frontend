@@ -42,9 +42,10 @@ const RegisterForm = () => {
       const payload = { ...studentData };
       delete payload.confirmPassword;
 
-      const response = await axios.post(
-        "http://localhost:5000/student/register",
-        payload
+    const response = await axios.post(
+  `${import.meta.env.VITE_API_URL}/student/register`,
+  payload
+
       );
 
       console.log("✅ Student registered:", response.data);

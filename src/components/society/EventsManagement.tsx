@@ -39,6 +39,7 @@ const EventsManagement = () => {
       }
 
       try {
+         const API_URL = import.meta.env.VITE_API_URL;
         const userData = JSON.parse(storedUser);
         const userId = userData.id;
         
@@ -50,7 +51,7 @@ const EventsManagement = () => {
 
         setLoadingSociety(true);
         const response = await axios.post(
-          "http://localhost:5000/society/society/data",
+          `${API_URL}/society/society/data`,
           { user_id: userId },
           {
             headers: {
@@ -432,13 +433,14 @@ const EventsManagement = () => {
                       if (!storedUser) return;
                       
                       try {
+                         const API_URL = import.meta.env.VITE_API_URL;
                         const userData = JSON.parse(storedUser);
                         const userId = userData.id;
                         if (!userId) return;
                         
                         setLoadingSociety(true);
                         const response = await axios.post(
-                          "http://localhost:5000/society/society/data",
+                          `${API_URL}/society/society/data`,
                           { user_id: userId },
                           {
                             headers: {

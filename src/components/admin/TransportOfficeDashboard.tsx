@@ -55,6 +55,7 @@ const TransportOfficeDashboard = () => {
   // Fetch all event requests (read-only view)
   const fetchAllEventRequests = async () => {
     try {
+       const API_URL = import.meta.env.VITE_API_URL;
       setLoading(true);
       setError("");
   
@@ -64,7 +65,7 @@ const TransportOfficeDashboard = () => {
       }
   
       const response = await axios.post(
-        "http://localhost:5000/admin/event-requests",
+        `${API_URL}/admin/event-requests`,
         { role: "transport_office_view" }, // Special role for read-only view
         {
           headers: {
@@ -86,10 +87,11 @@ const TransportOfficeDashboard = () => {
   // Handle view event request details
   const handleViewEventRequest = async (reqId) => {
     try {
+       const API_URL = import.meta.env.VITE_API_URL;
       setLoading(true);
       const token = localStorage.getItem("token");
       
-      const response = await axios.get(`http://localhost:5000/admin/event-requests/${reqId}`, {
+      const response = await axios.get(`${API_URL}/admin/event-requests/${reqId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 

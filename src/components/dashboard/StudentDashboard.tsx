@@ -34,7 +34,8 @@ const StudentDashboard = () => {
         throw new Error("No authentication token found");
       }
 
-      const response = await axios.get("http://localhost:5000/user/active/societies", {
+     const response = await axios.get(`${import.meta.env.VITE_API_URL}/user/active/societies`, {
+
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -59,7 +60,8 @@ const StudentDashboard = () => {
         throw new Error("No authentication token found");
       }
 
-      const response = await axios.get("http://localhost:5000/user/stats", {
+    const response = await axios.get(`${import.meta.env.VITE_API_URL}/user/stats`, {
+
         headers: {
           Authorization: `Bearer ${token}`,
         },

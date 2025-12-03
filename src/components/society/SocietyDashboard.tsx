@@ -90,6 +90,7 @@ const SocietyDashboard = () => {
     }
 
     try {
+       const API_URL = import.meta.env.VITE_API_URL;
       const userData = JSON.parse(storedUser);
       const userId = userData.id;
       
@@ -102,7 +103,7 @@ const SocietyDashboard = () => {
       console.log("Fetching society data for user ID:", userId);
       
       const response = await axios.post(
-        "http://localhost:5000/society/society/data",
+        `${API_URL}/society/society/data`,
         { user_id: userId },
         {
           headers: {
@@ -149,8 +150,9 @@ const SocietyDashboard = () => {
     }
 
     try {
+       const API_URL = import.meta.env.VITE_API_URL;
       const response = await axios.post(
-        `http://localhost:5000/society/membership/form`,
+        `${API_URL}/society/membership/form`,
         { society_id: currentSocietyId },
         {
           headers: {
@@ -189,9 +191,10 @@ const SocietyDashboard = () => {
 
     setLoadingRequests(true);
     try {
+       const API_URL = import.meta.env.VITE_API_URL;
       console.log("Fetching membership requests for society ID:", currentSocietyId);
       const response = await axios.post(
-        "http://localhost:5000/society/membership/requests",
+        `${API_URL}/society/membership/requests`,
         { society_id: currentSocietyId },
         {
           headers: {
@@ -218,8 +221,9 @@ const SocietyDashboard = () => {
   // Approve membership request
   const handleApproveRequest = async (requestId: number) => {
     try {
+       const API_URL = import.meta.env.VITE_API_URL;
       const response = await axios.post(
-        "http://localhost:5000/society/membership/approve",
+        `${API_URL}/society/membership/approve`,
         { request_id: requestId },
         {
           headers: {
@@ -243,8 +247,9 @@ const SocietyDashboard = () => {
   // Decline membership request
   const handleDeclineRequest = async (requestId: number) => {
     try {
+       const API_URL = import.meta.env.VITE_API_URL;
       const response = await axios.post(
-        "http://localhost:5000/society/membership/reject",
+        `${API_URL}/society/membership/reject`,
         { request_id: requestId },
         {
           headers: {
@@ -284,8 +289,9 @@ const SocietyDashboard = () => {
     }
 
     try {
+       const API_URL = import.meta.env.VITE_API_URL;
       const response = await axios.post(
-        "http://localhost:5000/society/membership/settings",
+        `${API_URL}/society/membership/settings`,
         {
           society_id: societyInfo.society_id,
           membership_fee: membershipFee,
@@ -312,6 +318,7 @@ const SocietyDashboard = () => {
   // Fetch posts for the society
   const fetchSocietyPosts = async (societyId: number) => {
     try {
+       const API_URL = import.meta.env.VITE_API_URL;
       setLoadingPosts(true);
       const token = localStorage.getItem("token");
       if (!token) return;
@@ -320,7 +327,7 @@ const SocietyDashboard = () => {
       const userId = user.id || user.user_id;
 
       const response = await axios.post(
-        "http://localhost:5000/society/posts",
+        `${API_URL}/society/posts`,
         { society_id: societyId, user_id: userId },
         {
           headers: {
@@ -359,12 +366,13 @@ const SocietyDashboard = () => {
   // Fetch events for the society
   const fetchSocietyEvents = async (societyId: number) => {
     try {
+       const API_URL = import.meta.env.VITE_API_URL;
       setLoadingEvents(true);
       const token = localStorage.getItem("token");
       if (!token) return;
 
       const response = await axios.post(
-        "http://localhost:5000/society/events",
+        `${API_URL}/society/events`,
         { society_id: societyId },
         {
           headers: {
@@ -412,9 +420,10 @@ const SocietyDashboard = () => {
     if (likingPost === postId) return;
     
     try {
+       const API_URL = import.meta.env.VITE_API_URL;
       setLikingPost(postId);
       
-      const response = await axios.post('http://localhost:5000/user/like/toggle', {
+      const response = await axios.post(`${API_URL}/user/like/toggle`, {
         post_id: postId
       }, {
         headers: {
@@ -451,9 +460,10 @@ const SocietyDashboard = () => {
     if (!newComment.trim() || submittingComment) return;
     
     try {
+       const API_URL = import.meta.env.VITE_API_URL;
       setSubmittingComment(true);
       
-      const response = await axios.post('http://localhost:5000/user/comment/add', {
+      const response = await axios.post(`${API_URL}/user/comment/add`, {
         post_id: postId,
         comment_text: newComment.trim()
       }, {
@@ -1191,7 +1201,8 @@ const SocietyDashboard = () => {
                               {post.media_files.map((file: any) => {
                                 let imageUrl = file.file_url;
                                 if (file.file_url && !file.file_url.startsWith('http')) {
-                                  imageUrl = `http://localhost:5000/${file.file_url.replace(/\\/g, '/').replace(/^.*?\/assets\//, 'assets/')}`;
+                                  imageUrl = `${import.meta.env.VITE_API_URL}/${file.file_url.replace(/\\/g, '/').replace(/^.*?\/assets\//, 'assets/')}`;
+
                                 }
                                 return (
                                   <img 
@@ -1213,7 +1224,8 @@ const SocietyDashboard = () => {
                             {post.media_files.map((file: any) => {
                               let videoUrl = file.file_url;
                               if (file.file_url && !file.file_url.startsWith('http')) {
-                                videoUrl = `http://localhost:5000/${file.file_url.replace(/\\/g, '/').replace(/^.*?\/assets\//, 'assets/')}`;
+                               videoUrl = `${import.meta.env.VITE_API_URL}/${file.file_url.replace(/\\/g, '/').replace(/^.*?\/assets\//, 'assets/')}`;
+
                               }
                               return (
                                 <video 
@@ -1233,7 +1245,7 @@ const SocietyDashboard = () => {
                             {post.media_files.map((file: any) => {
                               let fileUrl = file.file_url;
                               if (file.file_url && !file.file_url.startsWith('http')) {
-                                fileUrl = `http://localhost:5000/${file.file_url.replace(/\\/g, '/').replace(/^.*?\/assets\//, 'assets/')}`;
+                                fileUrl = `${import.meta.env.VITE_API_URL}/${file.file_url.replace(/\\/g, '/').replace(/^.*?\/assets\//, 'assets/')}`;
                               }
                               return (
                                 <div key={file.media_id} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
@@ -1279,7 +1291,7 @@ const SocietyDashboard = () => {
                                               if (!token) return;
 
                                               const response = await axios.post(
-                                                'http://localhost:5000/user/poll/vote',
+                                                `${import.meta.env.VITE_API_URL}/user/poll/vote`,
                                                 { option_id: optionId, poll_id: pollId },
                                                 {
                                                   headers: {

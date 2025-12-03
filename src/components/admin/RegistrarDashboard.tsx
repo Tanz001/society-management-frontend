@@ -103,6 +103,7 @@ const RegistrarDashboard = () => {
   // Fetch all societies
   const fetchAllSocieties = async () => {
     try {
+       const API_URL = import.meta.env.VITE_API_URL;
       setLoading(true);
       setError("");
   
@@ -110,7 +111,7 @@ const RegistrarDashboard = () => {
       if (!token) throw new Error("No authentication token found");
   
       const response = await axios.post(
-        "http://localhost:5000/admin/societies-by-role",
+        `${API_URL}/admin/societies-by-role`,
         { role: "registrar" },
         {
           headers: {
@@ -133,11 +134,12 @@ const RegistrarDashboard = () => {
   // Fetch allowed statuses for Registrar based on current status
   const fetchStatuses = async (currentStatusId: number = 4) => {
     try {
+       const API_URL = import.meta.env.VITE_API_URL;
       const token = localStorage.getItem("token");
       if (!token) return;
 
       // Registrar can only set status 6 (Approve) or 7 (Reject) from status 4 (Approved by Board President)
-      const response = await axios.get(`http://localhost:5000/admin/allowed-statuses?role=registrar&current_status_id=${currentStatusId}`, {
+      const response = await axios.get(`${API_URL}/admin/allowed-statuses?role=registrar&current_status_id=${currentStatusId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -150,11 +152,12 @@ const RegistrarDashboard = () => {
   // Handle society review/detail view
   const handleViewDetails = async (society: Society) => {
     try {
+       const API_URL = import.meta.env.VITE_API_URL;
       setLoading(true);
       const token = localStorage.getItem("token");
       
       // Fetch detailed society information
-      const response = await axios.get(`http://localhost:5000/admin/societies/${society.society_id}`, {
+      const response = await axios.get(`${API_URL}/admin/societies/${society.society_id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -187,6 +190,7 @@ const RegistrarDashboard = () => {
     if (!selectedSociety || !selectedStatus) return;
 
     try {
+      const API_URL = import.meta.env.VITE_API_URL; 
       setActionLoading(true);
       const token = localStorage.getItem("token");
       const currentUser = getCurrentUser();
@@ -196,7 +200,7 @@ const RegistrarDashboard = () => {
       }
 
       const response = await axios.put(
-        `http://localhost:5000/admin/societies/${selectedSociety.society_id}/status`,
+        `${API_URL}/admin/societies/${selectedSociety.society_id}/status`,
         {
           status_id: selectedStatus,
           note: statusNote,
@@ -271,6 +275,7 @@ const RegistrarDashboard = () => {
   // Fetch all event requests
   const fetchAllEventRequests = async () => {
     try {
+       const API_URL = import.meta.env.VITE_API_URL;
       setLoadingEventRequests(true);
       setError("");
   
@@ -282,7 +287,7 @@ const RegistrarDashboard = () => {
       }
   
       const response = await axios.post(
-        "http://localhost:5000/admin/event-requests",  // ✅ POST
+        `${API_URL}/admin/event-requests`,  // ✅ POST
         { role: currentUser?.role },                   // ✅ send role in body
         {
           headers: {
@@ -304,10 +309,11 @@ const RegistrarDashboard = () => {
   // Handle view event request details
   const handleViewEventRequest = async (reqId: number) => {
     try {
+       const API_URL = import.meta.env.VITE_API_URL;
       setLoading(true);
       const token = localStorage.getItem("token");
       
-      const response = await axios.get(`http://localhost:5000/admin/event-requests/${reqId}`, {
+      const response = await axios.get(`${API_URL}/admin/event-requests/${reqId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -336,6 +342,7 @@ const RegistrarDashboard = () => {
     if (!selectedEventRequest || !selectedEventStatus) return;
 
     try {
+       const API_URL = import.meta.env.VITE_API_URL;
       setActionLoading(true);
       const token = localStorage.getItem("token");
       const currentUser = getCurrentUser();
@@ -347,7 +354,7 @@ const RegistrarDashboard = () => {
       // Registrar can only approve (6) or reject (7) event requests
       const action = selectedEventStatus === 6 ? 'approve' : 'reject';
       const response = await axios.put(
-        `http://localhost:5000/admin/registrar/event-requests/${selectedEventRequest.req_id}/review`,
+        `${API_URL}/admin/registrar/event-requests/${selectedEventRequest.req_id}/review`,
         {
           action,
           note: eventStatusNote,
@@ -640,7 +647,8 @@ const RegistrarDashboard = () => {
                           <div className="w-20 h-20 bg-university-navy/10 rounded-lg flex items-center justify-center flex-shrink-0">
                             {society.society_logo ? (
                               <img 
-                                src={`http://localhost:5000/${society.society_logo}`}
+                             src={`${import.meta.env.VITE_API_URL}/${society.society_logo}`}
+
                                 alt={society.name}
                                 className="w-16 h-16 rounded-lg object-cover"
                               />
@@ -915,7 +923,7 @@ const RegistrarDashboard = () => {
                   <div className="w-24 h-24 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
                     {selectedSociety.society_logo || selectedSociety.logo_path ? (
                       <img 
-                        src={`http://localhost:5000/${selectedSociety.society_logo || selectedSociety.logo_path}`}
+                        src={`${import.meta.env.VITE_API_URL}/${selectedSociety.society_logo || selectedSociety.logo_path}`}
                         alt={selectedSociety.name}
                         className="w-20 h-20 rounded-lg object-cover"
                       />

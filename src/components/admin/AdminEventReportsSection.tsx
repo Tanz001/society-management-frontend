@@ -20,6 +20,7 @@ const AdminEventReportsSection = ({ isActive }: AdminEventReportsSectionProps) =
 
   const fetchAllEventReports = useCallback(async () => {
     try {
+       const API_URL = import.meta.env.VITE_API_URL;
       setLoadingEventReports(true);
       setError(null);
 
@@ -28,7 +29,7 @@ const AdminEventReportsSection = ({ isActive }: AdminEventReportsSectionProps) =
         throw new Error("No authentication token found");
       }
 
-      const response = await axios.get("http://localhost:5000/admin/event-reports", {
+      const response = await axios.get(`${API_URL}/admin/event-reports`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -53,7 +54,7 @@ const AdminEventReportsSection = ({ isActive }: AdminEventReportsSectionProps) =
           throw new Error("No authentication token found");
         }
 
-        const response = await axios.get(`http://localhost:5000/admin/event-reports/${reportId}`, {
+        const response = await axios.get(`${import.meta.env.VITE_API_URL}/admin/event-reports/${reportId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -172,7 +173,7 @@ const AdminEventReportsSection = ({ isActive }: AdminEventReportsSectionProps) =
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => window.open(`http://localhost:5000/${report.report_file}`, "_blank")}
+                    onClick={() => window.open(`${import.meta.env.VITE_API_URL}/${report.report_file}`, "_blank")}
                   >
                     <FileText className="h-4 w-4 mr-2" />
                     Download
@@ -297,7 +298,7 @@ const AdminEventReportsSection = ({ isActive }: AdminEventReportsSectionProps) =
                 <h3 className="font-semibold mb-3 text-university-navy">Report File</h3>
                 <Button
                   variant="outline"
-                  onClick={() => window.open(`http://localhost:5000/${selectedReport.report_file}`, "_blank")}
+                  onClick={() => window.open(`${import.meta.env.VITE_API_URL}/${selectedReport.report_file}`, "_blank")}
                 >
                   <FileText className="h-4 w-4 mr-2" />
                   Download Report

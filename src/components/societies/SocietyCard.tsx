@@ -33,7 +33,8 @@ const SocietyCard = ({ society }: SocietyCardProps) => {
       <div className="aspect-video bg-gradient-secondary flex items-center justify-center text-university-navy font-bold text-2xl">
         {society.society_logo ? (
           <img 
-            src={`http://localhost:5000/${society.society_logo.replace(/\\/g, '/')}`} 
+           src={`${import.meta.env.VITE_API_URL}/${society.society_logo.replace(/\\/g, '/')}`}
+
             alt={society.name} 
             className="w-full h-full object-cover" 
             onError={(e) => {

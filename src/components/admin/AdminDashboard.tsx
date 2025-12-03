@@ -127,6 +127,8 @@ const AdminDashboard = () => {
   const handleApprove = async (societyId) => {
     try {
       console.log("Approving society:", societyId);
+      const API_URL = import.meta.env.VITE_API_URL;
+      
       
       const token = localStorage.getItem("token");
       if (!token) {
@@ -134,7 +136,7 @@ const AdminDashboard = () => {
       }
 
       const response = await axios.put(
-        `http://localhost:5000/admin/societies/${societyId}/approve`,
+        `${API_URL}/admin/societies/${societyId}/approve`,
         {},
         {
           headers: {
@@ -163,6 +165,7 @@ const AdminDashboard = () => {
 
   const handleReject = async (societyId) => {
     try {
+       const API_URL = import.meta.env.VITE_API_URL;
       console.log("Rejecting society:", societyId);
       
       const token = localStorage.getItem("token");
@@ -171,7 +174,7 @@ const AdminDashboard = () => {
       }
 
       const response = await axios.put(
-        `http://localhost:5000/admin/societies/${societyId}/reject`,
+        `${API_URL}/admin/societies/${societyId}/reject`,
         {},
         {
           headers: {
@@ -200,6 +203,7 @@ const AdminDashboard = () => {
   // Function to get all societies
   const getAllSocieties = async () => {
     try {
+       const API_URL = import.meta.env.VITE_API_URL;
       setLoading(true);
       setError(null);
       
@@ -208,7 +212,7 @@ const AdminDashboard = () => {
         throw new Error("No authentication token found");
       }
 
-      const response = await axios.get("http://localhost:5000/admin/societies", {
+      const response = await axios.get(`${API_URL}/admin/societies`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -242,13 +246,14 @@ const AdminDashboard = () => {
     }
 
     try {
+       const API_URL = import.meta.env.VITE_API_URL;
       const token = localStorage.getItem("token");
       if (!token) {
         throw new Error("No authentication token found");
       }
 
       const response = await axios.delete(
-        `http://localhost:5000/admin/societies/${societyId}`,
+        `${API_URL}/admin/societies/${societyId}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -273,6 +278,7 @@ const AdminDashboard = () => {
   // Function to get all events
   const getAllEvents = async () => {
     try {
+       const API_URL = import.meta.env.VITE_API_URL;
       setEventsLoading(true);
       setError(null);
       
@@ -281,7 +287,7 @@ const AdminDashboard = () => {
         throw new Error("No authentication token found");
       }
 
-      const response = await axios.get("http://localhost:5000/admin/events", {
+      const response = await axios.get(`${API_URL}/admin/events`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -300,6 +306,7 @@ const AdminDashboard = () => {
   // Function to get all students
   const getAllStudents = async () => {
     try {
+       const API_URL = import.meta.env.VITE_API_URL;
       setStudentsLoading(true);
       setError(null);
       
@@ -308,7 +315,7 @@ const AdminDashboard = () => {
         throw new Error("No authentication token found");
       }
 
-      const response = await axios.get("http://localhost:5000/admin/students", {
+      const response = await axios.get(`${API_URL}/admin/students`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -331,13 +338,14 @@ const AdminDashboard = () => {
     }
 
     try {
+       const API_URL = import.meta.env.VITE_API_URL;
       const token = localStorage.getItem("token");
       if (!token) {
         throw new Error("No authentication token found");
       }
 
       const response = await axios.delete(
-        `http://localhost:5000/admin/students/${studentId}`,
+        `${API_URL}/admin/students/${studentId}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -372,6 +380,7 @@ const AdminDashboard = () => {
     }
 
     try {
+       const API_URL = import.meta.env.VITE_API_URL;
       const token = localStorage.getItem("token");
       if (!token) {
         throw new Error("No authentication token found");
@@ -381,7 +390,7 @@ const AdminDashboard = () => {
       delete payload.confirmPassword;
 
       const response = await axios.post(
-        "http://localhost:5000/admin/create-advisor",
+        `${API_URL}/admin/create-advisor`,
         payload,
         {
           headers: {
@@ -699,7 +708,8 @@ const AdminDashboard = () => {
                               <div className="w-16 h-16 bg-university-navy/10 rounded-lg flex items-center justify-center">
                                 {society.society_logo ? (
                                   <img 
-                                    src={`http://localhost:5000/${society.society_logo}`} 
+                                    src={`${import.meta.env.VITE_API_URL}/${society.society_logo}`}
+
                                     alt={society.name}
                                     className="w-12 h-12 rounded-lg object-cover"
                                   />
@@ -1248,7 +1258,7 @@ const AdminDashboard = () => {
                   <div className="w-20 h-20 bg-white/20 rounded-lg flex items-center justify-center">
                     {selectedSocietyForDetail.society_logo ? (
                       <img 
-                        src={`http://localhost:5000/${selectedSocietyForDetail.society_logo}`} 
+                        src={`${import.meta.env.VITE_API_URL}/${selectedSocietyForDetail.society_logo}`} 
                         alt={selectedSocietyForDetail.name}
                         className="w-16 h-16 rounded-lg object-cover"
                       />
@@ -1418,7 +1428,7 @@ const AdminDashboard = () => {
                 <Card className="p-4">
                   <h3 className="font-semibold mb-3 text-university-navy">Cover Image</h3>
                   <img 
-                    src={`http://localhost:5000/${selectedSocietyForDetail.cover_photo}`} 
+                    src={`${import.meta.env.VITE_API_URL}/${selectedSocietyForDetail.cover_photo}`} 
                     alt={selectedSocietyForDetail.name}
                     className="w-full h-48 object-cover rounded-lg"
                   />

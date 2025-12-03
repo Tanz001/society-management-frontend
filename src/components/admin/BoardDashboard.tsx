@@ -97,7 +97,7 @@
         if (!token) throw new Error("No authentication token found");
     
         const response = await axios.post(
-          "http://localhost:5000/admin/societies-by-role",
+          `${import.meta.env.VITE_API_URL}/admin/societies-by-role`,
           { role: "society_board" },
           {
             headers: {
@@ -119,11 +119,12 @@
     // Handle society review
     const handleReviewClick = async (society: Society) => {
       try {
+         const API_URL = import.meta.env.VITE_API_URL;
         setLoading(true);
         const token = localStorage.getItem("token");
         
         // Fetch detailed society information
-        const response = await axios.get(`http://localhost:5000/admin/societies/${society.society_id}`, {
+        const response = await axios.get(`${API_URL}/admin/societies/${society.society_id}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -143,6 +144,7 @@
       if (!selectedSociety) return;
 
       try {
+         const API_URL = import.meta.env.VITE_API_URL;
         setActionLoading(true);
         const token = localStorage.getItem("token");
         const currentUser = getCurrentUser();
@@ -152,7 +154,7 @@
         }
 
         const response = await axios.put(
-          `http://localhost:5000/admin/board/societies/${selectedSociety.society_id}/review`,
+          `${API_URL}/admin/board/societies/${selectedSociety.society_id}/review`,
           {
             action,
             note: reviewNote,
@@ -187,10 +189,11 @@
     // Fetch all statuses
     const fetchStatuses = async () => {
       try {
+         const API_URL = import.meta.env.VITE_API_URL;
         const token = localStorage.getItem("token");
         if (!token) return;
 
-        const response = await axios.get("http://localhost:5000/admin/statuses", {
+        const response = await axios.get(`${API_URL}/admin/statuses`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -203,6 +206,7 @@
     // Fetch all event requests
     const fetchAllEventRequests = async () => {
       try {
+         const API_URL = import.meta.env.VITE_API_URL;
         setLoadingEventRequests(true);
         setError("");
     
@@ -214,7 +218,7 @@
         }
     
         const response = await axios.post(
-          "http://localhost:5000/admin/event-requests",  // ✅ POST
+          `${API_URL}/admin/event-requests`,  // ✅ POST
           { role: currentUser?.role },                   // ✅ send role in body
           {
             headers: {
@@ -237,8 +241,9 @@
       try {
         setLoading(true);
         const token = localStorage.getItem("token");
+        const API_URL = import.meta.env.VITE_API_URL;
         
-        const response = await axios.get(`http://localhost:5000/admin/event-requests/${reqId}`, {
+        const response = await axios.get(`${API_URL}/admin/event-requests/${reqId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -265,6 +270,7 @@
       if (!selectedEventRequest || !selectedEventStatus) return;
 
       try {
+         const API_URL = import.meta.env.VITE_API_URL;
         setActionLoading(true);
         const token = localStorage.getItem("token");
         const currentUser = getCurrentUser();
@@ -274,7 +280,7 @@
         }
 
         const response = await axios.put(
-          `http://localhost:5000/admin/event-requests/${selectedEventRequest.req_id}/status`,
+          `${API_URL}/admin/event-requests/${selectedEventRequest.req_id}/status`,
           {
             status_id: selectedEventStatus,
             note: eventStatusNote,
@@ -439,7 +445,8 @@
                         <div className="w-16 h-16 bg-university-navy/10 rounded-lg flex items-center justify-center">
                           {society.society_logo ? (
                             <img 
-                              src={`http://localhost:5000/${society.society_logo}`}
+                             src={`${import.meta.env.VITE_API_URL}/${society.society_logo}`}
+
                               alt={society.name}
                               className="w-12 h-12 rounded-lg object-cover"
                             />
@@ -608,7 +615,7 @@
                     <div className="w-20 h-20 bg-white/20 rounded-lg flex items-center justify-center">
                       {selectedSociety.society_logo ? (
                         <img 
-                          src={`http://localhost:5000/${selectedSociety.society_logo}`}
+                          src={`${import.meta.env.VITE_API_URL}/${selectedSociety.society_logo}`}
                           alt={selectedSociety.name}
                           className="w-16 h-16 rounded-lg object-cover"
                         />

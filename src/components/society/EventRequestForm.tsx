@@ -62,6 +62,7 @@ const EventRequestForm = ({ societyId, userId, onSubmitSuccess, showCard = true 
 
     setLoading(true);
     try {
+       const API_URL = import.meta.env.VITE_API_URL;
       const token = localStorage.getItem("token");
       if (!token) {
         toast.error("Authentication required");
@@ -69,7 +70,7 @@ const EventRequestForm = ({ societyId, userId, onSubmitSuccess, showCard = true 
       }
 
       const response = await axios.post(
-        "http://localhost:5000/society/event-request/create",
+        `${API_URL}/society/event-request/create`,
         {
           society_id: societyId,
           submitted_by: userId,
