@@ -1,28 +1,28 @@
 import { useState, useEffect } from "react";
-import { User, Lock } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card } from "@/components/ui/card";
+import { Eye, EyeOff } from "lucide-react";
 
-function Login() {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [click, setClick] = useState(true);
-  const [shake, setShake] = useState(false);
-  const d = new Date();
-  let year = d.getFullYear();
+interface LoginFormProps {
+  userType?: "student" | "society" | "admin";
+}
+
+const LoginForm = ({ userType = "student" }: LoginFormProps) => {
+  const [showPassword, setShowPassword] = useState(false);
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+  });
+  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   // Simple navigation function (replace with your actual router)
-  const navigate = (path) => {
+  const navigate = (path: string) => {
     console.log("Navigating to:", path);
     // In your actual app, uncomment this:
     // window.location.href = path;
-  };
-
-  const handleInputChange = (e) => {
-    const newValue = e.target.value;
-    setShake(newValue.includes("@"));
-  };
-
-  const inputStyle = {
-    borderColor: shake ? "red" : "",
   };
 
   // Check if user is already authenticated
@@ -87,25 +87,20 @@ function Login() {
         navigate("/dashboard/student");
       }
     }
-  }, [navigate]);
+  }, []);
 
-  const log_in_verify = () => {
-    if (username === "" || password === "") {
-      console.error("Empty Roll No Or CNIC Field");
-    } else if (shake) {
-      console.error("Remove @ from Roll No");
-    } else {
-      log_in();
-    }
-  };
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setIsLoading(true);
 
-  async function log_in() {
-    setClick(false);
-    
     try {
       console.log("Making login request to: https://lms.gcu.edu.pk/api/fc/login");
-      console.log("Request payload:", { usnm: username, pwd: password });
-      
+      console.log("Request payload:", { 
+        usnm: formData.email, 
+        pwd: formData.password 
+      });
+
       // Call backend login API using fetch
       const response = await fetch("https://lms.gcu.edu.pk/api/fc/login", {
         method: "POST",
@@ -113,8 +108,8 @@ function Login() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          usnm: username,
-          pwd: password,
+          usnm: formData.email,
+          pwd: formData.password,
         }),
       });
 
@@ -124,12 +119,10 @@ function Login() {
       const data = await response.json();
       console.log("Response data:", data);
 
-      const { user, error, warning, token } = data;
+      const { user, error: apiError, warning, token } = data;
 
-      if (error || warning) {
-        console.error(error || warning);
-        setClick(true);
-        return;
+      if (apiError || warning) {
+        throw new Error(apiError || warning);
       }
 
       if (token) {
@@ -200,7 +193,9 @@ function Login() {
           navigate("/dashboard/student");
         }
       }
-    } catch (err) {
+
+      setIsLoading(false);
+    } catch (err: any) {
       console.error("Login failed:", err.message);
       console.error("Full error object:", err);
       
@@ -208,254 +203,125 @@ function Login() {
       localStorage.removeItem("token");
       localStorage.removeItem("user");
       
-      setClick(true);
+      setError(err.message || "Login failed");
+      setIsLoading(false);
     }
-  }
+  };
 
+  const userTypeConfig = {
+    student: {
+      title: "Student Login",
+      description: "Access your student dashboard",
+      buttonVariant: "university" as const,
+      registerPath: "/auth/register",
+    },
+    society: {
+      title: "Society Login",
+      description: "Access your society dashboard",
+      buttonVariant: "default" as const,
+      registerPath: "/auth/register-society",
+    },
+    admin: {
+      title: "Admin Login",
+      description: "Administrator access",
+      buttonVariant: "destructive" as const,
+      registerPath: "",
+    },
+  };
 
+  const config = userTypeConfig[userType];
 
   return (
-    <>
-      <div style={{
-        minHeight: "100vh",
-        display: "flex",
-        position: "relative",
-        background: "linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%)",
-        fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
-      }}>
-        <div style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: "rgba(0, 0, 0, 0.3)",
-          zIndex: 0
-        }}></div>
-
-        <div style={{
-          flex: 1,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "40px",
-          color: "white",
-          zIndex: 1
-        }}>
-          <div style={{
-            width: "200px",
-            height: "200px",
-            background: "white",
-            borderRadius: "50%",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            marginBottom: "30px",
-            boxShadow: "0 10px 40px rgba(0,0,0,0.3)"
-          }}>
-            <div style={{
-              fontSize: "48px",
-              fontWeight: "bold",
-              color: "#1e3a8a"
-            }}>GCU</div>
+    <Card className="p-8 shadow-lg border-2 border-gray-100 hover:shadow-xl transition-shadow duration-300">
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="space-y-5">
+          <div className="space-y-2">
+            <Label htmlFor="email" className="text-sm font-semibold text-university-navy">
+              Email Address
+            </Label>
+            <Input
+              id="email"
+              type="email"
+              placeholder="Enter your email"
+              value={formData.email}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, email: e.target.value }))
+              }
+              required
+              className="h-12 text-base border-2 focus:border-university-navy transition-colors"
+            />
           </div>
-          <h1 style={{
-            fontSize: "2.5rem",
-            marginBottom: "20px",
-            textAlign: "center",
-            fontWeight: "bold",
-            textShadow: "2px 2px 4px rgba(0,0,0,0.3)"
-          }}>Government College University Lahore</h1>
-          <p style={{
-            fontSize: "1.2rem",
-            textAlign: "center",
-            maxWidth: "500px",
-            lineHeight: "1.6"
-          }}>
-            Welcome to the Student Facilitation Center. Use your LMS credentials
-            to log in and access services.
-          </p>
+
+          <div className="space-y-2">
+            <Label htmlFor="password" className="text-sm font-semibold text-university-navy">
+              Password
+            </Label>
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="Enter your password"
+                value={formData.password}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, password: e.target.value }))
+                }
+                required
+                className="h-12 text-base border-2 pr-12 focus:border-university-navy transition-colors"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute inset-y-0 right-0 pr-4 flex items-center text-muted-foreground hover:text-university-navy transition-colors"
+              >
+                {showPassword ? (
+                  <EyeOff className="h-5 w-5" />
+                ) : (
+                  <Eye className="h-5 w-5" />
+                )}
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div style={{
-          width: "500px",
-          background: "white",
-          padding: "60px 50px",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-          zIndex: 1,
-          boxShadow: "-10px 0 30px rgba(0,0,0,0.3)"
-        }}>
-          <h1 style={{
-            fontSize: "1.8rem",
-            fontWeight: "bold",
-            color: "#12004a",
-            marginBottom: "10px",
-            textAlign: "center"
-          }}>
-            GCU Student Facilitation Center
-          </h1>
-          <div style={{
-            height: "3px",
-            background: "linear-gradient(90deg, #1e3a8a, #3b82f6)",
-            margin: "20px 0",
-            borderRadius: "2px"
-          }} />
-          <p style={{
-            fontSize: "20px",
-            color: "#12004a",
-            fontWeight: "bold",
-            textAlign: "left",
-            marginBottom: "30px"
-          }}>
-            Sign in to continue
-          </p>
-          <form
-            style={{ width: "100%" }}
-            onSubmit={(e) => {
-              e.preventDefault();
-              log_in_verify();
-            }}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+            <p className="text-red-600 text-sm font-medium">{error}</p>
+          </div>
+        )}
+
+        <Button
+          type="submit"
+          variant={config.buttonVariant}
+          size="lg"
+          className="w-full h-12 text-base font-semibold shadow-md hover:shadow-lg transition-shadow"
+          disabled={isLoading}
+        >
+          {isLoading ? "Loading..." : "Sign In"}
+        </Button>
+
+        <div className="text-center space-y-3 pt-2">
+          <a
+            href="/auth/forgot-password"
+            className="text-sm text-university-navy hover:text-university-gold font-medium transition-colors inline-block"
           >
-            <div style={{
-              position: "relative",
-              marginBottom: "20px"
-            }}>
-              <User style={{
-                position: "absolute",
-                left: "12px",
-                top: "50%",
-                transform: "translateY(-50%)",
-                color: "#666",
-                width: "20px",
-                height: "20px",
-                zIndex: 1
-              }} />
-              <input
-                type="text"
-                placeholder="Complete Roll No"
-                style={{
-                  width: "100%",
-                  padding: "14px 14px 14px 45px",
-                  fontSize: "16px",
-                  border: shake ? "2px solid red" : "2px solid #ddd",
-                  borderRadius: "8px",
-                  outline: "none",
-                  transition: "border-color 0.3s",
-                  boxSizing: "border-box"
-                }}
-                onChange={(event) => {
-                  setUsername(event.target.value);
-                  handleInputChange(event);
-                }}
-              />
-            </div>
-            <div style={{
-              position: "relative",
-              marginBottom: "20px"
-            }}>
-              <Lock style={{
-                position: "absolute",
-                left: "12px",
-                top: "50%",
-                transform: "translateY(-50%)",
-                color: "#666",
-                width: "20px",
-                height: "20px",
-                zIndex: 1
-              }} />
-              <input
-                type="password"
-                placeholder="CNIC"
-                style={{
-                  width: "100%",
-                  padding: "14px 14px 14px 45px",
-                  fontSize: "16px",
-                  border: "2px solid #ddd",
-                  borderRadius: "8px",
-                  outline: "none",
-                  transition: "border-color 0.3s",
-                  boxSizing: "border-box"
-                }}
-                onChange={(event) => setPassword(event.target.value)}
-              />
-            </div>
-            <button 
-              type="submit"
-              disabled={!click}
-              style={{
-                width: "100%",
-                padding: "14px",
-                fontSize: "16px",
-                fontWeight: "bold",
-                color: "white",
-                background: !click ? "#999" : "linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%)",
-                border: "none",
-                borderRadius: "8px",
-                cursor: !click ? "not-allowed" : "pointer",
-                transition: "all 0.3s",
-                boxShadow: "0 4px 15px rgba(30, 58, 138, 0.4)"
-              }}
-            >
-              {click ? "Login" : "Loading..."}
-            </button>
-          </form>
-          <div style={{ marginTop: "30px" }}>
-            <p style={{ textAlign: "center", marginBottom: "15px", fontSize: "14px" }}>
-              <span style={{
-                color: "#570009",
-                fontSize: "1.1rem",
-                fontWeight: "bold",
-              }}>
-                Note:
-              </span>
-              <span style={{ color: "black" }}>
-                {" "}If login does not work, contact{" "}
-              </span>
-              <a
-                href="https://gcu.edu.pk/directorate-IT.php"
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  textDecoration: "none",
-                  fontWeight: "bold",
-                  color: "#570009",
-                }}
-              >
-                DIT
-              </a>
-            </p>
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "8px",
-              color: "black",
-              fontSize: "16px"
-            }}>
-              <p style={{ margin: 0 }}>Need help?</p>
-              <p
-                style={{
-                  margin: 0,
-                  color: "#570009",
-                  cursor: "pointer",
-                  textDecoration: "underline",
-                  fontWeight: "bold"
-                }}
-                onClick={() => {
-                  alert("Login Guide:\n\nFor inter student: XXXX-1-21\nFor university student: XXXX-BS-Dept-21\n\nExamples:\nComputer Science: 0000-BSCS-21\nChemistry: 0000-BS-CHEM-21");
-                }}
-              >
-                Login Guide
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </>
-  );
-}
+            Forgot your password?
+          </a>
 
-export default Login;
+          {userType !== "admin" && (
+            <div className="text-sm text-muted-foreground">
+              Don&apos;t have an account?{" "}
+              <a
+                href={config.registerPath}
+                className="text-university-navy hover:text-university-gold font-semibold transition-colors"
+              >
+                Sign up
+              </a>
+            </div>
+          )}
+        </div>
+      </form>
+    </Card>
+  );
+};
+
+export default LoginForm;
