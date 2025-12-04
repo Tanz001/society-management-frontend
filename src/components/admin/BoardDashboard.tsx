@@ -5,8 +5,9 @@
   import { Textarea } from "@/components/ui/textarea";
   import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
   import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-  import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-  import { 
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import AdminEventReportsSection from "@/components/admin/AdminEventReportsSection";
+import { 
     Users, 
     Building, 
     Calendar, 
@@ -64,8 +65,9 @@
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [actionLoading, setActionLoading] = useState(false);
-    const [reviewNote, setReviewNote] = useState("");
-    const [activeTab, setActiveTab] = useState<string>("overview");
+  const [reviewNote, setReviewNote] = useState("");
+  // Default to event-requests tab; societies UI is now hidden
+  const [activeTab, setActiveTab] = useState<string>("event-requests");
     const navigate = useNavigate();
     const [statuses, setStatuses] = useState<Status[]>([]);
     const [eventRequests, setEventRequests] = useState<any[]>([]);
@@ -405,11 +407,13 @@
             {/* Tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="mb-6">
-                <TabsTrigger value="overview">Societies</TabsTrigger>
+                {/* Societies tab hidden as per latest requirements */}
+                {/* <TabsTrigger value="overview">Societies</TabsTrigger> */}
                 <TabsTrigger value="event-requests">Event Requests</TabsTrigger>
+                <TabsTrigger value="event-reports">Event Reports</TabsTrigger>
               </TabsList>
 
-              {/* Societies Tab */}
+              {/* Societies Tab (kept for reference but not reachable from UI) */}
               <TabsContent value="overview">
                 {/* Actions */}
                 <div className="flex items-center justify-between mb-6">
@@ -592,6 +596,11 @@
                     </p>
                   </div>
                 )}
+              </TabsContent>
+
+              {/* Event Reports Tab */}
+              <TabsContent value="event-reports">
+                <AdminEventReportsSection isActive={activeTab === "event-reports"} />
               </TabsContent>
             </Tabs>
           </div>
@@ -806,17 +815,79 @@
                     <h3 className="font-semibold mb-3 text-university-navy">Event Information</h3>
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Event Date:</span>
-                        <span className="font-medium">{new Date(selectedEventRequest.event_date).toLocaleDateString()}</span>
+                        <span className="text-muted-foreground">Event Name:</span>
+                        <span className="font-medium">{selectedEventRequest.event_name || selectedEventRequest.title}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Event Time:</span>
-                        <span className="font-medium">{selectedEventRequest.event_time}</span>
+                        <span className="text-muted-foreground">Event Type:</span>
+                        <span className="font-medium">{selectedEventRequest.event_type || "Not specified"}</span>
                       </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Date From:</span>
+                        <span className="font-medium">
+                          {selectedEventRequest.date_from 
+                            ? new Date(selectedEventRequest.date_from).toLocaleDateString()
+                            : selectedEventRequest.event_date 
+                            ? new Date(selectedEventRequest.event_date).toLocaleDateString()
+                            : "Not specified"}
+                        </span>
+                      </div>
+                      {selectedEventRequest.date_to && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Date To:</span>
+                          <span className="font-medium">{new Date(selectedEventRequest.date_to).toLocaleDateString()}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Time From:</span>
+                        <span className="font-medium">{selectedEventRequest.time_from || selectedEventRequest.event_time || "Not specified"}</span>
+                      </div>
+                      {selectedEventRequest.time_to && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Time To:</span>
+                          <span className="font-medium">{selectedEventRequest.time_to}</span>
+                        </div>
+                      )}
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Venue:</span>
-                        <span className="font-medium">{selectedEventRequest.venue}</span>
+                        <span className="font-medium">{selectedEventRequest.venue || "Not specified"}</span>
                       </div>
+                      {selectedEventRequest.collaborating_org && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Collaborating Org:</span>
+                          <span className="font-medium">{selectedEventRequest.collaborating_org}</span>
+                        </div>
+                      )}
+                      {selectedEventRequest.sponsor_name && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Sponsor:</span>
+                          <span className="font-medium">{selectedEventRequest.sponsor_name}</span>
+                        </div>
+                      )}
+                      {selectedEventRequest.sponsor_amount && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Sponsor Amount:</span>
+                          <span className="font-medium">${selectedEventRequest.sponsor_amount}</span>
+                        </div>
+                      )}
+                      {selectedEventRequest.coordinator_name && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Coordinator:</span>
+                          <span className="font-medium">{selectedEventRequest.coordinator_name}</span>
+                        </div>
+                      )}
+                      {selectedEventRequest.coordinator_contact && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Coordinator Contact:</span>
+                          <span className="font-medium">{selectedEventRequest.coordinator_contact}</span>
+                        </div>
+                      )}
+                      {selectedEventRequest.media_coverage && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Media Coverage:</span>
+                          <span className="font-medium">{selectedEventRequest.media_coverage}</span>
+                        </div>
+                      )}
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Status:</span>
                         <span className="font-medium">{selectedEventRequest.status_name}</span>
@@ -830,17 +901,19 @@
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Name:</span>
                         <span className="font-medium">
-                          {selectedEventRequest.firstName} {selectedEventRequest.lastName}
+                          {selectedEventRequest.firstName && selectedEventRequest.lastName
+                            ? `${selectedEventRequest.firstName} ${selectedEventRequest.lastName}`
+                            : "Not available"}
                         </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Email:</span>
-                        <span className="font-medium">{selectedEventRequest.email}</span>
+                        <span className="font-medium">{selectedEventRequest.email || selectedEventRequest.president_email || "Not provided"}</span>
                       </div>
-                      {selectedEventRequest.rollNo && (
+                      {(selectedEventRequest.rollNo || selectedEventRequest.RollNO) && (
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Roll No:</span>
-                          <span className="font-medium">{selectedEventRequest.rollNo}</span>
+                          <span className="font-medium">{selectedEventRequest.rollNo || selectedEventRequest.RollNO}</span>
                         </div>
                       )}
                       {selectedEventRequest.society_name && (
@@ -853,17 +926,272 @@
                   </Card>
                 </div>
 
-                {/* Description */}
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-3 text-university-navy">Event Description</h3>
-                  <p className="text-muted-foreground leading-relaxed">{selectedEventRequest.description}</p>
-                </Card>
+                {/* Description / Media Coverage */}
+                {(selectedEventRequest.description || selectedEventRequest.media_coverage) && (
+                  <Card className="p-4">
+                    <h3 className="font-semibold mb-3 text-university-navy">Event Description / Media Coverage</h3>
+                    {selectedEventRequest.description && (
+                      <p className="text-muted-foreground leading-relaxed mb-3">{selectedEventRequest.description}</p>
+                    )}
+                    {selectedEventRequest.media_coverage && (
+                      <div>
+                        <p className="font-medium text-sm mb-1">Media Coverage:</p>
+                        <p className="text-muted-foreground leading-relaxed">{selectedEventRequest.media_coverage}</p>
+                      </div>
+                    )}
+                  </Card>
+                )}
 
-                {/* Note */}
-                {selectedEventRequest.note && (
-                  <Card className="p-4 bg-blue-50 border-blue-200">
-                    <h3 className="font-semibold mb-3 text-university-navy">Admin Note</h3>
-                    <p className="text-muted-foreground italic">{selectedEventRequest.note}</p>
+                {/* Participants: Students */}
+                {Array.isArray(selectedEventRequest.student_participants) &&
+                  selectedEventRequest.student_participants.length > 0 && (
+                  <Card className="p-4">
+                    <h3 className="font-semibold mb-3 text-university-navy">Student Participants</h3>
+                    <div className="space-y-2 text-sm">
+                      {selectedEventRequest.student_participants.map((s: any, idx: number) => (
+                        <div
+                          key={idx}
+                          className="flex flex-wrap justify-between border-b last:border-0 pb-2 last:pb-0"
+                        >
+                          <span className="font-medium">
+                            {s.academic_program || "Program not specified"}
+                          </span>
+                          <span className="text-muted-foreground">
+                            {s.semester && `Semester: ${s.semester} • `}
+                            {typeof s.no_of_students === "number" && s.no_of_students > 0
+                              ? `${s.no_of_students} students`
+                              : "Count not specified"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
+
+                {/* Participants: Staff */}
+                {Array.isArray(selectedEventRequest.staff_participants) &&
+                  selectedEventRequest.staff_participants.length > 0 && (
+                  <Card className="p-4">
+                    <h3 className="font-semibold mb-3 text-university-navy">Staff Participants</h3>
+                    <div className="space-y-2 text-sm">
+                      {selectedEventRequest.staff_participants.map((s: any, idx: number) => (
+                        <div
+                          key={idx}
+                          className="flex flex-wrap justify-between border-b last:border-0 pb-2 last:pb-0"
+                        >
+                          <span className="font-medium">
+                            {s.department || "Department not specified"}
+                          </span>
+                          <span className="text-muted-foreground">
+                            {s.gazetted || "Category not specified"} •{" "}
+                            {typeof s.no_of_staff === "number" && s.no_of_staff > 0
+                              ? `${s.no_of_staff} staff`
+                              : "Count not specified"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
+
+                {/* Management Requirements */}
+                {selectedEventRequest.management_requirements && (
+                  <Card className="p-4">
+                    <h3 className="font-semibold mb-3 text-university-navy">Management Requirements</h3>
+                    <div className="grid md:grid-cols-2 gap-3 text-sm">
+                      <div className="space-y-1">
+                        <p>
+                          <span className="font-medium">Sound System:</span>{" "}
+                          {selectedEventRequest.management_requirements.sound_system ? "Yes" : "No"}
+                        </p>
+                        <p>
+                          <span className="font-medium">Recording:</span>{" "}
+                          {selectedEventRequest.management_requirements.recording ? "Yes" : "No"}
+                        </p>
+                        <p>
+                          <span className="font-medium">Bouquet:</span>{" "}
+                          {selectedEventRequest.management_requirements.bouquet ? "Yes" : "No"}
+                        </p>
+                        <p>
+                          <span className="font-medium">Souvenirs:</span>{" "}
+                          {selectedEventRequest.management_requirements.souvenirs ? "Yes" : "No"}
+                        </p>
+                        <p>
+                          <span className="font-medium">University Photographer:</span>{" "}
+                          {selectedEventRequest.management_requirements.university_photographer
+                            ? "Yes"
+                            : "No"}
+                        </p>
+                      </div>
+                      <div className="space-y-1">
+                        <p>
+                          <span className="font-medium">Special Arrangements:</span>{" "}
+                          {selectedEventRequest.management_requirements.special_arrangements
+                            ? "Yes"
+                            : "No"}
+                        </p>
+                        {selectedEventRequest.management_requirements.special_arrangements_detail && (
+                          <p className="text-muted-foreground">
+                            {selectedEventRequest.management_requirements.special_arrangements_detail}
+                          </p>
+                        )}
+                        <p>
+                          <span className="font-medium">Refreshments:</span>{" "}
+                          {selectedEventRequest.management_requirements.refreshment_required
+                            ? "Yes"
+                            : "No"}
+                        </p>
+                        {selectedEventRequest.management_requirements.refreshment_required && (
+                          <>
+                            {selectedEventRequest.management_requirements.refreshment_category && (
+                              <p className="text-muted-foreground">
+                                <span className="font-medium">Category:</span>{" "}
+                                {selectedEventRequest.management_requirements.refreshment_category}
+                              </p>
+                            )}
+                            {selectedEventRequest.management_requirements.refreshment_persons && (
+                              <p className="text-muted-foreground">
+                                <span className="font-medium">Persons:</span>{" "}
+                                {selectedEventRequest.management_requirements.refreshment_persons} persons
+                              </p>
+                            )}
+                          </>
+                        )}
+                        {selectedEventRequest.management_requirements.any_other && (
+                          <p className="text-muted-foreground">
+                            <span className="font-medium">Other:</span>{" "}
+                            {selectedEventRequest.management_requirements.any_other}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </Card>
+                )}
+
+                {/* Transport Requests */}
+                {Array.isArray(selectedEventRequest.transport_requests) &&
+                  selectedEventRequest.transport_requests.length > 0 && (
+                  <Card className="p-4">
+                    <h3 className="font-semibold mb-3 text-university-navy">Transport Requests</h3>
+                    <div className="space-y-2 text-sm">
+                      {selectedEventRequest.transport_requests.map((t: any, idx: number) => (
+                        <div
+                          key={idx}
+                          className="border rounded p-2 flex flex-wrap justify-between gap-2"
+                        >
+                          <div>
+                            <p className="font-medium">{t.vehicle_type || "Vehicle not specified"}</p>
+                            <p className="text-muted-foreground">
+                              {t.purpose || "Purpose not specified"}
+                            </p>
+                          </div>
+                          <div className="text-right text-xs text-muted-foreground">
+                            {t.date && <div>📅 {new Date(t.date).toLocaleDateString()}</div>}
+                            {t.time && <div>🕐 {t.time}</div>}
+                            {t.destination && <div>📍 {t.destination}</div>}
+                            {typeof t.no_of_persons === "number" && t.no_of_persons > 0 && (
+                              <div>👥 {t.no_of_persons} persons</div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
+
+                {/* Documents */}
+                {Array.isArray(selectedEventRequest.documents) &&
+                  selectedEventRequest.documents.length > 0 && (
+                  <Card className="p-4">
+                    <h3 className="font-semibold mb-3 text-university-navy">Attached Documents</h3>
+                    <div className="space-y-2 text-sm">
+                      {selectedEventRequest.documents.map((doc: any) => (
+                        <div
+                          key={doc.doc_id}
+                          className="flex items-center justify-between border-b last:border-0 pb-2 last:pb-0"
+                        >
+                          <span>
+                            <span className="font-medium capitalize">{doc.doc_type}</span>
+                            {" – "}
+                            {doc.file_path.split("/").pop()}
+                          </span>
+                          <a
+                            href={`${import.meta.env.VITE_API_URL}${doc.file_path}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-blue-600 hover:underline"
+                          >
+                            View
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
+
+                {/* Admin Notes from History - Grouped by Role */}
+                {Array.isArray(selectedEventRequest.status_history) &&
+                  selectedEventRequest.status_history.length > 0 && (
+                  <Card className="p-4">
+                    <h3 className="font-semibold mb-4 text-university-navy">Admin Notes & Status History</h3>
+                    <div className="space-y-6">
+                      {/* Group notes by role */}
+                      {(() => {
+                        const notesByRole: { [key: string]: any[] } = {};
+                        selectedEventRequest.status_history
+                          .filter((h: any) => h.note && h.note.trim() !== "")
+                          .forEach((history: any) => {
+                            const role = history.role || history.role_display_name || history.role_name || "Admin";
+                            if (!notesByRole[role]) {
+                              notesByRole[role] = [];
+                            }
+                            notesByRole[role].push(history);
+                          });
+
+                        const roleOrder = ["Board Secretary", "Board President", "Registrar", "VC", "Transport Office", "Protocol Office"];
+                        const sortedRoles = Object.keys(notesByRole).sort((a, b) => {
+                          const aIndex = roleOrder.indexOf(a);
+                          const bIndex = roleOrder.indexOf(b);
+                          if (aIndex === -1 && bIndex === -1) return a.localeCompare(b);
+                          if (aIndex === -1) return 1;
+                          if (bIndex === -1) return -1;
+                          return aIndex - bIndex;
+                        });
+
+                        if (sortedRoles.length === 0) {
+                          return <p className="text-sm text-muted-foreground italic">No admin notes yet.</p>;
+                        }
+
+                        return sortedRoles.map((role) => (
+                          <div key={role} className="space-y-3">
+                            <h4 className="font-semibold text-sm text-university-navy border-b pb-2">
+                              {role} Notes
+                            </h4>
+                            {notesByRole[role].map((history: any, idx: number) => (
+                              <div
+                                key={history.history_id || idx}
+                                className="border-l-4 border-blue-500 pl-4 py-2 bg-blue-50 rounded-r"
+                              >
+                                <div className="flex items-start justify-between mb-2">
+                                  <div>
+                                    <p className="text-xs text-muted-foreground">
+                                      {history.firstName && history.lastName
+                                        ? `${history.firstName} ${history.lastName}`
+                                        : "Unknown"}
+                                      {history.status_name && ` • ${history.status_name}`}
+                                    </p>
+                                  </div>
+                                  <span className="text-xs text-muted-foreground">
+                                    {new Date(history.changed_at).toLocaleString()}
+                                  </span>
+                                </div>
+                                <p className="text-sm text-gray-700 mt-1">{history.note}</p>
+                              </div>
+                            ))}
+                          </div>
+                        ));
+                      })()}
+                    </div>
                   </Card>
                 )}
 

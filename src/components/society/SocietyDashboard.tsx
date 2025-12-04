@@ -1099,19 +1099,34 @@ const SocietyDashboard = () => {
 
           {activeTab === "event-requests" && (
             <div className="space-y-6">
-              {societyInfo?.society_id && (() => {
-                const userData = JSON.parse(localStorage.getItem("user") || "{}");
-                return (
-                  <>
-                    <EventRequestForm 
-                      societyId={societyInfo.society_id}
-                      userId={userData.id}
-                      onSubmitSuccess={() => setEventRequestsRefreshKey(prev => prev + 1)}
-                    />
-                    <EventRequestsList key={eventRequestsRefreshKey} societyId={societyInfo.society_id} />
-                  </>
-                );
-              })()}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <h2 className="text-xl md:text-2xl font-semibold text-university-navy">
+                  Event Requests
+                </h2>
+                <Button
+                  variant="university"
+                  size="sm"
+                  className="w-full sm:w-auto"
+                  onClick={() => navigate("/dashboard/society/event-request/create")}
+                  disabled={!societyInfo?.society_id}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Event Request
+                </Button>
+              </div>
+
+              {societyInfo?.society_id ? (
+                <EventRequestsList
+                  key={eventRequestsRefreshKey}
+                  societyId={societyInfo.society_id}
+                />
+              ) : (
+                <Card className="p-6 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    Society information is still loading. Please wait a moment and try again.
+                  </p>
+                </Card>
+              )}
             </div>
           )}
 
