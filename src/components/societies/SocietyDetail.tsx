@@ -87,7 +87,7 @@ const SocietyDetail = () => {
       }
 
       const response = await axios.post(
-        'http://localhost:5000/user/poll/vote',
+        `${import.meta.env.VITE_API_URL}/user/poll/vote`,
         {
           option_id: optionId,
           poll_id: pollId
@@ -122,7 +122,7 @@ const SocietyDetail = () => {
       }
 
       const response = await axios.get(
-        `http://localhost:5000/user/poll/${pollId}`,
+        `${import.meta.env.VITE_API_URL}/user/poll/${pollId}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -147,7 +147,7 @@ const SocietyDetail = () => {
     try {
       setLikingPost(postId);
       
-      const response = await axios.post('http://localhost:5000/user/like/toggle', {
+      const response = await axios.post(`${import.meta.env.VITE_API_URL}/user/like/toggle`, {
         post_id: postId
       }, {
         headers: {
@@ -190,7 +190,7 @@ const SocietyDetail = () => {
   //   try {
   //     setSubmittingComment(true);
   //     
-  //     const response = await axios.post('http://localhost:5000/user/comment/add', {
+  //     const response = await axios.post(`${import.meta.env.VITE_API_URL}/user/comment/add`, {
   //       post_id: postId,
   //       comment_text: newComment.trim()
   //     }, {
@@ -252,7 +252,7 @@ const SocietyDetail = () => {
       }
 
       const response = await axios.post(
-        `http://localhost:5000/society/posts`,
+        `${import.meta.env.VITE_API_URL}/society/posts`,
         { society_id: societyId, user_id: userId },
         {
           headers: {
@@ -308,7 +308,7 @@ const SocietyDetail = () => {
           throw new Error("No authentication token found");
         }
 
-        const response = await axios.get(`http://localhost:5000/user/societies/${id}`, {
+        const response = await axios.get(`${import.meta.env.VITE_API_URL}/user/societies/${id}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -405,7 +405,7 @@ const SocietyDetail = () => {
                 {society.society_logo && (
                   <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-white/30 shadow-lg flex-shrink-0">
                     <img 
-                      src={`http://localhost:5000/${society.society_logo.replace(/\\/g, '/')}`} 
+                      src={`${import.meta.env.VITE_API_URL}/${society.society_logo.replace(/\\/g, '/')}`} 
                       alt={society.name}
                       className="w-full h-full object-cover"
                       onError={(e) => {
@@ -566,7 +566,7 @@ const SocietyDetail = () => {
                                   let imageUrl = file.file_url;
                                   if (file.file_url && !file.file_url.startsWith('http')) {
                                     // Convert Windows path to URL format
-                                    imageUrl = `http://localhost:5000/${file.file_url.replace(/\\/g, '/').replace(/^.*?\/assets\//, 'assets/')}`;
+                                    imageUrl = `${import.meta.env.VITE_API_URL}/${file.file_url.replace(/\\/g, '/').replace(/^.*?\/assets\//, 'assets/')}`;
                                   }
                                   
                                   return (
@@ -604,7 +604,7 @@ const SocietyDetail = () => {
                                   let videoUrl = file.file_url;
                                   if (file.file_url && !file.file_url.startsWith('http')) {
                                     // Convert Windows path to URL format
-                                    videoUrl = `http://localhost:5000/${file.file_url.replace(/\\/g, '/').replace(/^.*?\/assets\//, 'assets/')}`;
+                                    videoUrl = `${import.meta.env.VITE_API_URL}/${file.file_url.replace(/\\/g, '/').replace(/^.*?\/assets\//, 'assets/')}`;
                                   }
                                   
                                   return (
@@ -638,7 +638,7 @@ const SocietyDetail = () => {
                                   let fileUrl = file.file_url;
                                   if (file.file_url && !file.file_url.startsWith('http')) {
                                     // Convert Windows path to URL format
-                                    fileUrl = `http://localhost:5000/${file.file_url.replace(/\\/g, '/').replace(/^.*?\/assets\//, 'assets/')}`;
+                                    fileUrl = `${import.meta.env.VITE_API_URL}/${file.file_url.replace(/\\/g, '/').replace(/^.*?\/assets\//, 'assets/')}`;
                                   }
                                   
                                   return (

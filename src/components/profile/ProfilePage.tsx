@@ -81,7 +81,7 @@ const ProfilePage = () => {
         return;
       }
 
-      const response = await axios.get("http://localhost:5000/user/joined-societies", {
+      const response = await axios.get(`${import.meta.env.VITE_API_URL}/user/joined-societies`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -124,7 +124,7 @@ const ProfilePage = () => {
       console.log("Sending update data:", updateData);
 
       const res = await axios.put(
-        "http://localhost:5000/user/update-profile",
+        `${import.meta.env.VITE_API_URL}/user/update-profile`,
         updateData,
         {
           headers: {
@@ -168,7 +168,7 @@ const ProfilePage = () => {
     setLoadingRequests(true);
     try {
       const response = await axios.post(
-        "http://localhost:5000/user/membership/requests",
+        `${import.meta.env.VITE_API_URL}/user/membership/requests`,
         { user_id: userId },
         {
           headers: {
@@ -404,7 +404,7 @@ const ProfilePage = () => {
                         <div className="flex items-center space-x-4">
                           <Avatar>
                             <AvatarImage 
-                              src={society.society_logo ? `http://localhost:5000/${society.society_logo}` : ""} 
+                              src={society.society_logo ? `${import.meta.env.VITE_API_URL}/${society.society_logo}` : ""}
                             />
                             <AvatarFallback className="bg-university-navy text-white">
                               {society.society_name?.substring(0, 2).toUpperCase() || "SC"}

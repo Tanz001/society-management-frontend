@@ -40,6 +40,8 @@ interface StatusHistory {
   status_name: string;
   status_description: string;
   remarks: string | null;
+  role?: string | null;
+  note?: string | null;
   changed_at: string;
   firstName: string;
   lastName: string;
@@ -62,6 +64,7 @@ const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
 
     setLoading(true);
     try {
+       const API_URL = import.meta.env.VITE_API_URL;
       const token = localStorage.getItem("token");
       if (!token) {
         toast.error("Authentication required");
@@ -69,7 +72,7 @@ const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
       }
 
       const response = await axios.post(
-        "http://localhost:5000/society/event-request/list",
+        `${API_URL}/society/event-request/list`,
         { society_id: societyId },
         {
           headers: {
@@ -101,6 +104,7 @@ const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
   const fetchStatusHistory = async (eventReqId: number) => {
     setLoadingHistory(true);
     try {
+       const API_URL = import.meta.env.VITE_API_URL;
       const token = localStorage.getItem("token");
       if (!token) {
         toast.error("Authentication required");
@@ -108,7 +112,7 @@ const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
       }
 
       const response = await axios.get(
-        `http://localhost:5000/society/event-request/${eventReqId}/history`,
+        `${API_URL}/society/event-request/${eventReqId}/history`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -284,74 +288,171 @@ const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
               <p className="text-muted-foreground">Loading status history...</p>
             </div>
           ) : statusHistory.length > 0 ? (
-            <div className="space-y-4">
-              {statusHistory.map((history, index) => (
-                <Card key={history.history_id} className="p-4 shadow-card border-l-4 border-l-university-navy">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Badge 
-                          variant={
-                            [2, 4, 6, 8, 10, 11].includes(history.status_id) ? "default" : 
-                            [3, 5, 7, 9].includes(history.status_id) ? "destructive" : 
-                            "secondary"
-                          }
-                          className={
-                            [2, 4, 6, 8, 10, 11].includes(history.status_id) 
-                              ? "bg-green-100 text-green-800 border-green-200" : 
-                            [3, 5, 7, 9].includes(history.status_id)
-                              ? "bg-red-100 text-red-800 border-red-200" :
-                              "bg-yellow-100 text-yellow-800 border-yellow-200"
-                          }
-                        >
-                          {history.status_name}
-                        </Badge>
-                        {history.role_display_name && (
-                          <Badge variant="outline" className="text-xs">
-                            {history.role_display_name}
-                          </Badge>
-                        )}
-                      </div>
-                      
-                      {history.status_description && (
-                        <p className="text-sm text-muted-foreground mb-2">
-                          {history.status_description}
-                        </p>
-                      )}
+            <div className="space-y-6">
+              {/* Group notes by role */}
+              {(() => {
+                const notesByRole: { [key: string]: StatusHistory[] } = {};
+                const historyWithoutNotes: StatusHistory[] = [];
+                
+                statusHistory.forEach((history) => {
+                  const note = history.note || history.remarks;
+                  const role = history.role || history.role_display_name || history.role_name || "Admin";
+                  
+                  if (note && note.trim() !== "") {
+                    if (!notesByRole[role]) {
+                      notesByRole[role] = [];
+                    }
+                    notesByRole[role].push(history);
+                  } else {
+                    historyWithoutNotes.push(history);
+                  }
+                });
 
-                      {history.remarks && (
-                        <div className="bg-blue-50 border-l-4 border-blue-200 p-3 rounded mb-2">
-                          <p className="text-xs font-medium text-blue-900 mb-1">Note:</p>
-                          <p className="text-sm text-blue-800">{history.remarks}</p>
-                        </div>
-                      )}
+                const roleOrder = ["Board Secretary", "Board President", "Registrar", "VC", "Transport Office", "Protocol Office"];
+                const sortedRoles = Object.keys(notesByRole).sort((a, b) => {
+                  const aIndex = roleOrder.indexOf(a);
+                  const bIndex = roleOrder.indexOf(b);
+                  if (aIndex === -1 && bIndex === -1) return a.localeCompare(b);
+                  if (aIndex === -1) return 1;
+                  if (bIndex === -1) return -1;
+                  return aIndex - bIndex;
+                });
 
-                      <div className="flex items-center gap-4 text-xs text-muted-foreground mt-2">
-                        <div className="flex items-center">
-                          <User className="h-3 w-3 mr-1" />
-                          <span>
-                            {history.firstName} {history.lastName}
-                            {history.RollNO && ` (${history.RollNO})`}
-                          </span>
-                        </div>
-                        <div className="flex items-center">
-                          <Clock className="h-3 w-3 mr-1" />
-                          <span>{new Date(history.changed_at).toLocaleString()}</span>
-                        </div>
+                return (
+                  <>
+                    {/* Display notes grouped by role */}
+                    {sortedRoles.map((role) => (
+                      <div key={role} className="space-y-3">
+                        <h4 className="font-semibold text-sm text-university-navy border-b pb-2">
+                          {role} Notes
+                        </h4>
+                        {notesByRole[role].map((history) => (
+                          <Card key={history.history_id} className="p-4 shadow-card border-l-4 border-l-blue-500">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <Badge 
+                                    variant={
+                                      [2, 4, 6, 8, 10, 11].includes(history.status_id) ? "default" : 
+                                      [3, 5, 7, 9].includes(history.status_id) ? "destructive" : 
+                                      "secondary"
+                                    }
+                                    className={
+                                      [2, 4, 6, 8, 10, 11].includes(history.status_id) 
+                                        ? "bg-green-100 text-green-800 border-green-200" : 
+                                      [3, 5, 7, 9].includes(history.status_id)
+                                        ? "bg-red-100 text-red-800 border-red-200" :
+                                        "bg-yellow-100 text-yellow-800 border-yellow-200"
+                                    }
+                                  >
+                                    {history.status_name}
+                                  </Badge>
+                                </div>
+                                
+                                <div className="bg-blue-50 border-l-4 border-blue-200 p-3 rounded mb-2">
+                                  <p className="text-sm text-blue-800">{history.note || history.remarks}</p>
+                                </div>
+
+                                <div className="flex items-center gap-4 text-xs text-muted-foreground mt-2">
+                                  <div className="flex items-center">
+                                    <User className="h-3 w-3 mr-1" />
+                                    <span>
+                                      {history.firstName} {history.lastName}
+                                      {history.RollNO && ` (${history.RollNO})`}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center">
+                                    <Clock className="h-3 w-3 mr-1" />
+                                    <span>{new Date(history.changed_at).toLocaleString()}</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="ml-4">
+                                {[2, 4, 6, 8, 10, 11].includes(history.status_id) ? (
+                                  <CheckCircle className="h-5 w-5 text-green-600" />
+                                ) : [3, 5, 7, 9].includes(history.status_id) ? (
+                                  <XCircle className="h-5 w-5 text-red-600" />
+                                ) : (
+                                  <Clock className="h-5 w-5 text-yellow-600" />
+                                )}
+                              </div>
+                            </div>
+                          </Card>
+                        ))}
                       </div>
-                    </div>
-                    <div className="ml-4">
-                      {[2, 4, 6, 8, 10, 11].includes(history.status_id) ? (
-                        <CheckCircle className="h-5 w-5 text-green-600" />
-                      ) : [3, 5, 7, 9].includes(history.status_id) ? (
-                        <XCircle className="h-5 w-5 text-red-600" />
-                      ) : (
-                        <Clock className="h-5 w-5 text-yellow-600" />
-                      )}
-                    </div>
-                  </div>
-                </Card>
-              ))}
+                    ))}
+                    
+                    {/* Display status changes without notes */}
+                    {historyWithoutNotes.length > 0 && (
+                      <div className="space-y-3">
+                        <h4 className="font-semibold text-sm text-university-navy border-b pb-2">
+                          Status Changes
+                        </h4>
+                        {historyWithoutNotes.map((history) => (
+                          <Card key={history.history_id} className="p-4 shadow-card border-l-4 border-l-university-navy">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <Badge 
+                                    variant={
+                                      [2, 4, 6, 8, 10, 11].includes(history.status_id) ? "default" : 
+                                      [3, 5, 7, 9].includes(history.status_id) ? "destructive" : 
+                                      "secondary"
+                                    }
+                                    className={
+                                      [2, 4, 6, 8, 10, 11].includes(history.status_id) 
+                                        ? "bg-green-100 text-green-800 border-green-200" : 
+                                      [3, 5, 7, 9].includes(history.status_id)
+                                        ? "bg-red-100 text-red-800 border-red-200" :
+                                        "bg-yellow-100 text-yellow-800 border-yellow-200"
+                                    }
+                                  >
+                                    {history.status_name}
+                                  </Badge>
+                                  {history.role_display_name && (
+                                    <Badge variant="outline" className="text-xs">
+                                      {history.role_display_name}
+                                    </Badge>
+                                  )}
+                                </div>
+                                
+                                {history.status_description && (
+                                  <p className="text-sm text-muted-foreground mb-2">
+                                    {history.status_description}
+                                  </p>
+                                )}
+
+                                <div className="flex items-center gap-4 text-xs text-muted-foreground mt-2">
+                                  <div className="flex items-center">
+                                    <User className="h-3 w-3 mr-1" />
+                                    <span>
+                                      {history.firstName} {history.lastName}
+                                      {history.RollNO && ` (${history.RollNO})`}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center">
+                                    <Clock className="h-3 w-3 mr-1" />
+                                    <span>{new Date(history.changed_at).toLocaleString()}</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="ml-4">
+                                {[2, 4, 6, 8, 10, 11].includes(history.status_id) ? (
+                                  <CheckCircle className="h-5 w-5 text-green-600" />
+                                ) : [3, 5, 7, 9].includes(history.status_id) ? (
+                                  <XCircle className="h-5 w-5 text-red-600" />
+                                ) : (
+                                  <Clock className="h-5 w-5 text-yellow-600" />
+                                )}
+                              </div>
+                            </div>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           ) : (
             <div className="text-center py-8">

@@ -63,12 +63,13 @@ const RoleAccess = () => {
         }
 
         const [rolesResponse, societiesResponse] = await Promise.all([
-          axios.get("http://localhost:5000/admin/roles", {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          axios.get("http://localhost:5000/admin/roles/societies", {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
+       axios.get(`${import.meta.env.VITE_API_URL}/admin/roles`, {
+  headers: { Authorization: `Bearer ${token}` },
+}),
+axios.get(`${import.meta.env.VITE_API_URL}/admin/roles/societies`, {
+  headers: { Authorization: `Bearer ${token}` },
+}),
+
         ]);
 
         setRoles(rolesResponse.data.roles || []);
@@ -100,7 +101,7 @@ const RoleAccess = () => {
         }
 
         const response = await axios.get(
-          `http://localhost:5000/admin/roles/assignments/${selectedFacultyId}`,
+          `${import.meta.env.VITE_API_URL}/admin/roles/assignments/${selectedFacultyId}`,
           {
             headers: { Authorization: `Bearer ${token}` },
           }
@@ -169,7 +170,7 @@ const RoleAccess = () => {
       ];
 
       await axios.post(
-        "http://localhost:5000/admin/roles/assignments",
+        `${import.meta.env.VITE_API_URL}/admin/roles/assignments`,
         {
           faculty_id: selectedFacultyId,
           assignments: assignmentsPayload,

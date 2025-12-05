@@ -210,9 +210,10 @@ const SocietyRegistration = () => {
          throw new Error("No authentication token found");
        }
 
-       const response = await axios.post(
-         "http://localhost:5000/society/register",
-         payload,
+     const response = await axios.post(
+  `${import.meta.env.VITE_API_URL}/society/register`,
+  payload,
+
          {
            headers: {
              Authorization: `Bearer ${token}`, // Ensure proper Bearer token format

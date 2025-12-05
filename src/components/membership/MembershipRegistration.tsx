@@ -50,6 +50,7 @@ const MembershipRegistration = ({
 // Fetch membership settings from API
 const fetchMembershipSettings = async (societyId: string) => {
   try {
+     const API_URL = import.meta.env.VITE_API_URL;
     setLoadingSettings(true);
     console.log(`Fetching membership settings for society ID: ${societyId}`);
 
@@ -60,7 +61,7 @@ const fetchMembershipSettings = async (societyId: string) => {
     }
 
     const response = await axios.post(
-      `http://localhost:5000/society/membership/form`,
+      `${API_URL}/society/membership/form`,
       { society_id: societyId },
       {
         headers: {
@@ -123,7 +124,9 @@ const fetchMembershipSettings = async (societyId: string) => {
             throw new Error("No authentication token found");
           }
 
-          const response = await axios.get(`http://localhost:5000/user/societies/${societyId}`, {
+          
+          const response = await axios.get(`${import.meta.env.VITE_API_URL}/user/societies/${societyId}`, {
+
             
             headers: {
               Authorization: `Bearer ${token}`,
@@ -222,7 +225,7 @@ const fetchMembershipSettings = async (societyId: string) => {
       if (!token) throw new Error("No authentication token found");
   
       const response = await axios.post(
-        "http://localhost:5000/user/membership/submit",
+        `${import.meta.env.VITE_API_URL}/user/membership/submit`,
         submitData,
         {
           headers: {

@@ -29,6 +29,7 @@ import EngagementPage from "./components/engagement/EngagementPage";
 import EventsPage from "./components/events/EventsPage";
 import MembershipRegistration from "./components/membership/MembershipRegistration";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
+import SocietyEventRequestPage from "./components/society/SocietyEventRequestPage";
 
 const queryClient = new QueryClient();
 
@@ -89,6 +90,12 @@ const App = () => (
           <Route path="/dashboard/society" element={
             <ProtectedRoute requireAuth>
               <SocietyDashboard />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/dashboard/society/event-request/create" element={
+            <ProtectedRoute requireAuth>
+              <SocietyEventRequestPage />
             </ProtectedRoute>
           } />
           
