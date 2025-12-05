@@ -21,73 +21,12 @@ const LoginForm = ({ userType = "student" }: LoginFormProps) => {
   // Simple navigation function (replace with your actual router)
   const navigate = (path: string) => {
     console.log("Navigating to:", path);
-    // In your actual app, uncomment this:
-    // window.location.href = path;
+    // Uncomment the line below to actually navigate:
+    window.location.href = path;
   };
 
   // Check if user is already authenticated
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    const user = localStorage.getItem("user");
-    
-    console.log("LoginForm - Checking authentication state:");
-    console.log("Token exists:", !!token);
-    console.log("User exists:", !!user);
-    
-    if (token && user) {
-      try {
-        const userData = JSON.parse(user);
-        console.log("User admin status:", userData.admin);
-        console.log("User society owner status:", userData.society_owner);
-        
-        // Check role_name for routing
-        if (userData.admin === 1) {
-          const roleName = userData.role_name ? String(userData.role_name).trim().toLowerCase() : null;
-          const roleId = userData.role_id;
-          console.log("User is admin with role_id:", roleId, "role_name:", roleName);
-          
-          // Redirect based on role_name
-          if (roleName === 'board_secretary') {
-            console.log("Redirecting to Board Secretary dashboard");
-            navigate("/dashboard/admin/board-secretary");
-          } else if (roleName === 'board_president') {
-            console.log("Redirecting to Board President dashboard");
-            navigate("/dashboard/admin/board-president");
-          } else if (roleName === 'registrar') {
-            console.log("Redirecting to Registrar dashboard");
-            navigate("/dashboard/admin/registrar");
-          } else if (roleName === 'vc' || roleName === 'vice_chancellor') {
-            console.log("Redirecting to VC dashboard");
-            navigate("/dashboard/admin/vc");
-          } else if (roleName === 'transport_office') {
-            console.log("Redirecting to Transport Office dashboard");
-            navigate("/dashboard/admin/transport-office");
-          } else if (roleName === 'protocol_office') {
-            console.log("Redirecting to Protocol Office dashboard");
-            navigate("/dashboard/admin/protocol-office");
-          } else if (roleName === 'admin') {
-            console.log("Redirecting to Admin dashboard");
-            navigate("/dashboard/admin");
-          } else {
-            console.warn("⚠️ Unknown admin role. Role ID:", roleId, "Role name:", roleName);
-            navigate("/dashboard/admin");
-          }
-        } else if (userData.society_owner === 1) {
-          console.log("User is society owner, redirecting to society dashboard");
-          navigate("/dashboard/society");
-        } else if (userData.role_name === 'advisor') {
-          console.log("User is advisor, redirecting to advisor dashboard");
-          navigate("/dashboard/student");
-        } else {
-          console.log("User is student, redirecting to student dashboard");
-          navigate("/dashboard/student");
-        }
-      } catch (error) {
-        console.error("Error parsing user data:", error);
-        navigate("/dashboard/student");
-      }
-    }
-  }, []);
+ 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,78 +60,25 @@ const LoginForm = ({ userType = "student" }: LoginFormProps) => {
 
       const { user, error: apiError, warning, token } = data;
 
+      
+      console.log("Parsed user:", user);
+      console.log("Parsed user:", user.ROLE);
+      console.log("Parsed token:", data)
+
+
+      if(user.ROLE == 'STDR'){
+        localStorage.setItem("token", token);
+        navigate('/dashboard/student');
+      }
+      else{
+        localStorage.setItem("token", token);
+        navigate('/');
+      }
       if (apiError || warning) {
         throw new Error(apiError || warning);
       }
 
-      if (token) {
-        // Save JWT token
-        localStorage.setItem("token", token);
-
-        // Save student/user data
-        localStorage.setItem("user", JSON.stringify(user));
-
-        console.log("Login successful:", data);
-        console.log("Token saved:", token);
-        console.log("User data saved:", user);
-        console.log("Available fields in user data:", Object.keys(user));
-        
-        // Verify localStorage storage
-        console.log("Token in localStorage:", localStorage.getItem("token"));
-        console.log("User in localStorage:", localStorage.getItem("user"));
-
-        // Check user role and redirect accordingly
-        const userData = user;
-        console.log("=== LOGIN DEBUG INFO ===");
-        console.log("Full userData object:", JSON.stringify(userData, null, 2));
-        console.log("User admin status:", userData.admin);
-        console.log("User role:", userData.role);
-        console.log("User society owner status:", userData.society_owner);
-        console.log("All userData keys:", Object.keys(userData));
-        
-        // Check role_name for routing
-        if (userData.admin === 1) {
-          const roleName = userData.role_name ? String(userData.role_name).trim().toLowerCase() : null;
-          const roleId = userData.role_id;
-          console.log("User is admin with role_id:", roleId, "role_name:", roleName);
-          
-          // Redirect based on role_name
-          if (roleName === 'board_secretary') {
-            console.log("Redirecting to Board Secretary dashboard");
-            navigate("/dashboard/admin/board-secretary");
-          } else if (roleName === 'board_president') {
-            console.log("Redirecting to Board President dashboard");
-            navigate("/dashboard/admin/board-president");
-          } else if (roleName === 'registrar') {
-            console.log("Redirecting to Registrar dashboard");
-            navigate("/dashboard/admin/registrar");
-          } else if (roleName === 'vc' || roleName === 'vice_chancellor') {
-            console.log("Redirecting to VC dashboard");
-            navigate("/dashboard/admin/vc");
-          } else if (roleName === 'transport_office') {
-            console.log("Redirecting to Transport Office dashboard");
-            navigate("/dashboard/admin/transport-office");
-          } else if (roleName === 'protocol_office') {
-            console.log("Redirecting to Protocol Office dashboard");
-            navigate("/dashboard/admin/protocol-office");
-          } else if (roleName === 'admin') {
-            console.log("Redirecting to Admin dashboard");
-            navigate("/dashboard/admin");
-          } else {
-            console.warn("⚠️ Unknown admin role. Role ID:", roleId, "Role name:", roleName);
-            navigate("/dashboard/admin");
-          }
-        } else if (userData.society_owner === 1) {
-          console.log("User is society owner, redirecting to society dashboard");
-          navigate("/dashboard/society");
-        } else if (userData.role_name === 'advisor') {
-          console.log("User is advisor, redirecting to advisor dashboard");
-          navigate("/dashboard/student");
-        } else {
-          console.log("User is student, redirecting to student dashboard");
-          navigate("/dashboard/student");
-        }
-      }
+     
 
       setIsLoading(false);
     } catch (err: any) {
@@ -241,7 +127,7 @@ const LoginForm = ({ userType = "student" }: LoginFormProps) => {
             </Label>
             <Input
               id="email"
-              type="email"
+              type="text"
               placeholder="Enter your email"
               value={formData.email}
               onChange={(e) =>
