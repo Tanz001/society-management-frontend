@@ -34,10 +34,14 @@ const LoginForm = ({ userType = "student" }: LoginFormProps) => {
     setIsLoading(true);
 
     try {
-      console.log("Making login request to: https://lms.gcu.edu.pk/api/fc/login");
-      console.log("Request payload:", { 
-        usnm: formData.email, 
-        pwd: formData.password 
+      // Call backend login API
+    const API_URL = import.meta.env.VITE_API_URL;
+
+      console.log("Daniyal");
+
+      const res = await axios.post(`${API_URL}/student/login`, {
+        email: formData.email,
+        password: formData.password,
       });
 
       // Call backend login API using fetch

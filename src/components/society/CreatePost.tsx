@@ -81,6 +81,7 @@ const CreatePost = () => {
   
     setLoading(true);
     try {
+       const API_URL = import.meta.env.VITE_API_URL;
       const formData = new FormData();
       formData.append("society_id", societyId);
       formData.append("society_name", societyName);
@@ -98,7 +99,7 @@ const CreatePost = () => {
       }
   
       const response = await axios.post(
-        `http://localhost:5000/society/create`,
+        `${API_URL}/society/create`,
         formData,
         {
           headers: {

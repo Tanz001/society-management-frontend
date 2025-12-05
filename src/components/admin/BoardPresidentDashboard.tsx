@@ -65,8 +65,9 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [actionLoading, setActionLoading] = useState(false);
-    const [reviewNote, setReviewNote] = useState("");
-    const [activeTab, setActiveTab] = useState<string>("overview");
+  const [reviewNote, setReviewNote] = useState("");
+  // Default to event-requests tab; societies UI is now hidden
+  const [activeTab, setActiveTab] = useState<string>("event-requests");
     const navigate = useNavigate();
     const [statuses, setStatuses] = useState<Status[]>([]);
     const [eventRequests, setEventRequests] = useState<any[]>([]);
@@ -74,8 +75,16 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
     const [selectedEventRequest, setSelectedEventRequest] = useState<any | null>(null);
     const [isEventRequestModalOpen, setIsEventRequestModalOpen] = useState(false);
     const [isEventStatusModalOpen, setIsEventStatusModalOpen] = useState(false);
-    const [eventStatusNote, setEventStatusNote] = useState("");
-    const [selectedEventStatus, setSelectedEventStatus] = useState<number>(0);
+  const [eventStatusNote, setEventStatusNote] = useState("");
+  const [selectedEventStatus, setSelectedEventStatus] = useState<number>(0);
+  const [eventRequestStats, setEventRequestStats] = useState({
+    total: 0,
+    pending: 0,
+    approved: 0,
+    rejected: 0
+  });
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [eventRequestFilter, setEventRequestFilter] = useState<string>("all"); // all, pending, approved, rejected
 
     // Helper functions for event requester details
     const getRequesterName = (request?: any) => {
@@ -111,6 +120,7 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
     // Fetch pending societies for Board President
     const fetchPendingSocieties = async () => {
       try {
+         const API_URL = import.meta.env.VITE_API_URL;
         setLoading(true);
         setError("");
     
@@ -118,7 +128,7 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
         if (!token) throw new Error("No authentication token found");
     
         const response = await axios.post(
-          "http://localhost:5000/admin/societies-by-role",
+          `${API_URL}/admin/societies-by-role`,
           { role: "board_president" },
           {
             headers: {
@@ -140,11 +150,12 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
     // Handle society review
     const handleReviewClick = async (society: Society) => {
       try {
+         const API_URL = import.meta.env.VITE_API_URL;
         setLoading(true);
         const token = localStorage.getItem("token");
         
         // Fetch detailed society information
-        const response = await axios.get(`http://localhost:5000/admin/societies/${society.society_id}`, {
+        const response = await axios.get(`${API_URL}/admin/societies/${society.society_id}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -167,6 +178,7 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
       if (!selectedSociety) return;
 
       try {
+         const API_URL = import.meta.env.VITE_API_URL;
         setActionLoading(true);
         const token = localStorage.getItem("token");
         const currentUser = getCurrentUser();
@@ -176,7 +188,7 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
         }
 
         const response = await axios.put(
-          `http://localhost:5000/admin/board-president/societies/${selectedSociety.society_id}/review`,
+          `${API_URL}/admin/board-president/societies/${selectedSociety.society_id}/review`,
           {
             action,
             note: reviewNote,
@@ -211,11 +223,12 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
     // Fetch allowed statuses for Board President based on current status
     const fetchStatuses = async (currentStatusId: number = 2) => {
       try {
+         const API_URL = import.meta.env.VITE_API_URL;
         const token = localStorage.getItem("token");
         if (!token) return;
 
         // Board President can only set status 4 (Approve) or 5 (Reject) from status 2 (Approved by Board Secretary)
-        const response = await axios.get(`http://localhost:5000/admin/allowed-statuses?role=board_president&current_status_id=${currentStatusId}`, {
+        const response = await axios.get(`${API_URL}/admin/allowed-statuses?role=board_president&current_status_id=${currentStatusId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -238,9 +251,12 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
           throw new Error("No authentication token found");
         }
     
-        const response = await axios.post(
-          "http://localhost:5000/admin/event-requests",
-          { role: "board_president" },
+     const response = await axios.post(
+  `${import.meta.env.VITE_API_URL}/admin/event-requests`,
+  { 
+    role: "board_president",
+    filter: eventRequestFilter
+  },
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -261,10 +277,11 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
     // Handle view event request details
     const handleViewEventRequest = async (reqId: number) => {
       try {
+         const API_URL = import.meta.env.VITE_API_URL;
         setLoading(true);
         const token = localStorage.getItem("token");
         
-        const response = await axios.get(`http://localhost:5000/admin/event-requests/${reqId}`, {
+        const response = await axios.get(`${API_URL}/admin/event-requests/${reqId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -278,11 +295,38 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
       }
     };
 
+    // Fetch event request stats
+    const fetchEventRequestStats = async () => {
+      try {
+        setStatsLoading(true);
+        const token = localStorage.getItem("token");
+        if (!token) return;
+
+        const response = await axios.post(
+          `${import.meta.env.VITE_API_URL}/admin/event-requests/stats`,
+          { role: "board_president" },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (response.data.success) {
+          setEventRequestStats(response.data.data || response.data.stats);
+        }
+      } catch (err: any) {
+        console.error("Error fetching event request stats:", err);
+      } finally {
+        setStatsLoading(false);
+      }
+    };
+
     // Handle open event status change modal
     const handleChangeEventStatus = async (request: any) => {
       setSelectedEventRequest(request);
       setSelectedEventStatus(0); // Reset selection
-      setEventStatusNote(request.note || "");
+      setEventStatusNote(""); // Always start with empty note
       setIsEventStatusModalOpen(true);
       // Fetch allowed statuses based on the request's current status
       await fetchStatuses(request.status_id);
@@ -293,6 +337,7 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
       if (!selectedEventRequest || !selectedEventStatus) return;
 
       try {
+         const API_URL = import.meta.env.VITE_API_URL;
         setActionLoading(true);
         const token = localStorage.getItem("token");
         const currentUser = getCurrentUser();
@@ -304,7 +349,7 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
         // Board President can only approve (4) or reject (5) event requests
         const action = selectedEventStatus === 4 ? 'approve' : 'reject';
         const response = await axios.put(
-          `http://localhost:5000/admin/board-president/event-requests/${selectedEventRequest.req_id}/review`,
+          `${API_URL}/admin/board-president/event-requests/${selectedEventRequest.req_id}/review`,
           {
             action,
             note: eventStatusNote,
@@ -317,8 +362,9 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
 
         console.log("Event request status updated successfully:", response.data);
         
-        // Refresh the event requests list
+        // Refresh the event requests list and stats
         await fetchAllEventRequests();
+        await fetchEventRequestStats();
         
         // Close modal
         setIsEventStatusModalOpen(false);
@@ -343,12 +389,13 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
       fetchStatuses();
     }, []);
 
-    // Fetch event requests when tab is active
+    // Fetch event requests when tab is active or filter changes
     useEffect(() => {
       if (activeTab === "event-requests") {
         fetchAllEventRequests();
+        fetchEventRequestStats();
       }
-    }, [activeTab]);
+    }, [activeTab, eventRequestFilter]);
 
     // Logout function
     const handleLogout = () => {
@@ -386,55 +433,110 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
         {/* Dashboard Content */}
         <section className="py-8 px-4">
           <div className="container mx-auto max-w-7xl">
-            {/* Stats Overview */}
-            <div className="grid md:grid-cols-3 gap-6 mb-8">
-              <Card className="p-6 shadow-card">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Pending Reviews</p>
-                    <p className="text-2xl font-bold text-university-navy">{societies.length}</p>
+            {/* Stats Overview - Event Requests */}
+            {activeTab === "event-requests" && (
+              <div className="grid md:grid-cols-4 gap-6 mb-8">
+                <Card className="p-6 shadow-card">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total Requests</p>
+                      <p className="text-2xl font-bold text-university-navy">
+                        {statsLoading ? "..." : eventRequestStats.total}
+                      </p>
+                    </div>
+                    <FileText className="h-8 w-8 text-university-navy" />
                   </div>
-                  <AlertTriangle className="h-8 w-8 text-university-maroon" />
-                </div>
-                <p className="text-sm text-muted-foreground mt-2">Societies awaiting board approval</p>
-              </Card>
+                </Card>
 
-              <Card className="p-6 shadow-card">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">This Month</p>
-                    <p className="text-2xl font-bold text-university-navy">
-                      {societies.filter(s => new Date(s.created_at).getMonth() === new Date().getMonth()).length}
-                    </p>
+                <Card className="p-6 shadow-card">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Pending</p>
+                      <p className="text-2xl font-bold text-university-navy">
+                        {statsLoading ? "..." : eventRequestStats.pending}
+                      </p>
+                    </div>
+                    <Clock className="h-8 w-8 text-university-maroon" />
                   </div>
-                  <Calendar className="h-8 w-8 text-university-gold" />
-                </div>
-                <p className="text-sm text-muted-foreground mt-2">New applications</p>
-              </Card>
+                </Card>
 
-              <Card className="p-6 shadow-card">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Categories</p>
-                    <p className="text-2xl font-bold text-university-navy">
-                      {new Set(societies.map(s => s.category)).size}
-                    </p>
+                <Card className="p-6 shadow-card">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Approved</p>
+                      <p className="text-2xl font-bold text-university-navy">
+                        {statsLoading ? "..." : eventRequestStats.approved}
+                      </p>
+                    </div>
+                    <CheckCircle className="h-8 w-8 text-green-600" />
                   </div>
-                  <Building className="h-8 w-8 text-university-navy" />
-                </div>
-                <p className="text-sm text-muted-foreground mt-2">Different society types</p>
-              </Card>
-            </div>
+                </Card>
+
+                <Card className="p-6 shadow-card">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Rejected</p>
+                      <p className="text-2xl font-bold text-university-navy">
+                        {statsLoading ? "..." : eventRequestStats.rejected}
+                      </p>
+                    </div>
+                    <XCircle className="h-8 w-8 text-red-600" />
+                  </div>
+                </Card>
+              </div>
+            )}
+            
+            {activeTab !== "event-requests" && (
+              <div className="grid md:grid-cols-3 gap-6 mb-8">
+                <Card className="p-6 shadow-card">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Pending Reviews</p>
+                      <p className="text-2xl font-bold text-university-navy">{societies.length}</p>
+                    </div>
+                    <AlertTriangle className="h-8 w-8 text-university-maroon" />
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-2">Societies awaiting board approval</p>
+                </Card>
+
+                <Card className="p-6 shadow-card">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">This Month</p>
+                      <p className="text-2xl font-bold text-university-navy">
+                        {societies.filter(s => new Date(s.created_at).getMonth() === new Date().getMonth()).length}
+                      </p>
+                    </div>
+                    <Calendar className="h-8 w-8 text-university-gold" />
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-2">New applications</p>
+                </Card>
+
+                <Card className="p-6 shadow-card">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Categories</p>
+                      <p className="text-2xl font-bold text-university-navy">
+                        {new Set(societies.map(s => s.category)).size}
+                      </p>
+                    </div>
+                    <Building className="h-8 w-8 text-university-navy" />
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-2">Different society types</p>
+                </Card>
+              </div>
+            )}
 
             {/* Tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="mb-6">
-                <TabsTrigger value="overview">Societies</TabsTrigger>
+                {/* Societies tab hidden as per latest requirements */}
+                {/* <TabsTrigger value="overview">Societies</TabsTrigger> */}
                 <TabsTrigger value="event-requests">Event Requests</TabsTrigger>
                 <TabsTrigger value="event-reports">Event Reports</TabsTrigger>
               </TabsList>
 
-              {/* Societies Tab */}
+              {/* Societies Tab (kept for reference but not reachable from UI) */}
               <TabsContent value="overview">
                 {/* Actions */}
                 <div className="flex items-center justify-between mb-6">
@@ -470,7 +572,8 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
                         <div className="w-16 h-16 bg-university-navy/10 rounded-lg flex items-center justify-center">
                           {society.society_logo ? (
                             <img 
-                              src={`http://localhost:5000/${society.society_logo}`}
+                              src={`${import.meta.env.VITE_API_URL}/${society.society_logo}`}
+
                               alt={society.name}
                               className="w-12 h-12 rounded-lg object-cover"
                             />
@@ -546,6 +649,50 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
                   </Button>
                 </div>
 
+                {/* Filter Buttons */}
+                <div className="flex gap-2 mb-6">
+                  <Button
+                    variant={eventRequestFilter === "all" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setEventRequestFilter("all");
+                      fetchAllEventRequests();
+                    }}
+                  >
+                    All
+                  </Button>
+                  <Button
+                    variant={eventRequestFilter === "pending" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setEventRequestFilter("pending");
+                      fetchAllEventRequests();
+                    }}
+                  >
+                    Pending
+                  </Button>
+                  <Button
+                    variant={eventRequestFilter === "approved" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setEventRequestFilter("approved");
+                      fetchAllEventRequests();
+                    }}
+                  >
+                    Approved
+                  </Button>
+                  <Button
+                    variant={eventRequestFilter === "rejected" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setEventRequestFilter("rejected");
+                      fetchAllEventRequests();
+                    }}
+                  >
+                    Rejected
+                  </Button>
+                </div>
+
                 {loadingEventRequests && eventRequests.length === 0 ? (
                   <div className="text-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-university-navy mx-auto mb-4"></div>
@@ -600,7 +747,7 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
                               <Eye className="h-3 w-3 mr-1" />
                               View Details
                             </Button>
-                            {/* Only show Update Status button for Approved by Board Secretary (status 2) - Board President's pending items */}
+                            {/* Show Update Status button for status 2 (pending for president), show status badge for others */}
                             {request.status_id === 2 ? (
                               <Button 
                                 size="sm" 
@@ -611,9 +758,17 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
                                 <Edit className="h-3 w-3 mr-1" />
                                 Update Status
                               </Button>
-                            ) : (
+                            ) : request.status_id === 4 ? (
                               <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-center">
-                                Tracked: {request.status_name}
+                                Approved: {request.status_name}
+                              </Badge>
+                            ) : request.status_id === 5 ? (
+                              <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 text-center">
+                                Rejected: {request.status_name}
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-center">
+                                {request.status_name}
                               </Badge>
                             )}
                           </div>
@@ -632,9 +787,9 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
                 )}
               </TabsContent>
 
-            <TabsContent value="event-reports">
-              <AdminEventReportsSection isActive={activeTab === "event-reports"} />
-            </TabsContent>
+              <TabsContent value="event-reports">
+                <AdminEventReportsSection isActive={activeTab === "event-reports"} />
+              </TabsContent>
             </Tabs>
           </div>
         </section>
@@ -657,7 +812,8 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
                     <div className="w-20 h-20 bg-white/20 rounded-lg flex items-center justify-center">
                       {selectedSociety.society_logo ? (
                         <img 
-                          src={`http://localhost:5000/${selectedSociety.society_logo}`}
+                        src={`${import.meta.env.VITE_API_URL}/${selectedSociety.society_logo}`}
+
                           alt={selectedSociety.name}
                           className="w-16 h-16 rounded-lg object-cover"
                         />
@@ -848,17 +1004,79 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
                     <h3 className="font-semibold mb-3 text-university-navy">Event Information</h3>
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Event Date:</span>
-                        <span className="font-medium">{new Date(selectedEventRequest.event_date).toLocaleDateString()}</span>
+                        <span className="text-muted-foreground">Event Name:</span>
+                        <span className="font-medium">{selectedEventRequest.event_name || selectedEventRequest.title}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Event Time:</span>
-                        <span className="font-medium">{selectedEventRequest.event_time}</span>
+                        <span className="text-muted-foreground">Event Type:</span>
+                        <span className="font-medium">{selectedEventRequest.event_type || "Not specified"}</span>
                       </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Date From:</span>
+                        <span className="font-medium">
+                          {selectedEventRequest.date_from 
+                            ? new Date(selectedEventRequest.date_from).toLocaleDateString()
+                            : selectedEventRequest.event_date 
+                            ? new Date(selectedEventRequest.event_date).toLocaleDateString()
+                            : "Not specified"}
+                        </span>
+                      </div>
+                      {selectedEventRequest.date_to && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Date To:</span>
+                          <span className="font-medium">{new Date(selectedEventRequest.date_to).toLocaleDateString()}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Time From:</span>
+                        <span className="font-medium">{selectedEventRequest.time_from || selectedEventRequest.event_time || "Not specified"}</span>
+                      </div>
+                      {selectedEventRequest.time_to && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Time To:</span>
+                          <span className="font-medium">{selectedEventRequest.time_to}</span>
+                        </div>
+                      )}
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Venue:</span>
-                        <span className="font-medium">{selectedEventRequest.venue}</span>
+                        <span className="font-medium">{selectedEventRequest.venue || "Not specified"}</span>
                       </div>
+                      {selectedEventRequest.collaborating_org && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Collaborating Org:</span>
+                          <span className="font-medium">{selectedEventRequest.collaborating_org}</span>
+                        </div>
+                      )}
+                      {selectedEventRequest.sponsor_name && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Sponsor:</span>
+                          <span className="font-medium">{selectedEventRequest.sponsor_name}</span>
+                        </div>
+                      )}
+                      {selectedEventRequest.sponsor_amount && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Sponsor Amount:</span>
+                          <span className="font-medium">{selectedEventRequest.sponsor_amount}</span>
+                        </div>
+                      )}
+                      {selectedEventRequest.coordinator_name && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Coordinator:</span>
+                          <span className="font-medium">{selectedEventRequest.coordinator_name}</span>
+                        </div>
+                      )}
+                      {selectedEventRequest.coordinator_contact && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Coordinator Contact:</span>
+                          <span className="font-medium">{selectedEventRequest.coordinator_contact}</span>
+                        </div>
+                      )}
+                      {selectedEventRequest.media_coverage && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Media Coverage:</span>
+                          <span className="font-medium">{selectedEventRequest.media_coverage}</span>
+                        </div>
+                      )}
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Status:</span>
                         <span className="font-medium">{selectedEventRequest.status_name}</span>
@@ -895,17 +1113,85 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
                   </Card>
                 </div>
 
-                {/* Description */}
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-3 text-university-navy">Event Description</h3>
-                  <p className="text-muted-foreground leading-relaxed">{selectedEventRequest.description}</p>
-                </Card>
+                {/* Description / Media Coverage */}
+                {(selectedEventRequest.description || selectedEventRequest.media_coverage) && (
+                  <Card className="p-4">
+                    <h3 className="font-semibold mb-3 text-university-navy">Event Description / Media Coverage</h3>
+                    {selectedEventRequest.description && (
+                      <p className="text-muted-foreground leading-relaxed mb-3">{selectedEventRequest.description}</p>
+                    )}
+                    {selectedEventRequest.media_coverage && (
+                      <div>
+                        <p className="font-medium text-sm mb-1">Media Coverage:</p>
+                        <p className="text-muted-foreground leading-relaxed">{selectedEventRequest.media_coverage}</p>
+                      </div>
+                    )}
+                  </Card>
+                )}
 
-                {/* Note */}
-                {selectedEventRequest.note && (
-                  <Card className="p-4 bg-blue-50 border-blue-200">
-                    <h3 className="font-semibold mb-3 text-university-navy">Admin Note</h3>
-                    <p className="text-muted-foreground italic">{selectedEventRequest.note}</p>
+                {/* Admin Notes from History - Grouped by Role */}
+                {Array.isArray(selectedEventRequest.status_history) &&
+                  selectedEventRequest.status_history.length > 0 && (
+                  <Card className="p-4">
+                    <h3 className="font-semibold mb-4 text-university-navy">Admin Notes & Status History</h3>
+                    <div className="space-y-6">
+                      {/* Group notes by role */}
+                      {(() => {
+                        const notesByRole: { [key: string]: any[] } = {};
+                        selectedEventRequest.status_history
+                          .filter((h: any) => h.note && h.note.trim() !== "")
+                          .forEach((history: any) => {
+                            const role = history.role || history.role_display_name || history.role_name || "Admin";
+                            if (!notesByRole[role]) {
+                              notesByRole[role] = [];
+                            }
+                            notesByRole[role].push(history);
+                          });
+
+                        const roleOrder = ["Board Secretary", "Board President", "Registrar", "VC", "Transport Office", "Protocol Office"];
+                        const sortedRoles = Object.keys(notesByRole).sort((a, b) => {
+                          const aIndex = roleOrder.indexOf(a);
+                          const bIndex = roleOrder.indexOf(b);
+                          if (aIndex === -1 && bIndex === -1) return a.localeCompare(b);
+                          if (aIndex === -1) return 1;
+                          if (bIndex === -1) return -1;
+                          return aIndex - bIndex;
+                        });
+
+                        if (sortedRoles.length === 0) {
+                          return <p className="text-sm text-muted-foreground italic">No admin notes yet.</p>;
+                        }
+
+                        return sortedRoles.map((role) => (
+                          <div key={role} className="space-y-3">
+                            <h4 className="font-semibold text-sm text-university-navy border-b pb-2">
+                              {role} Notes
+                            </h4>
+                            {notesByRole[role].map((history: any, idx: number) => (
+                              <div
+                                key={history.history_id || idx}
+                                className="border-l-4 border-blue-500 pl-4 py-2 bg-blue-50 rounded-r"
+                              >
+                                <div className="flex items-start justify-between mb-2">
+                                  <div>
+                                    <p className="text-xs text-muted-foreground">
+                                      {history.firstName && history.lastName
+                                        ? `${history.firstName} ${history.lastName}`
+                                        : "Unknown"}
+                                      {history.status_name && ` • ${history.status_name}`}
+                                    </p>
+                                  </div>
+                                  <span className="text-xs text-muted-foreground">
+                                    {new Date(history.changed_at).toLocaleString()}
+                                  </span>
+                                </div>
+                                <p className="text-sm text-gray-700 mt-1">{history.note}</p>
+                              </div>
+                            ))}
+                          </div>
+                        ));
+                      })()}
+                    </div>
                   </Card>
                 )}
 
@@ -976,7 +1262,7 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
                 <div>
                   <label className="text-sm font-medium mb-2 block">Note (Optional)</label>
                   <Textarea
-                    placeholder="Add a note explaining the status change..."
+                    placeholder="Write note"
                     value={eventStatusNote}
                     onChange={(e) => setEventStatusNote(e.target.value)}
                     rows={4}
@@ -1002,6 +1288,8 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
       </div>
     );
   };
+  
 
   export default BoardPresidentDashboard;
+
 
