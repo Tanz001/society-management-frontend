@@ -43,9 +43,7 @@ const App = () => (
           {/* Default route is login */}
           <Route path="/" element={
             <ProtectedRoute guestOnly>
-              <AuthLayout title="Student Login" subtitle="Access your student dashboard">
-                <LoginForm userType="student" />
-              </AuthLayout>
+              <LoginForm />
             </ProtectedRoute>
           } />
           
