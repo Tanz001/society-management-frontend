@@ -24,6 +24,7 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
   } from "lucide-react";
   import { useNavigate } from "react-router-dom";
   import axios from "axios";
+  import { useToast } from "@/components/ui/use-toast";
 
   interface Society {
     society_id: number;
@@ -59,6 +60,7 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
   }
 
   const BoardPresidentDashboard = () => {
+    const { toast } = useToast();
     const [societies, setSocieties] = useState<Society[]>([]);
     const [selectedSociety, setSelectedSociety] = useState<Society | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -86,9 +88,12 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
   const [statsLoading, setStatsLoading] = useState(false);
   const [eventRequestFilter, setEventRequestFilter] = useState<string>("all"); // all, pending, approved, rejected
 
-    // Helper functions for event requester details
+    // Get advisor info (priority) or submitted by info (fallback)
     const getRequesterName = (request?: any) => {
       if (!request) return "Not available";
+      // Priority: Advisor name
+      if (request.advisor_name) return request.advisor_name;
+      // Fallback: Student name
       const name = `${request.firstName || ""} ${request.lastName || ""}`.trim();
       if (name) return name;
       if (request.president_name) return request.president_name;
@@ -98,11 +103,22 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
 
     const getRequesterEmail = (request?: any) => {
       if (!request) return "Not provided";
+      // Priority: Advisor email
+      if (request.advisor_email) return request.advisor_email;
+      // Fallback: Student email
       return request.email || request.president_email || request.submitted_by_email || "Not provided";
+    };
+
+    const getRequesterPhone = (request?: any) => {
+      if (!request) return null;
+      // Priority: Advisor phone
+      if (request.advisor_phone) return request.advisor_phone;
+      return null;
     };
 
     const getRequesterRoll = (request?: any) => {
       if (!request) return null;
+      // Only show roll number for students, not advisors
       return request.rollNo || request.RollNO || request.student_rollno || request.submitted_by_rollno || null;
     };
 
@@ -183,8 +199,14 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
         const token = localStorage.getItem("token");
         const currentUser = getCurrentUser();
 
-        if (!currentUser?.id) {
-          throw new Error("User information not found");
+        const userId = currentUser?.faculty_id || currentUser?.id || currentUser?.user_id;
+        if (!userId) {
+          toast({
+            title: "Error",
+            description: "User information not found. Please login again.",
+            variant: "destructive",
+          });
+          return;
         }
 
         const response = await axios.put(
@@ -192,7 +214,7 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
           {
             action,
             note: reviewNote,
-            changed_by: currentUser.id
+            changed_by: userId
           },
           {
             headers: { Authorization: `Bearer ${token}` },
@@ -209,12 +231,20 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
         setSelectedSociety(null);
         setReviewNote("");
         
-        // Show success message
-        alert(`Society ${action}d successfully!`);
+        // Show success toast
+        toast({
+          title: "Success",
+          description: `Society ${action}d successfully!`,
+          variant: "default",
+        });
         
       } catch (err: any) {
         console.error(`Error ${action}ing society:`, err);
-        alert(err.response?.data?.message || err.message || `Failed to ${action} society`);
+        toast({
+          title: "Error",
+          description: err.response?.data?.message || err.message || `Failed to ${action} society`,
+          variant: "destructive",
+        });
       } finally {
         setActionLoading(false);
       }
@@ -342,8 +372,14 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
         const token = localStorage.getItem("token");
         const currentUser = getCurrentUser();
 
-        if (!currentUser?.id) {
-          throw new Error("User information not found");
+        const userId = currentUser?.faculty_id || currentUser?.id || currentUser?.user_id;
+        if (!userId) {
+          toast({
+            title: "Error",
+            description: "User information not found. Please login again.",
+            variant: "destructive",
+          });
+          return;
         }
 
         // Board President can only approve (4) or reject (5) event requests
@@ -353,7 +389,7 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
           {
             action,
             note: eventStatusNote,
-            changed_by: currentUser.id
+            changed_by: userId
           },
           {
             headers: { Authorization: `Bearer ${token}` },
@@ -372,12 +408,20 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
         setSelectedEventStatus(0);
         setEventStatusNote("");
         
-        // Show success message
-        alert("Event request status updated successfully!");
+        // Show success toast
+        toast({
+          title: "Success",
+          description: "Event request status updated successfully!",
+          variant: "default",
+        });
         
       } catch (err: any) {
         console.error("Error updating event request status:", err);
-        alert(err.response?.data?.message || err.message || "Failed to update status");
+        toast({
+          title: "Error",
+          description: err.response?.data?.message || err.message || "Failed to update status",
+          variant: "destructive",
+        });
       } finally {
         setActionLoading(false);
       }
@@ -1085,7 +1129,9 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
                   </Card>
 
                   <Card className="p-4">
-                    <h3 className="font-semibold mb-3 text-university-navy">Submitted By</h3>
+                    <h3 className="font-semibold mb-3 text-university-navy">
+                      {selectedEventRequest?.advisor_name ? "Advisor Information" : "Submitted By"}
+                    </h3>
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Name:</span>
@@ -1097,6 +1143,12 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
                         <span className="text-muted-foreground">Email:</span>
                         <span className="font-medium">{getRequesterEmail(selectedEventRequest)}</span>
                       </div>
+                      {getRequesterPhone(selectedEventRequest) && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Phone:</span>
+                          <span className="font-medium">{getRequesterPhone(selectedEventRequest)}</span>
+                        </div>
+                      )}
                       {getRequesterRoll(selectedEventRequest) && (
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Roll No:</span>

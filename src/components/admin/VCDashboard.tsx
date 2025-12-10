@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { useToast } from "@/components/ui/use-toast";
 
 interface Society {
   society_id: number;
@@ -60,6 +61,7 @@ interface Status {
 }
 
 const VCDashboard = () => {
+  const { toast } = useToast();
   const [societies, setSocieties] = useState<Society[]>([]);
   const [selectedSociety, setSelectedSociety] = useState<Society | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -166,8 +168,14 @@ const fetchSocietiesForVC = async () => {
       const token = localStorage.getItem("token");
       const currentUser = getCurrentUser();
 
-      if (!currentUser?.id) {
-        throw new Error("User information not found");
+      const userId = currentUser?.faculty_id || currentUser?.id || currentUser?.user_id;
+      if (!userId) {
+        toast({
+          title: "Error",
+          description: "User information not found. Please login again.",
+          variant: "destructive",
+        });
+        return;
       }
 
       const response = await axios.put(
@@ -175,7 +183,7 @@ const fetchSocietiesForVC = async () => {
         {
           action,
           note: reviewNote,
-          changed_by: currentUser.id
+          changed_by: userId
         },
         {
           headers: { Authorization: `Bearer ${token}` },
@@ -192,15 +200,23 @@ const fetchSocietiesForVC = async () => {
       setSelectedSociety(null);
       setReviewNote("");
       
-      // Show success message
+      // Show success toast
       const message = action === 'approve' 
         ? "Society has been officially approved and is now active!" 
         : "Society application has been rejected.";
-      alert(message);
+      toast({
+        title: "Success",
+        description: message,
+        variant: "default",
+      });
       
     } catch (err: any) {
       console.error(`Error ${action}ing society:`, err);
-      alert(err.response?.data?.message || err.message || `Failed to ${action} society`);
+      toast({
+        title: "Error",
+        description: err.response?.data?.message || err.message || `Failed to ${action} society`,
+        variant: "destructive",
+      });
     } finally {
       setActionLoading(false);
     }
@@ -326,8 +342,14 @@ const fetchSocietiesForVC = async () => {
       const token = localStorage.getItem("token");
       const currentUser = getCurrentUser();
 
-      if (!currentUser?.id) {
-        throw new Error("User information not found");
+      const userId = currentUser?.faculty_id || currentUser?.id || currentUser?.user_id;
+      if (!userId) {
+        toast({
+          title: "Error",
+          description: "User information not found. Please login again.",
+          variant: "destructive",
+        });
+        return;
       }
 
       // VC can only approve (8) or reject (9) event requests
@@ -337,7 +359,7 @@ const fetchSocietiesForVC = async () => {
         {
           action,
           note: eventStatusNote,
-          changed_by: currentUser.id
+          changed_by: userId
         },
         {
           headers: { Authorization: `Bearer ${token}` },
@@ -356,12 +378,20 @@ const fetchSocietiesForVC = async () => {
         setSelectedEventStatus(0);
         setEventStatusNote("");
       
-      // Show success message
-      alert("Event request status updated successfully!");
+      // Show success toast
+      toast({
+        title: "Success",
+        description: "Event request status updated successfully!",
+        variant: "default",
+      });
       
     } catch (err: any) {
       console.error("Error updating event request status:", err);
-      alert(err.response?.data?.message || err.message || "Failed to update status");
+      toast({
+        title: "Error",
+        description: err.response?.data?.message || err.message || "Failed to update status",
+        variant: "destructive",
+      });
     } finally {
       setActionLoading(false);
     }
@@ -1402,22 +1432,34 @@ const fetchSocietiesForVC = async () => {
                 </Card>
 
                 <Card className="p-4">
-                  <h3 className="font-semibold mb-3 text-university-navy">Submitted By</h3>
+                  <h3 className="font-semibold mb-3 text-university-navy">
+                    {selectedEventRequest?.advisor_name ? "Advisor Information" : "Submitted By"}
+                  </h3>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Name:</span>
                       <span className="font-medium">
-                        {selectedEventRequest.firstName && selectedEventRequest.lastName
+                        {selectedEventRequest.advisor_name || 
+                         (selectedEventRequest.firstName && selectedEventRequest.lastName
                           ? `${selectedEventRequest.firstName} ${selectedEventRequest.lastName}`
-                          : selectedEventRequest.president_name || "Not available"}
+                          : selectedEventRequest.president_name || "Not available")}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Email:</span>
                       <span className="font-medium">
-                        {selectedEventRequest.president_email || selectedEventRequest.email || "Not provided"}
+                        {selectedEventRequest.advisor_email || 
+                         selectedEventRequest.president_email || 
+                         selectedEventRequest.email || 
+                         "Not provided"}
                       </span>
                     </div>
+                    {selectedEventRequest.advisor_phone && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Phone:</span>
+                        <span className="font-medium">{selectedEventRequest.advisor_phone}</span>
+                      </div>
+                    )}
                     {(selectedEventRequest.rollNo || selectedEventRequest.RollNO) && (
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Roll No:</span>
