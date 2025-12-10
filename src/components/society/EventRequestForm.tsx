@@ -144,11 +144,16 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
     media_coverage: "",
   });
 
+  const genId = () =>
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
   /* ------------------ SECTIONS ------------------ */
   const [students, setStudents] = useState<StudentRow[]>([
-    { ...defaultStudent, id: crypto.randomUUID() },
+    { ...defaultStudent, id: genId() },
   ]);
-  const [staff, setStaff] = useState<StaffRow[]>([{ ...defaultStaff, id: crypto.randomUUID() }]);
+  const [staff, setStaff] = useState<StaffRow[]>([{ ...defaultStaff, id: genId() }]);
   const [transports, setTransports] = useState<TransportRow[]>([]);
   const [management, setManagement] = useState<ManagementRequirements>({
     ...defaultManagement,
@@ -225,7 +230,7 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
   ===================================================================================== */
 
   const addStudent = () => {
-    setStudents((prev) => [...prev, { ...defaultStudent, id: crypto.randomUUID() }]);
+    setStudents((prev) => [...prev, { ...defaultStudent, id: genId() }]);
   };
   const removeStudent = (index: number) =>
     setStudents((prev) => prev.filter((_, i) => i !== index));
@@ -244,7 +249,7 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
   ===================================================================================== */
 
   const addStaff = () => {
-    setStaff((prev) => [...prev, { ...defaultStaff, id: crypto.randomUUID() }]);
+    setStaff((prev) => [...prev, { ...defaultStaff, id: genId() }]);
   };
   const removeStaff = (index: number) =>
     setStaff((prev) => prev.filter((_, i) => i !== index));
@@ -259,7 +264,7 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
   ===================================================================================== */
 
   const addTransport = () => {
-    setTransports((prev) => [...prev, { ...defaultTransport, id: crypto.randomUUID() }]);
+    setTransports((prev) => [...prev, { ...defaultTransport, id: genId() }]);
   };
   const removeTransport = (index: number) =>
     setTransports((prev) => prev.filter((_, i) => i !== index));
@@ -502,8 +507,8 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
           media_coverage: "",
         });
 
-        setStudents([{ ...defaultStudent, id: crypto.randomUUID() }]);
-        setStaff([{ ...defaultStaff, id: crypto.randomUUID() }]);
+        setStudents([{ ...defaultStudent, id: genId() }]);
+        setStaff([{ ...defaultStaff, id: genId() }]);
         setTransports([]);
         setManagement({ ...defaultManagement });
         setDocuments({
