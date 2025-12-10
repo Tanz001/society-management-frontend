@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, User, Mail, Phone, MapPin, GraduationCap, BookOpen, Calendar, CreditCard } from "lucide-react";
+import { Upload, User, Mail, Phone, MapPin, GraduationCap, BookOpen, Calendar, CreditCard, ArrowLeft } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { toast } from "sonner";
@@ -46,6 +46,7 @@ const MembershipRegistration = ({
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [membershipSettings, setMembershipSettings] = useState<any>(null);
   const [loadingSettings, setLoadingSettings] = useState(false);
+  const [admProfile, setAdmProfile] = useState<any>(null);
 
 // Fetch membership settings from API
 const fetchMembershipSettings = async (societyId: string) => {
@@ -158,18 +159,41 @@ const fetchMembershipSettings = async (societyId: string) => {
       }
     };
 
-    const loadUserData = () => {
-      // Set default values for form fields - user will enter their own data
-      setFormData(prev => ({
-        ...prev,
-        name: "",
-        email: "",
-        phone: "",
-        university: "Government College University",
-        department: "",
-        semester: "",
-        rollno: ""
-      }));
+    const loadUserData = async () => {
+      try {
+        const storedUser = localStorage.getItem("user");
+        const token = localStorage.getItem("token");
+        if (!storedUser || !token) return;
+        const userData = JSON.parse(storedUser);
+        const rollno = userData.RollNO || userData.rollno || userData.ROLNO;
+        const email = userData.email;
+        const userId = userData.id || userData.user_id || userData.faculty_id;
+
+        console.log("🔍 MembershipRegistration - loadUserData - userData:", userData);
+        console.log("🔍 MembershipRegistration - loadUserData - Extracted:", { rollno, email, userId });
+
+        const res = await axios.post(`${import.meta.env.VITE_API_URL}/user/student/profile/adm`, {
+          rollno,
+          email,
+          user_id: userId,
+        });
+
+        const profile = res.data?.profile || res.data;
+        setAdmProfile(profile);
+
+        setFormData(prev => ({
+          ...prev,
+          name: profile?.NM || "",
+          email: profile?.EMAIL || "",
+          phone: "", // laisser l'étudiant saisir/mettre à jour
+          university: "Government College University",
+          department: profile?.DEPARTMENT || "",
+          semester: profile?.SESSION || "",
+          rollno: profile?.ROLNO || "",
+        }));
+      } catch (err) {
+        console.error("Error loading user profile for membership:", err);
+      }
     };
 
     fetchSocietyData();
@@ -204,7 +228,10 @@ const fetchMembershipSettings = async (societyId: string) => {
   
     try {
       const submitData = new FormData();
-      submitData.append("user_id", "1"); // replace with actual user ID if available
+      const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+      const userId = admProfile?.ID || storedUser.id || storedUser.user_id || storedUser.faculty_id || "";
+
+      submitData.append("user_id", String(userId));
       submitData.append("society_id", membershipSettings?.society_id || societyId || "");
       submitData.append("full_name", formData.name);
       submitData.append("email", formData.email);
@@ -313,6 +340,15 @@ const fetchMembershipSettings = async (societyId: string) => {
   return (
     <div className="min-h-screen bg-background py-8 px-4">
       <div className="container mx-auto max-w-4xl">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="mb-4 text-university-navy hover:bg-university-navy/10"
+          onClick={() => navigate(-1)}
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back
+        </Button>
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-university-navy mb-2">

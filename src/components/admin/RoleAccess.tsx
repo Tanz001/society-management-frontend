@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
-import { Loader2, ShieldCheck, Users, Building2, ArrowLeft, Info } from "lucide-react";
+import { Loader2, ShieldCheck, Users, Building2, ArrowLeft, Info, UserPlus } from "lucide-react";
 
 interface Role {
   role_id: number;
@@ -30,29 +30,33 @@ interface Assignment {
   role_name?: string;
 }
 
-const facultyOptions = [
-  { id: 201, name: "Dr. Sara Ahmed", email: "sara.ahmed@gcu.edu.pk", department: "Computer Science" },
-  { id: 202, name: "Prof. Kamran Ali", email: "kamran.ali@gcu.edu.pk", department: "Business Administration" },
-  { id: 203, name: "Ms. Ayesha Khan", email: "ayesha.khan@gcu.edu.pk", department: "Media & Arts" },
-  { id: 204, name: "Dr. Bilal Qureshi", email: "bilal.qureshi@gcu.edu.pk", department: "Electrical Engineering" },
-];
+interface Faculty {
+  faculty_id: number;
+  name: string;
+  email: string;
+  cnic?: string;
+  phone?: string;
+  is_active: number;
+}
 
 const RoleAccess = () => {
   const { toast } = useToast();
   const [roles, setRoles] = useState<Role[]>([]);
   const [societies, setSocieties] = useState<SocietySummary[]>([]);
-  const [selectedFacultyId, setSelectedFacultyId] = useState<number>(facultyOptions[0]?.id ?? 201);
+  const [faculty, setFaculty] = useState<Faculty[]>([]);
+  const [selectedFacultyId, setSelectedFacultyId] = useState<number | null>(null);
   const [selectedRoleIds, setSelectedRoleIds] = useState<number[]>([]);
   const [advisorSocietyIds, setAdvisorSocietyIds] = useState<number[]>([]);
   const [metaLoading, setMetaLoading] = useState(true);
   const [assignmentsLoading, setAssignmentsLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [facultyLoading, setFacultyLoading] = useState(true);
 
   const advisorRoleId = useMemo(() => {
     return roles.find((role) => role.role_name?.toLowerCase() === "advisor")?.role_id ?? null;
   }, [roles]);
 
-  const selectedFaculty = facultyOptions.find((faculty) => faculty.id === selectedFacultyId);
+  const selectedFaculty = faculty.find((f) => f.faculty_id === selectedFacultyId);
 
   useEffect(() => {
     const fetchMeta = async () => {
@@ -62,18 +66,27 @@ const RoleAccess = () => {
           throw new Error("No authentication token found");
         }
 
-        const [rolesResponse, societiesResponse] = await Promise.all([
-       axios.get(`${import.meta.env.VITE_API_URL}/admin/roles`, {
-  headers: { Authorization: `Bearer ${token}` },
-}),
-axios.get(`${import.meta.env.VITE_API_URL}/admin/roles/societies`, {
-  headers: { Authorization: `Bearer ${token}` },
-}),
-
+        const [rolesResponse, societiesResponse, facultyResponse] = await Promise.all([
+          axios.get(`${import.meta.env.VITE_API_URL}/admin/roles`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          axios.get(`${import.meta.env.VITE_API_URL}/admin/roles/societies`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          axios.get(`${import.meta.env.VITE_API_URL}/admin/faculty`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
         ]);
 
         setRoles(rolesResponse.data.roles || []);
         setSocieties(societiesResponse.data.societies || []);
+        const facultyList = facultyResponse.data.faculty || [];
+        setFaculty(facultyList);
+        
+        // Auto-select first faculty if available
+        if (facultyList.length > 0 && !selectedFacultyId) {
+          setSelectedFacultyId(facultyList[0].faculty_id);
+        }
       } catch (error: any) {
         console.error("Error loading role access metadata:", error);
         toast({
@@ -83,6 +96,7 @@ axios.get(`${import.meta.env.VITE_API_URL}/admin/roles/societies`, {
         });
       } finally {
         setMetaLoading(false);
+        setFacultyLoading(false);
       }
     };
 
@@ -90,7 +104,7 @@ axios.get(`${import.meta.env.VITE_API_URL}/admin/roles/societies`, {
   }, [toast]);
 
   useEffect(() => {
-    if (!selectedFacultyId || metaLoading) return;
+    if (!selectedFacultyId || metaLoading || facultyLoading) return;
 
     const fetchAssignments = async () => {
       try {
@@ -137,7 +151,7 @@ axios.get(`${import.meta.env.VITE_API_URL}/admin/roles/societies`, {
     };
 
     fetchAssignments();
-  }, [selectedFacultyId, metaLoading, toast]);
+  }, [selectedFacultyId, metaLoading, facultyLoading, toast]);
 
   const handleRoleToggle = (roleId: number, checked: boolean) => {
     setSelectedRoleIds((prev) =>
@@ -159,15 +173,32 @@ axios.get(`${import.meta.env.VITE_API_URL}/admin/roles/societies`, {
         throw new Error("No authentication token found");
       }
 
+      // Create assignments payload
+      // For platform roles (without society_id), create one entry per role
+      const platformRoleAssignments = selectedRoleIds.map((role_id) => ({ 
+        role_id, 
+        society_id: null 
+      }));
+
+      // For advisor role, create ONE entry per society selected
+      // If 2 societies are selected, this will create 2 separate entries in faculty_roles
+      const advisorAssignments = advisorRoleId && advisorSocietyIds.length > 0
+        ? advisorSocietyIds.map((society_id) => ({
+            role_id: advisorRoleId,
+            society_id,
+          }))
+        : [];
+
       const assignmentsPayload = [
-        ...selectedRoleIds.map((role_id) => ({ role_id, society_id: null })),
-        ...(advisorRoleId
-          ? advisorSocietyIds.map((society_id) => ({
-              role_id: advisorRoleId,
-              society_id,
-            }))
-          : []),
+        ...platformRoleAssignments,
+        ...advisorAssignments,
       ];
+
+      console.log(`Saving ${assignmentsPayload.length} assignments:`, {
+        platformRoles: platformRoleAssignments.length,
+        advisorSocieties: advisorAssignments.length,
+        total: assignmentsPayload.length
+      });
 
       await axios.post(
         `${import.meta.env.VITE_API_URL}/admin/roles/assignments`,
@@ -212,7 +243,7 @@ axios.get(`${import.meta.env.VITE_API_URL}/admin/roles/societies`, {
               </p>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" className="text-white border-white hover:bg-white/20" asChild>
+              <Button variant="outline" className="text-white border-white/30 hover:bg-white/20 hover:border-white/50 bg-black/20 backdrop-blur-sm" asChild>
                 <Link to="/dashboard/admin">
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Back to Admin Dashboard
@@ -227,31 +258,44 @@ axios.get(`${import.meta.env.VITE_API_URL}/admin/roles/societies`, {
         <div className="container mx-auto max-w-6xl space-y-6">
           <Card className="p-6 shadow-card">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <div>
+              <div className="flex-1">
                 <h2 className="text-xl font-semibold text-university-navy">Choose Faculty Member</h2>
                 <p className="text-sm text-muted-foreground">
                   Select a faculty member to configure their platform access.
                 </p>
               </div>
-              <Select
-                value={String(selectedFacultyId)}
-                onValueChange={(value) => setSelectedFacultyId(Number(value))}
-              >
-                <SelectTrigger className="w-full md:w-80 bg-white">
-                  <SelectValue placeholder="Select faculty member" />
-                </SelectTrigger>
-                <SelectContent>
-                  {facultyOptions.map((faculty) => (
-                    <SelectItem key={faculty.id} value={String(faculty.id)}>
-                      {faculty.name} • {faculty.department}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex gap-2">
+                <Button variant="outline" asChild>
+                  <Link to="/dashboard/admin/add-faculty">
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Add Faculty
+                  </Link>
+                </Button>
+                <Select
+                  value={selectedFacultyId ? String(selectedFacultyId) : ""}
+                  onValueChange={(value) => setSelectedFacultyId(Number(value))}
+                  disabled={facultyLoading}
+                >
+                  <SelectTrigger className="w-full md:w-80 bg-white">
+                    <SelectValue placeholder={facultyLoading ? "Loading..." : "Select faculty member"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {faculty.length === 0 ? (
+                      <SelectItem value="none" disabled>No faculty members found</SelectItem>
+                    ) : (
+                      faculty.map((f) => (
+                        <SelectItem key={f.faculty_id} value={String(f.faculty_id)}>
+                          {f.name} • {f.email}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             {selectedFaculty && (
-              <div className="mt-4 grid md:grid-cols-3 gap-4">
+              <div className="mt-4 grid md:grid-cols-4 gap-4">
                 <Card className="p-4 bg-muted/40 border-none shadow-none">
                   <p className="text-xs uppercase text-muted-foreground">Name</p>
                   <p className="font-semibold text-university-navy">{selectedFaculty.name}</p>
@@ -260,9 +304,17 @@ axios.get(`${import.meta.env.VITE_API_URL}/admin/roles/societies`, {
                   <p className="text-xs uppercase text-muted-foreground">Email</p>
                   <p className="font-semibold text-university-navy">{selectedFaculty.email}</p>
                 </Card>
+                {selectedFaculty.phone && (
+                  <Card className="p-4 bg-muted/40 border-none shadow-none">
+                    <p className="text-xs uppercase text-muted-foreground">Phone</p>
+                    <p className="font-semibold text-university-navy">{selectedFaculty.phone}</p>
+                  </Card>
+                )}
                 <Card className="p-4 bg-muted/40 border-none shadow-none">
-                  <p className="text-xs uppercase text-muted-foreground">Department</p>
-                  <p className="font-semibold text-university-navy">{selectedFaculty.department}</p>
+                  <p className="text-xs uppercase text-muted-foreground">Status</p>
+                  <p className="font-semibold text-university-navy">
+                    {selectedFaculty.is_active ? "Active" : "Inactive"}
+                  </p>
                 </Card>
               </div>
             )}

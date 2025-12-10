@@ -66,8 +66,8 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
     const [error, setError] = useState("");
     const [actionLoading, setActionLoading] = useState(false);
   const [reviewNote, setReviewNote] = useState("");
-  // Default to event-requests tab; societies UI is now hidden
-  const [activeTab, setActiveTab] = useState<string>("event-requests");
+  // Default to societies tab for Board Secretary
+  const [activeTab, setActiveTab] = useState<string>("overview");
     const navigate = useNavigate();
     const [statuses, setStatuses] = useState<Status[]>([]);
     const [eventRequests, setEventRequests] = useState<any[]>([]);
@@ -117,8 +117,8 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
       }
     };
 
-    // Fetch pending societies for Board Secretary
-    const fetchPendingSocieties = async () => {
+    // Fetch all societies for Board Secretary
+    const fetchAllSocieties = async () => {
       try {
         setLoading(true);
         setError("");
@@ -126,9 +126,8 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
         const token = localStorage.getItem("token");
         if (!token) throw new Error("No authentication token found");
     
-        const response = await axios.post(
-          `${import.meta.env.VITE_API_URL}/admin/societies-by-role`,
-          { role: "board_secretary" },
+        const response = await axios.get(
+          `${import.meta.env.VITE_API_URL}/admin/societies`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -198,7 +197,7 @@ const API_URL = import.meta.env.VITE_API_URL;
         console.log(`Society ${action}d successfully:`, response.data);
         
         // Refresh the societies list
-        await fetchPendingSocieties();
+        await fetchAllSocieties();
         
         // Close modal
         setIsModalOpen(false);
@@ -382,7 +381,7 @@ const API_URL = import.meta.env.VITE_API_URL;
 
     // Load societies on component mount
     useEffect(() => {
-      fetchPendingSocieties();
+      fetchAllSocieties();
       fetchStatuses();
     }, []);
 
@@ -413,6 +412,15 @@ const API_URL = import.meta.env.VITE_API_URL;
                 <p className="text-white/80">Review Pending Society Applications</p>
               </div>
               <div className="flex items-center space-x-3">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="text-white border-white hover:bg-white/20 bg-transparent"
+                  onClick={() => navigate("/society/register")}
+                >
+                  <Building className="h-4 w-4 mr-2" />
+                  Create Society
+                </Button>
                 <Button 
                   variant="outline" 
                   size="sm" 
@@ -486,8 +494,7 @@ const API_URL = import.meta.env.VITE_API_URL;
             {/* Tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="mb-6">
-                {/* Societies tab hidden as per latest requirements */}
-                {/* <TabsTrigger value="overview">Societies</TabsTrigger> */}
+                <TabsTrigger value="overview">Societies</TabsTrigger>
                 <TabsTrigger value="event-requests">Event Requests</TabsTrigger>
                 <TabsTrigger value="event-reports">Event Reports</TabsTrigger>
               </TabsList>
@@ -499,7 +506,7 @@ const API_URL = import.meta.env.VITE_API_URL;
                   <h2 className="text-2xl font-semibold text-university-navy">Pending Society Applications</h2>
                   <Button 
                     variant="outline" 
-                    onClick={fetchPendingSocieties}
+                    onClick={fetchAllSocieties}
                     disabled={loading}
                   >
                     {loading ? "Loading..." : "Refresh"}

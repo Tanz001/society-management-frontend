@@ -28,14 +28,18 @@ import {
   LogOut,
   Trash2,
   UserPlus,
-  ShieldCheck
+  ShieldCheck,
+  FileText
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/components/ui/use-toast";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 const AdminDashboard = () => {
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedSociety, setSelectedSociety] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -44,10 +48,19 @@ const AdminDashboard = () => {
   const [allSocieties, setAllSocieties] = useState([]);
   const [allEvents, setAllEvents] = useState([]);
   const [allStudents, setAllStudents] = useState([]);
+  const [allEventRequests, setAllEventRequests] = useState([]);
+  const [allEventReports, setAllEventReports] = useState([]);
+  const [allFaculty, setAllFaculty] = useState([]);
   const [loading, setLoading] = useState(false);
   const [eventsLoading, setEventsLoading] = useState(false);
   const [studentsLoading, setStudentsLoading] = useState(false);
+  const [eventRequestsLoading, setEventRequestsLoading] = useState(false);
+  const [eventReportsLoading, setEventReportsLoading] = useState(false);
+  const [facultyLoading, setFacultyLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [selectedEventRequest, setSelectedEventRequest] = useState<any>(null);
+  const [isEventRequestDetailModalOpen, setIsEventRequestDetailModalOpen] = useState(false);
+  const [loadingEventRequestDetails, setLoadingEventRequestDetails] = useState(false);
   const [societyFilter, setSocietyFilter] = useState("all"); // all, active, pending, rejected
   const [isAdvisorDialogOpen, setIsAdvisorDialogOpen] = useState(false);
   const [advisorData, setAdvisorData] = useState({
@@ -63,11 +76,22 @@ const AdminDashboard = () => {
     password: "",
     confirmPassword: "",
   });
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    title: "",
+    description: "",
+    onConfirm: () => {},
+    variant: "default" as "default" | "destructive"
+  });
+  const [societyToDelete, setSocietyToDelete] = useState<number | null>(null);
+  const [studentToDelete, setStudentToDelete] = useState<number | null>(null);
   const navigate = useNavigate();
 
   // Calculate stats from actual data
   const stats = {
     totalSocieties: allSocieties.length,
+    totalEventRequests: allEventRequests.length,
+    totalUsers: allStudents.length + allFaculty.length,
     activeSocieties: allSocieties.filter(society => 
       society.status_name === 'Approved by VC' || society.status === 'active'
     ).length,
@@ -77,8 +101,7 @@ const AdminDashboard = () => {
     suspendedSocieties: allSocieties.filter(society => 
       society.status === 'suspended' || society.status_name?.includes('Rejected')
     ).length,
-    totalUsers: allStudents.length,
-    activeUsers: allStudents.length, // All registered users are considered active
+    activeUsers: allStudents.length + allFaculty.filter((f: any) => f.is_active === 1).length,
     totalPosts: 0, // This would need to come from a separate API call
     flaggedPosts: 0, // This would need to come from a separate API call
     totalEvents: allEvents.length || allSocieties.reduce((total, society) => total + (society.events?.length || 0), 0),
@@ -154,12 +177,18 @@ const AdminDashboard = () => {
       // Close modal
       handleCloseModal();
       
-      // Show success message (you can add a toast notification here)
-      alert("Society approved successfully!");
+      toast({
+        title: "Success",
+        description: "Society approved successfully!",
+      });
       
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error approving society:", err);
-      alert(err.response?.data?.message || err.message || "Failed to approve society");
+      toast({
+        title: "Error",
+        description: err.response?.data?.message || err.message || "Failed to approve society",
+        variant: "destructive",
+      });
     }
   };
 
@@ -191,12 +220,18 @@ const AdminDashboard = () => {
       // Close modal
       handleCloseModal();
       
-      // Show success message
-      alert("Society rejected successfully!");
+      toast({
+        title: "Success",
+        description: "Society rejected successfully!",
+      });
       
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error rejecting society:", err);
-      alert(err.response?.data?.message || err.message || "Failed to reject society");
+      toast({
+        title: "Error",
+        description: err.response?.data?.message || err.message || "Failed to reject society",
+        variant: "destructive",
+      });
     }
   };
 
@@ -240,11 +275,20 @@ const AdminDashboard = () => {
   };
 
   // Function to delete a society
-  const handleDeleteSociety = async (societyId: number) => {
-    if (!window.confirm("Are you sure you want to delete this society? This action cannot be undone.")) {
-      return;
-    }
+  const handleDeleteSociety = (societyId: number) => {
+    setSocietyToDelete(societyId);
+    setConfirmDialog({
+      open: true,
+      title: "Delete Society",
+      description: "Are you sure you want to delete this society? This action cannot be undone.",
+      onConfirm: async () => {
+        await performDeleteSociety(societyId);
+      },
+      variant: "destructive"
+    });
+  };
 
+  const performDeleteSociety = async (societyId: number) => {
     try {
        const API_URL = import.meta.env.VITE_API_URL;
       const token = localStorage.getItem("token");
@@ -266,12 +310,20 @@ const AdminDashboard = () => {
       // Refresh the societies list
       await getAllSocieties();
       
-      // Show success message
-      alert("Society deleted successfully!");
+      toast({
+        title: "Success",
+        description: "Society deleted successfully!",
+      });
       
     } catch (err: any) {
       console.error("Error deleting society:", err);
-      alert(err.response?.data?.message || err.message || "Failed to delete society");
+      toast({
+        title: "Error",
+        description: err.response?.data?.message || err.message || "Failed to delete society",
+        variant: "destructive",
+      });
+    } finally {
+      setSocietyToDelete(null);
     }
   };
 
@@ -331,12 +383,188 @@ const AdminDashboard = () => {
     }
   };
 
-  // Function to delete a student
-  const handleDeleteStudent = async (studentId: number) => {
-    if (!window.confirm("Are you sure you want to delete this student? This action cannot be undone and will also delete all their societies.")) {
-      return;
-    }
+  // Function to get all event requests
+  const getAllEventRequests = async () => {
+    try {
+      const API_URL = import.meta.env.VITE_API_URL;
+      setEventRequestsLoading(true);
+      setError(null);
+      
+      const token = localStorage.getItem("token");
+      if (!token) {
+        throw new Error("No authentication token found");
+      }
 
+      const response = await axios.post(
+        `${API_URL}/admin/event-requests`,
+        { role: "super_admin", filter: "all" },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      console.log("All event requests fetched:", response.data);
+      setAllEventRequests(response.data.data || []);
+    } catch (err: any) {
+      console.error("Error fetching event requests:", err);
+      setError(err.response?.data?.message || err.message || "Failed to fetch event requests");
+    } finally {
+      setEventRequestsLoading(false);
+    }
+  };
+
+  // Function to get all event reports
+  const getAllEventReports = async () => {
+    try {
+      const API_URL = import.meta.env.VITE_API_URL;
+      setEventReportsLoading(true);
+      setError(null);
+      
+      const token = localStorage.getItem("token");
+      if (!token) {
+        throw new Error("No authentication token found");
+      }
+
+      const response = await axios.get(`${API_URL}/admin/event-reports`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      console.log("All event reports fetched:", response.data);
+      setAllEventReports(response.data.data || []);
+    } catch (err: any) {
+      console.error("Error fetching event reports:", err);
+      setError(err.response?.data?.message || err.message || "Failed to fetch event reports");
+    } finally {
+      setEventReportsLoading(false);
+    }
+  };
+
+  // Function to get all faculty
+  const getAllFaculty = async () => {
+    try {
+      const API_URL = import.meta.env.VITE_API_URL;
+      setFacultyLoading(true);
+      setError(null);
+      
+      const token = localStorage.getItem("token");
+      if (!token) {
+        throw new Error("No authentication token found");
+      }
+
+      const response = await axios.get(`${API_URL}/admin/faculty`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      console.log("All faculty fetched:", response.data);
+      setAllFaculty(response.data.faculty || []);
+    } catch (err: any) {
+      console.error("Error fetching faculty:", err);
+      setError(err.response?.data?.message || err.message || "Failed to fetch faculty");
+    } finally {
+      setFacultyLoading(false);
+    }
+  };
+
+  // Function to fetch complete event request details
+  const handleViewEventRequestDetails = async (eventRequestId: number) => {
+    try {
+      const API_URL = import.meta.env.VITE_API_URL;
+      setLoadingEventRequestDetails(true);
+      const token = localStorage.getItem("token");
+      if (!token) {
+        throw new Error("No authentication token found");
+      }
+
+      const response = await axios.get(
+        `${API_URL}/admin/event-requests/${eventRequestId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.data.success) {
+        setSelectedEventRequest(response.data.data);
+        setIsEventRequestDetailModalOpen(true);
+      } else {
+        toast({
+          title: "Error",
+          description: response.data.message || "Failed to fetch event request details",
+          variant: "destructive",
+        });
+      }
+    } catch (err: any) {
+      console.error("Error fetching event request details:", err);
+      toast({
+        title: "Error",
+        description: err.response?.data?.message || err.message || "Failed to fetch event request details",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingEventRequestDetails(false);
+    }
+  };
+
+  // Function to toggle faculty status
+  const handleToggleFacultyStatus = async (facultyId: number, currentStatus: number) => {
+    try {
+      const API_URL = import.meta.env.VITE_API_URL;
+      const token = localStorage.getItem("token");
+      if (!token) {
+        throw new Error("No authentication token found");
+      }
+
+      const newStatus = currentStatus === 1 ? 0 : 1;
+
+      const response = await axios.put(
+        `${API_URL}/admin/faculty/${facultyId}/status`,
+        { is_active: newStatus },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      toast({
+        title: "Success",
+        description: `Faculty member ${newStatus === 1 ? 'activated' : 'deactivated'} successfully!`,
+      });
+
+      // Refresh faculty list
+      await getAllFaculty();
+    } catch (err: any) {
+      console.error("Error toggling faculty status:", err);
+      toast({
+        title: "Error",
+        description: err.response?.data?.message || err.message || "Failed to update faculty status",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Function to delete a student
+  const handleDeleteStudent = (studentId: number) => {
+    setStudentToDelete(studentId);
+    setConfirmDialog({
+      open: true,
+      title: "Delete Student",
+      description: "Are you sure you want to delete this student? This action cannot be undone and will also delete all their societies.",
+      onConfirm: async () => {
+        await performDeleteStudent(studentId);
+      },
+      variant: "destructive"
+    });
+  };
+
+  const performDeleteStudent = async (studentId: number) => {
     try {
        const API_URL = import.meta.env.VITE_API_URL;
       const token = localStorage.getItem("token");
@@ -360,12 +588,20 @@ const AdminDashboard = () => {
       // Also refresh societies as some may have been deleted
       await getAllSocieties();
       
-      // Show success message
-      alert("Student deleted successfully!");
+      toast({
+        title: "Success",
+        description: "Student deleted successfully!",
+      });
       
     } catch (err: any) {
       console.error("Error deleting student:", err);
-      alert(err.response?.data?.message || err.message || "Failed to delete student");
+      toast({
+        title: "Error",
+        description: err.response?.data?.message || err.message || "Failed to delete student",
+        variant: "destructive",
+      });
+    } finally {
+      setStudentToDelete(null);
     }
   };
 
@@ -421,8 +657,10 @@ const AdminDashboard = () => {
       // Refresh students list
       await getAllStudents();
       
-      // Show success message
-      alert("Advisor account created successfully!");
+      toast({
+        title: "Success",
+        description: "Advisor account created successfully!",
+      });
       
     } catch (err: any) {
       console.error("Error creating advisor:", err);
@@ -433,6 +671,9 @@ const AdminDashboard = () => {
   // Load societies on component mount
   useEffect(() => {
     getAllSocieties();
+    getAllEventRequests();
+    getAllEventReports();
+    getAllFaculty();
   }, []);
 
   // Load events when events tab is selected
@@ -491,12 +732,14 @@ const AdminDashboard = () => {
       <section className="py-8 px-4">
         <div className="container mx-auto max-w-7xl">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-4 mb-8">
+            <TabsList className="grid w-full grid-cols-5 mb-8">
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="societies">Societies</TabsTrigger>
-              <TabsTrigger value="events">Events</TabsTrigger>
-              <TabsTrigger value="users">Users</TabsTrigger>
-              {/* <TabsTrigger value="reports">Reports</TabsTrigger> */}
+              <TabsTrigger value="event-requests">Event Requests</TabsTrigger>
+              <TabsTrigger value="event-reports">Event Reports</TabsTrigger>
+              <TabsTrigger value="faculty">Faculty</TabsTrigger>
+              {/* <TabsTrigger value="events">Events</TabsTrigger> */}
+              {/* <TabsTrigger value="users">Users</TabsTrigger> */}
             </TabsList>
 
             <TabsContent value="overview" className="space-y-8">
@@ -510,10 +753,21 @@ const AdminDashboard = () => {
                     </div>
                     <Building className="h-8 w-8 text-university-navy" />
                   </div>
-                  <div className="flex items-center mt-2 text-sm">
+                  {/* <div className="flex items-center mt-2 text-sm">
                     <TrendingUp className="h-3 w-3 text-green-500 mr-1" />
                     <span className="text-green-500">+{stats.monthlyGrowth}% this month</span>
+                  </div> */}
+                </Card>
+
+                <Card className="p-6 shadow-card">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total Event Requests</p>
+                      <p className="text-2xl font-bold text-university-navy">{stats.totalEventRequests}</p>
+                    </div>
+                    <Calendar className="h-8 w-8 text-university-gold" />
                   </div>
+                  <p className="text-sm text-muted-foreground mt-2">All event requests</p>
                 </Card>
 
                 <Card className="p-6 shadow-card">
@@ -527,7 +781,7 @@ const AdminDashboard = () => {
                   <p className="text-sm text-muted-foreground mt-2">{stats.activeUsers} active</p>
                 </Card>
 
-                <Card className="p-6 shadow-card">
+                {/* <Card className="p-6 shadow-card">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-muted-foreground">Pending Reviews</p>
@@ -536,9 +790,9 @@ const AdminDashboard = () => {
                     <AlertTriangle className="h-8 w-8 text-university-maroon" />
                   </div>
                   <p className="text-sm text-muted-foreground mt-2">Societies awaiting approval</p>
-                </Card>
+                </Card> */}
 
-                <Card className="p-6 shadow-card">
+                {/* <Card className="p-6 shadow-card">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-muted-foreground">Flagged Content</p>
@@ -547,7 +801,7 @@ const AdminDashboard = () => {
                     <MessageSquare className="h-8 w-8 text-university-maroon" />
                   </div>
                   <p className="text-sm text-muted-foreground mt-2">Requiring attention</p>
-                </Card>
+                </Card> */}
               </div>
 
               {/* Role Access Quick Link */}
@@ -898,7 +1152,7 @@ const AdminDashboard = () => {
 
             <TabsContent value="events" className="space-y-6">
               <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-semibold text-university-navy">All Events</h2>
+                <h2 className="text-2xl font-semibold text-university-navy">All Societies</h2>
                 <Button 
                   variant="outline" 
                   onClick={getAllEvents}
@@ -915,44 +1169,49 @@ const AdminDashboard = () => {
                 </Card>
               )}
 
-              {/* Events List */}
-              {allEvents.length > 0 && (
+              {/* Societies List */}
+              {filteredSocieties.length > 0 && (
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold text-university-navy">
-                    All Events ({allEvents.length})
+                    All Societies ({filteredSocieties.length})
                   </h3>
                   <div className="grid gap-4">
-                    {allEvents.map((event: any) => (
-                      <Card key={event.id} className="p-4 shadow-card">
+                    {filteredSocieties.map((society: any) => (
+                      <Card key={society.society_id} className="p-4 shadow-card hover:shadow-lg transition-shadow">
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
                             <div className="flex items-center space-x-2 mb-2">
-                              <h4 className="text-lg font-semibold text-university-navy">{event.title}</h4>
-                              <Badge variant="outline">{event.status_name || 'Pending'}</Badge>
+                              <h4 className="text-lg font-semibold text-university-navy">{society.name}</h4>
+                              <Badge variant={society.status_name === 'Approved by VC' ? "default" : society.status_id === 1 ? "secondary" : "destructive"}>
+                                {society.status_name || 'Pending'}
+                              </Badge>
+                              <Badge variant="outline">{society.category}</Badge>
                             </div>
-                            <p className="text-sm text-muted-foreground mb-2">{event.description}</p>
+                            <p className="text-sm text-muted-foreground mb-2">{society.description}</p>
                             <div className="flex items-center space-x-4 text-xs text-muted-foreground">
                               <div className="flex items-center space-x-1">
-                                <Building className="h-3 w-3" />
-                                <span>{event.society_name || 'Unknown Society'}</span>
+                                <MapPin className="h-3 w-3" />
+                                <span>{society.location || 'N/A'}</span>
                               </div>
-                              <div className="flex items-center space-x-1">
-                                <Calendar className="h-3 w-3" />
-                                <span>{event.event_date ? new Date(event.event_date).toLocaleDateString() : 'TBD'}</span>
-                              </div>
-                              {event.event_time && (
+                              {society.advisor && (
                                 <div className="flex items-center space-x-1">
-                                  <span>🕐 {event.event_time}</span>
-                                </div>
-                              )}
-                              {event.venue && (
-                                <div className="flex items-center space-x-1">
-                                  <MapPin className="h-3 w-3" />
-                                  <span>{event.venue}</span>
+                                  <Users className="h-3 w-3" />
+                                  <span>Advisor: {society.advisor}</span>
                                 </div>
                               )}
                             </div>
                           </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedSocietyForDetail(society);
+                              setIsSocietyDetailModalOpen(true);
+                            }}
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            View Details
+                          </Button>
                         </div>
                       </Card>
                     ))}
@@ -961,40 +1220,219 @@ const AdminDashboard = () => {
               )}
 
               {/* Loading State */}
-              {eventsLoading && allEvents.length === 0 && (
+              {loading && filteredSocieties.length === 0 && (
                 <div className="text-center py-8">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-university-navy mx-auto mb-4"></div>
-                  <p className="text-muted-foreground">Loading events...</p>
+                  <p className="text-muted-foreground">Loading societies...</p>
                 </div>
               )}
 
               {/* Empty State */}
-              {!eventsLoading && allEvents.length === 0 && !error && (
+              {!loading && filteredSocieties.length === 0 && !error && (
                 <div className="text-center py-8">
-                  <Calendar className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                  <h3 className="text-lg font-medium mb-2">No Events Found</h3>
-                  <p className="text-muted-foreground">No events have been created yet.</p>
+                  <Building className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <h3 className="text-lg font-medium mb-2">No Societies Found</h3>
+                  <p className="text-muted-foreground">No societies have been created yet.</p>
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="event-requests" className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-semibold text-university-navy">All Event Requests</h2>
+                <Button variant="outline" size="sm" onClick={getAllEventRequests} disabled={eventRequestsLoading}>
+                  {eventRequestsLoading ? "Refreshing..." : "Refresh"}
+                </Button>
+              </div>
+
+              {eventRequestsLoading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-university-navy mx-auto mb-4"></div>
+                  <p className="text-muted-foreground">Loading event requests...</p>
+                </div>
+              ) : allEventRequests.length === 0 ? (
+                <Card className="p-6 text-center">
+                  <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-medium mb-2">No Event Requests Found</h3>
+                  <p className="text-muted-foreground">No event requests have been submitted yet.</p>
+                </Card>
+              ) : (
+                <div className="grid gap-4">
+                  {allEventRequests.map((request: any) => (
+                    <Card key={request.req_id} className="p-4 hover:shadow-lg transition-shadow">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <h3 className="text-lg font-semibold text-university-navy">{request.title || request.event_name}</h3>
+                            <Badge variant={request.status_id === 1 ? "secondary" : [2, 4, 6, 8, 11, 13, 15].includes(request.status_id) ? "default" : "destructive"}>
+                              {request.status_name || "Pending"}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground mb-2">{request.description || request.media_coverage}</p>
+                          <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+                            <span>📅 {request.event_date ? new Date(request.event_date).toLocaleDateString() : "Date TBD"}</span>
+                            {request.event_time && <span>🕐 {request.event_time}</span>}
+                            {request.venue && <span>📍 {request.venue}</span>}
+                            {request.society_name && <span>🏛️ {request.society_name}</span>}
+                          </div>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={async () => {
+                            await handleViewEventRequestDetails(request.req_id);
+                          }}
+                          disabled={loadingEventRequestDetails}
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          {loadingEventRequestDetails ? "Loading..." : "View Details"}
+                        </Button>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="event-reports" className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-semibold text-university-navy">All Event Reports</h2>
+                <Button variant="outline" size="sm" onClick={getAllEventReports} disabled={eventReportsLoading}>
+                  {eventReportsLoading ? "Refreshing..." : "Refresh"}
+                </Button>
+              </div>
+
+              {eventReportsLoading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-university-navy mx-auto mb-4"></div>
+                  <p className="text-muted-foreground">Loading event reports...</p>
+                </div>
+              ) : allEventReports.length === 0 ? (
+                <Card className="p-6 text-center">
+                  <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-medium mb-2">No Event Reports Found</h3>
+                  <p className="text-muted-foreground">No event reports have been submitted yet.</p>
+                </Card>
+              ) : (
+                <div className="grid gap-4">
+                  {allEventReports.map((report: any) => (
+                    <Card key={report.report_id} className="p-4 hover:shadow-lg transition-shadow">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h3 className="text-lg font-semibold text-university-navy mb-2">{report.report_title}</h3>
+                          <p className="text-sm text-muted-foreground mb-2">{report.report_description}</p>
+                          <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+                            <span>📅 Event: {report.event_title}</span>
+                            <span>🏛️ {report.society_name}</span>
+                            <span>👤 {report.firstName} {report.lastName}</span>
+                            <span>📆 Submitted: {new Date(report.submitted_at).toLocaleDateString()}</span>
+                          </div>
+                          {report.report_file && (
+                            <div className="mt-2">
+                              <a
+                                href={`${import.meta.env.VITE_API_URL}/${report.report_file}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sm text-university-navy hover:underline"
+                              >
+                                📄 View Report File
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="faculty" className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-semibold text-university-navy">Faculty Management</h2>
+                <div className="flex space-x-2">
+                  <Button variant="outline" size="sm" onClick={getAllFaculty} disabled={facultyLoading}>
+                    {facultyLoading ? "Refreshing..." : "Refresh"}
+                  </Button>
+                  <Button variant="university" size="sm" onClick={() => navigate("/dashboard/admin/add-faculty")}>
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Add Faculty
+                  </Button>
+                </div>
+              </div>
+
+              {facultyLoading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-university-navy mx-auto mb-4"></div>
+                  <p className="text-muted-foreground">Loading faculty...</p>
+                </div>
+              ) : allFaculty.length === 0 ? (
+                <Card className="p-6 text-center">
+                  <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-medium mb-2">No Faculty Members Found</h3>
+                  <p className="text-muted-foreground">No faculty members have been added yet.</p>
+                </Card>
+              ) : (
+                <div className="grid gap-4">
+                  {allFaculty.map((faculty: any) => (
+                    <Card key={faculty.faculty_id} className="p-4 hover:shadow-lg transition-shadow">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <h3 className="text-lg font-semibold text-university-navy">{faculty.name}</h3>
+                            <Badge variant={faculty.is_active === 1 ? "default" : "secondary"}>
+                              {faculty.is_active === 1 ? "Active" : "Inactive"}
+                            </Badge>
+                          </div>
+                          <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                            <span>📧 {faculty.email}</span>
+                            {faculty.phone && <span>📞 {faculty.phone}</span>}
+                            {faculty.cnic && <span>🆔 CNIC: {faculty.cnic}</span>}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-2">
+                            Created: {new Date(faculty.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div className="flex space-x-2">
+                          <Button
+                            variant={faculty.is_active === 1 ? "destructive" : "default"}
+                            size="sm"
+                            onClick={() => handleToggleFacultyStatus(faculty.faculty_id, faculty.is_active)}
+                          >
+                            {faculty.is_active === 1 ? "Deactivate" : "Activate"}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => navigate(`/dashboard/admin/role-access?faculty_id=${faculty.faculty_id}`)}
+                          >
+                            <Settings className="h-4 w-4 mr-2" />
+                            Manage Roles
+                          </Button>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
                 </div>
               )}
             </TabsContent>
 
             <TabsContent value="users" className="space-y-6">
               <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-semibold text-university-navy">User Management</h2>
+                <h2 className="text-2xl font-semibold text-university-navy">All Societies</h2>
                 <div className="flex space-x-2">
                   <Button 
                     variant="outline" 
-                    onClick={getAllStudents}
-                    disabled={studentsLoading}
+                    onClick={getAllSocieties}
+                    disabled={loading}
                   >
-                    {studentsLoading ? "Loading..." : "Refresh"}
+                    {loading ? "Loading..." : "Refresh"}
                   </Button>
                   <Button 
                     variant="university"
-                    onClick={() => setIsAdvisorDialogOpen(true)}
+                    onClick={() => navigate("/society/register", { state: { returnTo: "/dashboard/admin" } })}
                   >
-                    <UserPlus className="h-4 w-4 mr-2" />
-                    Create Advisor
+                    Create Society
                   </Button>
                 </div>
               </div>
@@ -1006,77 +1444,49 @@ const AdminDashboard = () => {
                 </Card>
               )}
 
-              {/* Students List */}
-              {allStudents.length > 0 && (
+              {/* Societies List */}
+              {filteredSocieties.length > 0 && (
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold text-university-navy">
-                    All Registered Students ({allStudents.length})
+                    All Societies ({filteredSocieties.length})
                   </h3>
                   <div className="grid gap-4">
-                    {allStudents.map((student: any) => (
-                      <Card key={student.id} className="p-4 shadow-card">
+                    {filteredSocieties.map((society: any) => (
+                      <Card key={society.society_id} className="p-4 shadow-card hover:shadow-lg transition-shadow">
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
                             <div className="flex items-center space-x-2 mb-2">
-                              <h4 className="text-lg font-semibold text-university-navy">
-                                {student.firstName} {student.lastName}
-                              </h4>
-                              {student.role === 'advisor' && (
-                                <Badge variant="secondary">Advisor</Badge>
-                              )}
-                              {student.role === 'society_board' && (
-                                <Badge variant="outline">Society Board</Badge>
-                              )}
-                              {student.role === 'registrar' && (
-                                <Badge variant="outline">Registrar</Badge>
-                              )}
-                              {student.role === 'vc' && (
-                                <Badge variant="outline">VC</Badge>
-                              )}
-                              {student.admin === 1 && (
-                                <Badge variant="default">Admin</Badge>
-                              )}
-                              {student.society_owner === 1 && (
-                                <Badge variant="outline">Society Owner</Badge>
-                              )}
+                              <h4 className="text-lg font-semibold text-university-navy">{society.name}</h4>
+                              <Badge variant={society.status_name === 'Approved by VC' ? "default" : society.status_id === 1 ? "secondary" : "destructive"}>
+                                {society.status_name || 'Pending'}
+                              </Badge>
+                              <Badge variant="outline">{society.category}</Badge>
                             </div>
-                            <div className="grid md:grid-cols-2 gap-2 text-sm text-muted-foreground">
-                              <div>
-                                <span className="font-medium">Email:</span> {student.email}
+                            <p className="text-sm text-muted-foreground mb-2">{society.description}</p>
+                            <div className="flex items-center space-x-4 text-xs text-muted-foreground">
+                              <div className="flex items-center space-x-1">
+                                <MapPin className="h-3 w-3" />
+                                <span>{society.location || 'N/A'}</span>
                               </div>
-                              <div>
-                                <span className="font-medium">Roll No:</span> {student.rollNo}
-                              </div>
-                              <div>
-                                <span className="font-medium">University:</span> {student.university}
-                              </div>
-                              <div>
-                                <span className="font-medium">Major:</span> {student.major}
-                              </div>
-                              <div>
-                                <span className="font-medium">Degree:</span> {student.degree}
-                              </div>
-                              <div>
-                                <span className="font-medium">Semester:</span> {student.semester}
-                              </div>
-                              <div>
-                                <span className="font-medium">Phone:</span> {student.phone}
-                              </div>
-                              <div>
-                                <span className="font-medium">Registered:</span> {student.created_at ? new Date(student.created_at).toLocaleDateString() : 'N/A'}
-                              </div>
+                              {society.advisor && (
+                                <div className="flex items-center space-x-1">
+                                  <Users className="h-3 w-3" />
+                                  <span>Advisor: {society.advisor}</span>
+                                </div>
+                              )}
                             </div>
                           </div>
-                          {student.admin !== 1 && (
-                            <Button 
-                              size="sm" 
-                              variant="destructive"
-                              onClick={() => handleDeleteStudent(student.id)}
-                            >
-                              <Trash2 className="h-3 w-3 mr-1" />
-                              Delete
-                            </Button>
-                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedSocietyForDetail(society);
+                              setIsSocietyDetailModalOpen(true);
+                            }}
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            View Details
+                          </Button>
                         </div>
                       </Card>
                     ))}
@@ -1101,7 +1511,6 @@ const AdminDashboard = () => {
               </div>
               )}
             </TabsContent>
-
 
             {/* Reports tab commented out for now */}
             {/* <TabsContent value="reports">
@@ -1443,10 +1852,16 @@ const AdminDashboard = () => {
                 <Button 
                   variant="destructive"
                   onClick={() => {
-                    if (window.confirm("Are you sure you want to delete this society? This action cannot be undone.")) {
-                      handleDeleteSociety(selectedSocietyForDetail.society_id);
-                      setIsSocietyDetailModalOpen(false);
-                    }
+                    setConfirmDialog({
+                      open: true,
+                      title: "Delete Society",
+                      description: "Are you sure you want to delete this society? This action cannot be undone.",
+                      onConfirm: () => {
+                        handleDeleteSociety(selectedSocietyForDetail.society_id);
+                        setIsSocietyDetailModalOpen(false);
+                      },
+                      variant: "destructive"
+                    });
                   }}
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
@@ -1650,6 +2065,422 @@ const AdminDashboard = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Event Request Detail Modal */}
+      <Dialog open={isEventRequestDetailModalOpen} onOpenChange={setIsEventRequestDetailModalOpen}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Event Request Details</DialogTitle>
+            <DialogDescription>
+              Complete information about the event request including all notes and documents
+            </DialogDescription>
+          </DialogHeader>
+          {loadingEventRequestDetails ? (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-university-navy mx-auto mb-4"></div>
+              <p className="text-muted-foreground">Loading event request details...</p>
+            </div>
+          ) : selectedEventRequest ? (
+            <div className="space-y-4">
+              {/* Basic Information */}
+              <div className="grid md:grid-cols-2 gap-4">
+                <Card className="p-4">
+                  <h3 className="font-semibold mb-3 text-university-navy">Event Information</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Event Name:</span>
+                      <span className="font-medium">{selectedEventRequest.title || selectedEventRequest.event_name || "Not specified"}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Event Type:</span>
+                      <span className="font-medium">{selectedEventRequest.event_type || "Not specified"}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Date From:</span>
+                      <span className="font-medium">{selectedEventRequest.event_date || selectedEventRequest.date_from ? new Date(selectedEventRequest.event_date || selectedEventRequest.date_from).toLocaleDateString() : "TBD"}</span>
+                    </div>
+                    {selectedEventRequest.date_to && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Date To:</span>
+                        <span className="font-medium">{new Date(selectedEventRequest.date_to).toLocaleDateString()}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Time From:</span>
+                      <span className="font-medium">{selectedEventRequest.event_time || selectedEventRequest.time_from || "TBD"}</span>
+                    </div>
+                    {selectedEventRequest.time_to && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Time To:</span>
+                        <span className="font-medium">{selectedEventRequest.time_to}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Venue:</span>
+                      <span className="font-medium">{selectedEventRequest.venue || "Not specified"}</span>
+                    </div>
+                    {selectedEventRequest.collaborating_org && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Collaborating Org:</span>
+                        <span className="font-medium">{selectedEventRequest.collaborating_org}</span>
+                      </div>
+                    )}
+                    {selectedEventRequest.sponsor_name && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Sponsor:</span>
+                        <span className="font-medium">{selectedEventRequest.sponsor_name}</span>
+                      </div>
+                    )}
+                    {selectedEventRequest.sponsor_amount && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Sponsor Amount:</span>
+                        <span className="font-medium">{selectedEventRequest.sponsor_amount}</span>
+                      </div>
+                    )}
+                    {selectedEventRequest.coordinator_name && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Coordinator:</span>
+                        <span className="font-medium">{selectedEventRequest.coordinator_name}</span>
+                      </div>
+                    )}
+                    {selectedEventRequest.coordinator_contact && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Coordinator Contact:</span>
+                        <span className="font-medium">{selectedEventRequest.coordinator_contact}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Status:</span>
+                      <Badge variant={selectedEventRequest.status_id === 1 ? "secondary" : [2, 4, 6, 8, 11, 13, 15].includes(selectedEventRequest.status_id) ? "default" : "destructive"}>
+                        {selectedEventRequest.status_name || "Pending"}
+                      </Badge>
+                    </div>
+                  </div>
+                </Card>
+
+                <Card className="p-4">
+                  <h3 className="font-semibold mb-3 text-university-navy">Submitted By</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Name:</span>
+                      <span className="font-medium">
+                        {selectedEventRequest.firstName && selectedEventRequest.lastName
+                          ? `${selectedEventRequest.firstName} ${selectedEventRequest.lastName}`
+                          : selectedEventRequest.president_name || "Not available"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Email:</span>
+                      <span className="font-medium">
+                        {selectedEventRequest.president_email || selectedEventRequest.email || "Not provided"}
+                      </span>
+                    </div>
+                    {(selectedEventRequest.rollNo || selectedEventRequest.RollNO) && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Roll No:</span>
+                        <span className="font-medium">{selectedEventRequest.rollNo || selectedEventRequest.RollNO}</span>
+                      </div>
+                    )}
+                    {selectedEventRequest.society_name && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Society:</span>
+                        <span className="font-medium">{selectedEventRequest.society_name}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Created At:</span>
+                      <span className="font-medium">{new Date(selectedEventRequest.created_at).toLocaleString()}</span>
+                    </div>
+                  </div>
+                </Card>
+              </div>
+
+              {/* Description / Media Coverage */}
+              {(selectedEventRequest.description || selectedEventRequest.media_coverage) && (
+                <Card className="p-4">
+                  <h3 className="font-semibold mb-3 text-university-navy">Event Description / Media Coverage</h3>
+                  {selectedEventRequest.description && (
+                    <p className="text-muted-foreground leading-relaxed mb-3">{selectedEventRequest.description}</p>
+                  )}
+                  {selectedEventRequest.media_coverage && (
+                    <div>
+                      <p className="font-medium text-sm mb-1">Media Coverage:</p>
+                      <p className="text-muted-foreground leading-relaxed">{selectedEventRequest.media_coverage}</p>
+                    </div>
+                  )}
+                </Card>
+              )}
+
+              {/* Participants: Students */}
+              {Array.isArray(selectedEventRequest.student_participants) &&
+                selectedEventRequest.student_participants.length > 0 && (
+                <Card className="p-4">
+                  <h3 className="font-semibold mb-3 text-university-navy">Student Participants</h3>
+                  <div className="space-y-2 text-sm">
+                    {selectedEventRequest.student_participants.map((s: any, idx: number) => (
+                      <div
+                        key={idx}
+                        className="flex flex-wrap justify-between border-b last:border-0 pb-2 last:pb-0"
+                      >
+                        <span className="font-medium">
+                          {s.academic_program || "Program not specified"}
+                        </span>
+                        <span className="text-muted-foreground">
+                          {s.semester && `Semester: ${s.semester} • `}
+                          {typeof s.no_of_students === "number" && s.no_of_students > 0
+                            ? `${s.no_of_students} students`
+                            : "Count not specified"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
+
+              {/* Participants: Staff */}
+              {Array.isArray(selectedEventRequest.staff_participants) &&
+                selectedEventRequest.staff_participants.length > 0 && (
+                <Card className="p-4">
+                  <h3 className="font-semibold mb-3 text-university-navy">Staff Participants</h3>
+                  <div className="space-y-2 text-sm">
+                    {selectedEventRequest.staff_participants.map((s: any, idx: number) => (
+                      <div
+                        key={idx}
+                        className="flex flex-wrap justify-between border-b last:border-0 pb-2 last:pb-0"
+                      >
+                        <span className="font-medium">
+                          {s.department || "Department not specified"}
+                        </span>
+                        <span className="text-muted-foreground">
+                          {s.gazetted || "Category not specified"} •{" "}
+                          {typeof s.no_of_staff === "number" && s.no_of_staff > 0
+                            ? `${s.no_of_staff} staff`
+                            : "Count not specified"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
+
+              {/* Management Requirements */}
+              {selectedEventRequest.management_requirements && (
+                <Card className="p-4">
+                  <h3 className="font-semibold mb-3 text-university-navy">Management Requirements</h3>
+                  <div className="grid md:grid-cols-2 gap-3 text-sm">
+                    <div className="space-y-1">
+                      <p>
+                        <span className="font-medium">Sound System:</span>{" "}
+                        {selectedEventRequest.management_requirements.sound_system ? "Yes" : "No"}
+                      </p>
+                      <p>
+                        <span className="font-medium">Recording:</span>{" "}
+                        {selectedEventRequest.management_requirements.recording ? "Yes" : "No"}
+                      </p>
+                      <p>
+                        <span className="font-medium">Bouquet:</span>{" "}
+                        {selectedEventRequest.management_requirements.bouquet ? "Yes" : "No"}
+                      </p>
+                      <p>
+                        <span className="font-medium">Souvenirs:</span>{" "}
+                        {selectedEventRequest.management_requirements.souvenirs ? "Yes" : "No"}
+                      </p>
+                      <p>
+                        <span className="font-medium">University Photographer:</span>{" "}
+                        {selectedEventRequest.management_requirements.university_photographer
+                          ? "Yes"
+                          : "No"}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p>
+                        <span className="font-medium">Special Arrangements:</span>{" "}
+                        {selectedEventRequest.management_requirements.special_arrangements
+                          ? "Yes"
+                          : "No"}
+                      </p>
+                      {selectedEventRequest.management_requirements.special_arrangements_detail && (
+                        <p className="text-muted-foreground">
+                          {selectedEventRequest.management_requirements.special_arrangements_detail}
+                        </p>
+                      )}
+                      <p>
+                        <span className="font-medium">Refreshments:</span>{" "}
+                        {selectedEventRequest.management_requirements.refreshment_required
+                          ? "Yes"
+                          : "No"}
+                      </p>
+                      {selectedEventRequest.management_requirements.refreshment_required && (
+                        <>
+                          {selectedEventRequest.management_requirements.refreshment_category && (
+                            <p className="text-muted-foreground">
+                              <span className="font-medium">Category:</span>{" "}
+                              {selectedEventRequest.management_requirements.refreshment_category}
+                            </p>
+                          )}
+                          {selectedEventRequest.management_requirements.refreshment_persons && (
+                            <p className="text-muted-foreground">
+                              <span className="font-medium">Persons:</span>{" "}
+                              {selectedEventRequest.management_requirements.refreshment_persons} persons
+                            </p>
+                          )}
+                        </>
+                      )}
+                      {selectedEventRequest.management_requirements.any_other && (
+                        <p className="text-muted-foreground">
+                          <span className="font-medium">Other:</span>{" "}
+                          {selectedEventRequest.management_requirements.any_other}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              )}
+
+              {/* Transport Requests */}
+              {Array.isArray(selectedEventRequest.transport_requests) &&
+                selectedEventRequest.transport_requests.length > 0 && (
+                <Card className="p-4">
+                  <h3 className="font-semibold mb-3 text-university-navy">Transport Requests</h3>
+                  <div className="space-y-2 text-sm">
+                    {selectedEventRequest.transport_requests.map((t: any, idx: number) => (
+                      <div
+                        key={idx}
+                        className="border rounded p-2 flex flex-wrap justify-between gap-2"
+                      >
+                        <div>
+                          <p className="font-medium">{t.vehicle_type || "Vehicle not specified"}</p>
+                          <p className="text-muted-foreground">
+                            {t.purpose || "Purpose not specified"}
+                          </p>
+                        </div>
+                        <div className="text-right text-xs text-muted-foreground">
+                          {t.date && <div>📅 {new Date(t.date).toLocaleDateString()}</div>}
+                          {t.time && <div>🕐 {t.time}</div>}
+                          {t.destination && <div>📍 {t.destination}</div>}
+                          {typeof t.no_of_persons === "number" && t.no_of_persons > 0 && (
+                            <div>👥 {t.no_of_persons} persons</div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
+
+              {/* Documents */}
+              {Array.isArray(selectedEventRequest.documents) &&
+                selectedEventRequest.documents.length > 0 && (
+                <Card className="p-4">
+                  <h3 className="font-semibold mb-3 text-university-navy">Attached Documents</h3>
+                  <div className="space-y-2 text-sm">
+                    {selectedEventRequest.documents.map((doc: any) => (
+                      <div
+                        key={doc.doc_id}
+                        className="flex items-center justify-between border-b last:border-0 pb-2 last:pb-0"
+                      >
+                        <span>
+                          <span className="font-medium capitalize">{doc.doc_type}</span>
+                          {" – "}
+                          {doc.file_path.split("/").pop()}
+                        </span>
+                        <a
+                          href={`${import.meta.env.VITE_API_URL}${doc.file_path}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-blue-600 hover:underline"
+                        >
+                          View
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
+
+              {/* Admin Notes from History - Grouped by Role */}
+              {Array.isArray(selectedEventRequest.status_history) &&
+                selectedEventRequest.status_history.length > 0 && (
+                <Card className="p-4">
+                  <h3 className="font-semibold mb-4 text-university-navy">Admin Notes & Status History</h3>
+                  <div className="space-y-6">
+                    {/* Group notes by role */}
+                    {(() => {
+                      const notesByRole: { [key: string]: any[] } = {};
+                      selectedEventRequest.status_history
+                        .filter((h: any) => h.note && h.note.trim() !== "")
+                        .forEach((history: any) => {
+                          const role = history.role || history.role_display_name || history.role_name || "Admin";
+                          if (!notesByRole[role]) {
+                            notesByRole[role] = [];
+                          }
+                          notesByRole[role].push(history);
+                        });
+
+                      const roleOrder = ["Board Secretary", "Board President", "Registrar", "VC", "Transport Office", "Protocol Office"];
+                      const sortedRoles = Object.keys(notesByRole).sort((a, b) => {
+                        const aIndex = roleOrder.indexOf(a);
+                        const bIndex = roleOrder.indexOf(b);
+                        if (aIndex === -1 && bIndex === -1) return a.localeCompare(b);
+                        if (aIndex === -1) return 1;
+                        if (bIndex === -1) return -1;
+                        return aIndex - bIndex;
+                      });
+
+                      if (sortedRoles.length === 0) {
+                        return <p className="text-sm text-muted-foreground italic">No admin notes yet.</p>;
+                      }
+
+                      return sortedRoles.map((role) => (
+                        <div key={role} className="space-y-3">
+                          <h4 className="font-semibold text-sm text-university-navy border-b pb-2">
+                            {role} Notes
+                          </h4>
+                          {notesByRole[role].map((history: any, idx: number) => (
+                            <div
+                              key={history.history_id || idx}
+                              className="border-l-4 border-blue-500 pl-4 py-2 bg-blue-50 rounded-r"
+                            >
+                              <div className="flex items-start justify-between mb-2">
+                                <div>
+                                  <p className="text-xs text-muted-foreground">
+                                    {history.firstName && history.lastName
+                                      ? `${history.firstName} ${history.lastName}`
+                                      : "Unknown"}
+                                    {history.status_name && ` • ${history.status_name}`}
+                                  </p>
+                                </div>
+                                <span className="text-xs text-muted-foreground">
+                                  {new Date(history.changed_at).toLocaleString()}
+                                </span>
+                              </div>
+                              <p className="text-sm text-gray-700 mt-1">{history.note}</p>
+                            </div>
+                          ))}
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                </Card>
+              )}
+            </div>
+          ) : null}
+          <div className="flex justify-end space-x-2 pt-4">
+            <Button variant="outline" onClick={() => setIsEventRequestDetailModalOpen(false)}>
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) => setConfirmDialog({ ...confirmDialog, open })}
+        title={confirmDialog.title}
+        description={confirmDialog.description}
+        onConfirm={confirmDialog.onConfirm}
+        variant={confirmDialog.variant}
+      />
     </div>
   );
 };

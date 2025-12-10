@@ -58,6 +58,19 @@ const LoginForm = () => {
 
       // 👉 STUDENT DASHBOARD
       if (isStudent) {
+        // Synchroniser les données de l'étudiant depuis l'API externe
+        // Le token de l'API LMS est utilisé pour appeler l'API userProfile
+        try {
+          const API_URL = import.meta.env.VITE_API_URL;
+          const syncResponse = await axios.post(`${API_URL}/user/student/sync`, {
+            token: res.data.token, // Token de l'API LMS (https://lms.gcu.edu.pk/api/fc/login)
+          });
+          console.log("Student data synchronized successfully:", syncResponse.data);
+        } catch (syncError: any) {
+          // Ne pas bloquer le login si la synchronisation échoue
+          console.error("Error syncing student data:", syncError.response?.data || syncError.message);
+        }
+        
         navigate("/dashboard/student");
         return;
       }

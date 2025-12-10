@@ -27,6 +27,7 @@ import {
 const ProfilePage = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [studentInfo, setStudentInfo] = useState<any>(null);
+  const [admProfile, setAdmProfile] = useState<any>(null);
   const [membershipRequests, setMembershipRequests] = useState<any[]>([]);
   const [loadingRequests, setLoadingRequests] = useState(false);
   const [joinedSocieties, setJoinedSocieties] = useState<any[]>([]);
@@ -66,10 +67,38 @@ const ProfilePage = () => {
   useEffect(() => {
     console.log("StudentInfo in useEffect:", studentInfo);
     if (studentInfo) {
-      fetchMembershipRequests();
-      fetchJoinedSocieties();
+      fetchAdmProfile(studentInfo);
     }
   }, [studentInfo]);
+
+  // 🔹 Fetch adm_std profile + joined societies/events
+  const fetchAdmProfile = async (userData: any) => {
+    try {
+      const rollno = userData.RollNO || userData.rollno || userData.ROLNO;
+      const email = userData.email;
+      const userId = userData.id || userData.user_id || userData.faculty_id;
+
+      console.log("🔍 ProfilePage - fetchAdmProfile - userData:", userData);
+      console.log("🔍 ProfilePage - fetchAdmProfile - Extracted:", { rollno, email, userId });
+
+      const res = await axios.post(`${import.meta.env.VITE_API_URL}/user/student/profile/adm`, {
+        rollno,
+        email,
+        user_id: userId,
+      });
+
+      if (res.data?.success !== false) {
+        setAdmProfile(res.data.profile || res.data);
+        if (res.data.joined_societies) setJoinedSocieties(res.data.joined_societies);
+        if (res.data.membership_requests) setMembershipRequests(res.data.membership_requests);
+        if (res.data.upcoming_events) {
+          // Optionally store upcoming events; reuse joinedSocieties tab later if needed
+        }
+      }
+    } catch (err: any) {
+      console.error("Error fetching adm profile:", err.response?.data || err.message);
+    }
+  };
 
   // 🔹 Fetch joined societies
   const fetchJoinedSocieties = async () => {
@@ -155,11 +184,12 @@ const ProfilePage = () => {
       return;
     }
 
-    // Try different possible user ID field names
-    const userId = studentInfo.user_id || studentInfo.id || studentInfo.RollNO || studentInfo.rollno;
+    // Identifiants possibles : adm_std.ID ou rollno
+    const rollno = admProfile?.ROLNO || studentInfo.RollNO || studentInfo.rollno || studentInfo.ROLNO;
+    const userId = admProfile?.ID || studentInfo.user_id || studentInfo.id || studentInfo.RollNO || studentInfo.rollno;
     
-    if (!userId) {
-      console.log("No user ID found in studentInfo. Available fields:", Object.keys(studentInfo));
+    if (!userId && !rollno) {
+      console.log("No rollno or user ID found in studentInfo. Available fields:", Object.keys(studentInfo));
       return;
     }
 
@@ -169,7 +199,7 @@ const ProfilePage = () => {
     try {
       const response = await axios.post(
         `${import.meta.env.VITE_API_URL}/user/membership/requests`,
-        { user_id: userId },
+        { user_id: userId, rollno },
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -232,16 +262,24 @@ const ProfilePage = () => {
             </Button>
           </div>
           <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6">
-            <Avatar className="h-16 w-16 md:h-24 md:w-24">
-              <AvatarImage src={studentInfo.avatar || ""} />
-              <AvatarFallback className="bg-white text-university-navy text-lg md:text-2xl font-bold">
-                {(studentInfo.firstName?.substring(0, 1) || '') + (studentInfo.lastName?.substring(0, 1) || '')}
-              </AvatarFallback>
-            </Avatar>
+            <div className="relative">
+              <div className="h-16 w-16 md:h-24 md:w-24 rounded-full bg-white/20 border-4 border-white/30 flex items-center justify-center">
+                <User className="h-8 w-8 md:h-12 md:w-12 text-white" />
+              </div>
+              <div className="absolute -bottom-1 -right-1 h-6 w-6 md:h-8 md:w-8 rounded-full bg-university-gold border-2 border-white flex items-center justify-center">
+                {/* <span className="text-xs md:text-sm font-bold text-university-navy">
+                  {admProfile?.ROLNO || studentInfo.RollNO || studentInfo.rollno || 'N/A'}
+                </span> */}
+              </div>
+            </div>
             <div className="text-center md:text-left flex-1">
-              <h1 className="text-xl md:text-3xl font-bold mb-1 md:mb-2">{studentInfo.firstName} {studentInfo.lastName}</h1>
-              <p className="text-white/90 text-sm md:text-lg">{studentInfo.major} • {studentInfo.year}</p>
-              <p className="text-white/80 text-xs md:text-base">Student ID: {studentInfo.RollNO}</p>
+              <h1 className="text-xl md:text-3xl font-bold mb-1 md:mb-2">
+                {admProfile?.NM || studentInfo.firstName || studentInfo.name || 'Student'}
+              </h1>
+              <p className="text-white/90 text-sm md:text-lg">Government College University Lahore</p>
+              <p className="text-white/80 text-xs md:text-base">
+                {admProfile?.MOB && admProfile.MOB !== "null" ? `Phone: ${admProfile.MOB}` : studentInfo.phone ? `Phone: ${studentInfo.phone}` : ''}
+              </p>
             </div>
           </div>
         </div>
@@ -280,29 +318,25 @@ const ProfilePage = () => {
             <Card className="p-6 shadow-card">
               <h3 className="font-semibold text-university-navy mb-4">Personal Information</h3>
               <div className="space-y-4">
-                {/* First Name */}
+                {/* Full Name */}
                 <div className="flex items-center space-x-3">
                   <User className="h-4 w-4 text-muted-foreground" />
                   <div>
-                    <p className="text-sm text-muted-foreground">First Name</p>
+                    <p className="text-sm text-muted-foreground">Full Name</p>
                     {isEditing ? (
                       <Input name="firstName" value={studentInfo.firstName} onChange={handleInputChange} className="mt-1" />
                     ) : (
-                      <p className="font-[14px]">{studentInfo.firstName}</p>
+                      <p className="font-[14px]">{admProfile?.NM || studentInfo.firstName || studentInfo.name || 'N/A'}</p>
                     )}
                   </div>
                 </div>
 
-                {/* Last Name */}
+                {/* Roll Number */}
                 <div className="flex items-center space-x-3">
                   <User className="h-4 w-4 text-muted-foreground" />
                   <div>
-                    <p className="text-sm text-muted-foreground">Last Name</p>
-                    {isEditing ? (
-                      <Input name="lastName" value={studentInfo.lastName} onChange={handleInputChange} className="mt-1" />
-                    ) : (
-                      <p className="font-[14px]">{studentInfo.lastName}</p>
-                    )}
+                    <p className="text-sm text-muted-foreground">Roll Number</p>
+                    <p className="font-[14px]">{admProfile?.ROLNO || studentInfo.RollNO || studentInfo.rollno || 'N/A'}</p>
                   </div>
                 </div>
 
@@ -314,34 +348,30 @@ const ProfilePage = () => {
                     {isEditing ? (
                       <Input name="email" value={studentInfo.email} onChange={handleInputChange} className="mt-1" />
                     ) : (
-                      <p className="font-[14px]">{studentInfo.email}</p>
+                      <p className="font-[14px]">{admProfile?.EMAIL || studentInfo.email}</p>
                     )}
                   </div>
                 </div>
 
                 {/* Phone */}
-                <div className="flex items-center space-x-3">
+                {/* <div className="flex items-center space-x-3">
                   <Phone className="h-4 w-4 text-muted-foreground" />
                   <div>
                     <p className="text-sm text-muted-foreground">Phone</p>
                     {isEditing ? (
                       <Input name="phone" value={studentInfo.phone} onChange={handleInputChange} className="mt-1" />
                     ) : (
-                      <p className="font-[14px]">{studentInfo.phone}</p>
+                      <p className="font-[14px]">{admProfile?.MOB || studentInfo.phone}</p>
                     )}
                   </div>
-                </div>
+                </div> */}
 
-                {/* Location */}
+                {/* University */}
                 <div className="flex items-center space-x-3">
                   <MapPin className="h-4 w-4 text-muted-foreground" />
                   <div>
                     <p className="text-sm text-muted-foreground">University</p>
-                    {isEditing ? (
-                      <Input name="university" value={studentInfo.university} onChange={handleInputChange} className="mt-1" />
-                    ) : (
-                      <p className="font-[14px]">{studentInfo.university}</p>
-                    )}
+                    <p className="font-[14px]">Government College University Lahore</p>
                   </div>
                 </div>
 
@@ -353,7 +383,7 @@ const ProfilePage = () => {
                     {isEditing ? (
                       <Input name="major" value={studentInfo.major} onChange={handleInputChange} className="mt-1" />
                     ) : (
-                      <p className="font-[14px]">{studentInfo.major}</p>
+                      <p className="font-[14px]">{admProfile?.DEPARTMENT || studentInfo.major}</p>
                     )}
                   </div>
                 </div>
@@ -366,7 +396,7 @@ const ProfilePage = () => {
                     {isEditing ? (
                       <Input name="semester" value={studentInfo.semester} onChange={handleInputChange} className="mt-1" />
                     ) : (
-                      <p className="font-[14px]">{studentInfo.semester}</p>
+                      <p className="font-[14px]">{admProfile?.SESSION || studentInfo.semester}</p>
                     )}
                   </div>
                 </div>

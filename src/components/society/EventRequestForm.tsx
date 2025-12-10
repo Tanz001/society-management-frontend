@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo, memo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,6 +19,9 @@ import {
   Send,
   Plus,
   X,
+  ChevronRight,
+  ChevronLeft,
+  CheckCircle2,
 } from "lucide-react";
 import axios from "axios";
 import toast from "react-hot-toast";
@@ -28,21 +31,24 @@ import toast from "react-hot-toast";
 ===================================================================================== */
 
 type StudentRow = {
+  id: string;
   academic_program: string;
   semester: string;
-  no_of_students: number | "";
+  no_of_students: string;
 };
 
 type StaffRow = {
+  id: string;
   department: string;
-  gazetted: "Gazetted" | "Non-Gazetted";
-  no_of_staff: number | "";
+  gazetted: "Gazetted" | "Non-Gazetted" | "";
+  no_of_staff: string;
 };
 
 type TransportRow = {
+  id: string;
   vehicle_type: string;
   purpose: string;
-  no_of_persons: number | "";
+  no_of_persons: string;
   destination: string;
   date: string;
   time: string;
@@ -64,7 +70,7 @@ type ManagementRequirements = {
 
 interface EventFullFormProps {
   societyId: number;
-  userId: number;
+  userId?: number;
   onSubmitSuccess?: () => void;
   showCard?: boolean;
 }
@@ -74,18 +80,21 @@ interface EventFullFormProps {
 ===================================================================================== */
 
 const defaultStudent: StudentRow = {
+  id: "",
   academic_program: "",
   semester: "",
   no_of_students: "",
 };
 
 const defaultStaff: StaffRow = {
+  id: "",
   department: "",
-  gazetted: "Non-Gazetted",
+  gazetted: "",
   no_of_staff: "",
 };
 
 const defaultTransport: TransportRow = {
+  id: "",
   vehicle_type: "",
   purpose: "",
   no_of_persons: "",
@@ -137,9 +146,9 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
 
   /* ------------------ SECTIONS ------------------ */
   const [students, setStudents] = useState<StudentRow[]>([
-    { ...defaultStudent },
+    { ...defaultStudent, id: crypto.randomUUID() },
   ]);
-  const [staff, setStaff] = useState<StaffRow[]>([{ ...defaultStaff }]);
+  const [staff, setStaff] = useState<StaffRow[]>([{ ...defaultStaff, id: crypto.randomUUID() }]);
   const [transports, setTransports] = useState<TransportRow[]>([]);
   const [management, setManagement] = useState<ManagementRequirements>({
     ...defaultManagement,
@@ -168,6 +177,37 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
   });
 
   const [loading, setLoading] = useState(false);
+  
+  // Step management
+  const [currentStep, setCurrentStep] = useState(1);
+  const totalSteps = 6;
+  
+  const steps = [
+    { number: 1, title: "Basic Information", completed: false },
+    { number: 2, title: "Student Participants", completed: false },
+    { number: 3, title: "Staff Participants", completed: false },
+    { number: 4, title: "Management Requirements", completed: false },
+    { number: 5, title: "Transport Requests", completed: false },
+    { number: 6, title: "Documents", completed: false },
+  ];
+  
+  const nextStep = () => {
+    if (currentStep < totalSteps) {
+      setCurrentStep(currentStep + 1);
+    }
+  };
+  
+  const prevStep = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+  
+  const goToStep = (step: number) => {
+    if (step >= 1 && step <= totalSteps) {
+      setCurrentStep(step);
+    }
+  };
 
   /* =====================================================================================
      HANDLERS: MAIN FIELDS
@@ -184,47 +224,54 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
      HANDLERS: STUDENTS
   ===================================================================================== */
 
-  const addStudent = () =>
-    setStudents((prev) => [...prev, { ...defaultStudent }]);
+  const addStudent = () => {
+    setStudents((prev) => [...prev, { ...defaultStudent, id: crypto.randomUUID() }]);
+  };
   const removeStudent = (index: number) =>
     setStudents((prev) => prev.filter((_, i) => i !== index));
   const updateStudent = (
     index: number,
     field: keyof StudentRow,
     value: any
-  ) =>
+  ) => {
     setStudents((prev) =>
       prev.map((r, i) => (i === index ? { ...r, [field]: value } : r))
     );
+  };
 
   /* =====================================================================================
      HANDLERS: STAFF
   ===================================================================================== */
 
-  const addStaff = () => setStaff((prev) => [...prev, { ...defaultStaff }]);
+  const addStaff = () => {
+    setStaff((prev) => [...prev, { ...defaultStaff, id: crypto.randomUUID() }]);
+  };
   const removeStaff = (index: number) =>
     setStaff((prev) => prev.filter((_, i) => i !== index));
-  const updateStaff = (index: number, field: keyof StaffRow, value: any) =>
+  const updateStaff = (index: number, field: keyof StaffRow, value: any) => {
     setStaff((prev) =>
       prev.map((r, i) => (i === index ? { ...r, [field]: value } : r))
     );
+  };
 
   /* =====================================================================================
      HANDLERS: TRANSPORT
   ===================================================================================== */
 
-  const addTransport = () =>
-    setTransports((prev) => [...prev, { ...defaultTransport }]);
+  const addTransport = () => {
+    setTransports((prev) => [...prev, { ...defaultTransport, id: crypto.randomUUID() }]);
+  };
   const removeTransport = (index: number) =>
     setTransports((prev) => prev.filter((_, i) => i !== index));
   const updateTransport = (
     index: number,
     field: keyof TransportRow,
     value: any
-  ) =>
+  ) => {
     setTransports((prev) =>
       prev.map((r, i) => (i === index ? { ...r, [field]: value } : r))
     );
+  };
 
   /* =====================================================================================
      HANDLERS: MANAGEMENT CHECKBOXES
@@ -369,26 +416,49 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
 
       const fd = new FormData();
 
+      // Get userId from props or localStorage
+      const finalUserId = userId || (() => {
+        const storedUser = localStorage.getItem("user");
+        if (storedUser) {
+          const userData = JSON.parse(storedUser);
+          return userData.id || userData.faculty_id;
+        }
+        return null;
+      })();
+
+      if (!finalUserId) {
+        toast.error("User ID is required. Please log in again.");
+        setLoading(false);
+        return;
+      }
+
       // MAIN FIELDS
       fd.append("society_id", String(societyId));
-      fd.append("submitted_by", String(userId));
+      fd.append("submitted_by", String(finalUserId));
 
       Object.entries(main).forEach(([k, v]) => {
         fd.append(k, v ?? "");
       });
 
-      // PARTICIPANTS - Match backend field names
-      fd.append(
-        "student_participants",
-        JSON.stringify(includeStudents ? students : [])
-      );
-      fd.append(
-        "staff_participants",
-        JSON.stringify(includeStaff ? staff : [])
-      );
+      // PARTICIPANTS - Match backend field names (convert string numbers to numbers)
+      const studentParticipants = includeStudents ? students.map(s => ({
+        ...s,
+        no_of_students: s.no_of_students ? Number(s.no_of_students) : ""
+      })) : [];
       
-      // TRANSPORT
-      fd.append("transport_requests", JSON.stringify(transports));
+      const staffParticipants = includeStaff ? staff.map(st => ({
+        ...st,
+        no_of_staff: st.no_of_staff ? Number(st.no_of_staff) : ""
+      })) : [];
+      
+      const transportRequests = transports.map(t => ({
+        ...t,
+        no_of_persons: t.no_of_persons ? Number(t.no_of_persons) : ""
+      }));
+      
+      fd.append("student_participants", JSON.stringify(studentParticipants));
+      fd.append("staff_participants", JSON.stringify(staffParticipants));
+      fd.append("transport_requests", JSON.stringify(transportRequests));
       
       // MANAGEMENT REQUIREMENTS
       fd.append("management_requirements", JSON.stringify(management));
@@ -432,8 +502,8 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
           media_coverage: "",
         });
 
-        setStudents([{ ...defaultStudent }]);
-        setStaff([{ ...defaultStaff }]);
+        setStudents([{ ...defaultStudent, id: crypto.randomUUID() }]);
+        setStaff([{ ...defaultStaff, id: crypto.randomUUID() }]);
         setTransports([]);
         setManagement({ ...defaultManagement });
         setDocuments({
@@ -473,6 +543,54 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
     </div>
   );
 
+  // Student Row Component (memoized to prevent re-renders)
+  const StudentRow = memo(({ student, index, onUpdate, onRemove }: {
+    student: StudentRow;
+    index: number;
+    onUpdate: (index: number, field: keyof StudentRow, value: any) => void;
+    onRemove: (index: number) => void;
+  }) => {
+
+    return (
+      <div className="grid md:grid-cols-4 gap-3 items-end">
+        <div>
+          <Label>Academic Program</Label>
+          <Input
+            value={student.academic_program}
+            onChange={(e) => onUpdate(index, "academic_program", e.target.value)}
+            placeholder="e.g., BSCS"
+          />
+        </div>
+        <div>
+          <Label>Semester</Label>
+          <Input
+            value={student.semester}
+            onChange={(e) => onUpdate(index, "semester", e.target.value)}
+            placeholder="e.g., 3rd"
+          />
+        </div>
+        <div>
+          <Label>No. of Students</Label>
+          <Input
+            type="number"
+            value={student.no_of_students}
+            onChange={(e) => onUpdate(index, "no_of_students", e.target.value)}
+          />
+        </div>
+        <div className="flex items-end pb-1">
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => onRemove(index)}
+          >
+            <X className="mr-1 h-4 w-4" />
+            Remove
+          </Button>
+        </div>
+      </div>
+    );
+  });
+
   /* STUDENT SECTION */
   const StudentSection = () => (
     <div className="space-y-2 border rounded p-4">
@@ -484,53 +602,73 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
       </div>
 
       {students.map((s, i) => (
-        <div key={i} className="grid md:grid-cols-4 gap-3 items-end">
-          <div>
-            <Label>Academic Program</Label>
-            <Input
-              value={s.academic_program}
-              onChange={(e) =>
-                updateStudent(i, "academic_program", e.target.value)
-              }
-              placeholder="e.g., BSCS"
-            />
-          </div>
-          <div>
-            <Label>Semester</Label>
-            <Input
-              value={s.semester}
-              onChange={(e) => updateStudent(i, "semester", e.target.value)}
-              placeholder="e.g., 3rd"
-            />
-          </div>
-          <div>
-            <Label>No. of Students</Label>
-            <Input
-              type="number"
-              value={s.no_of_students as any}
-              onChange={(e) =>
-                updateStudent(
-                  i,
-                  "no_of_students",
-                  e.target.value ? Number(e.target.value) : ""
-                )
-              }
-            />
-          </div>
-          <div className="flex items-end pb-1">
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => removeStudent(i)}
-            >
-              <X className="mr-1 h-4 w-4" />
-              Remove
-            </Button>
-          </div>
-        </div>
+        <StudentRow
+          key={s.id}
+          student={s}
+          index={i}
+          onUpdate={updateStudent}
+          onRemove={removeStudent}
+        />
       ))}
+
+ 
     </div>
+
   );
+
+  // Staff Row Component (memoized)
+  const StaffRow = memo(({ staffMember, index, onUpdate, onRemove }: {
+    staffMember: StaffRow;
+    index: number;
+    onUpdate: (index: number, field: keyof StaffRow, value: any) => void;
+    onRemove: (index: number) => void;
+  }) => {
+
+    return (
+      <div className="grid md:grid-cols-4 gap-3 items-end">
+        <div>
+          <Label>Department</Label>
+          <Input
+            value={staffMember.department}
+            onChange={(e) => onUpdate(index, "department", e.target.value)}
+            placeholder="e.g., Computer Science"
+          />
+        </div>
+        <div>
+          <Label>Gazetted</Label>
+          <Select
+            value={staffMember.gazetted}
+            onValueChange={(v) => onUpdate(index, "gazetted", v as any)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Gazetted">Gazetted</SelectItem>
+              <SelectItem value="Non-Gazetted">Non-Gazetted</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label>No. of Staff</Label>
+          <Input
+            type="number"
+            value={staffMember.no_of_staff}
+            onChange={(e) => onUpdate(index, "no_of_staff", e.target.value)}
+          />
+        </div>
+        <div className="flex items-end">
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => onRemove(index)}
+          >
+            <X className="mr-1 h-4 w-4" /> Remove
+          </Button>
+        </div>
+      </div>
+    );
+  });
 
   /* STAFF SECTION */
   const StaffSection = () => (
@@ -543,54 +681,13 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
       </div>
 
       {staff.map((st, i) => (
-        <div key={i} className="grid md:grid-cols-4 gap-3 items-end">
-          <div>
-            <Label>Department</Label>
-            <Input
-              value={st.department}
-              onChange={(e) => updateStaff(i, "department", e.target.value)}
-              placeholder="e.g., Computer Science"
-            />
-          </div>
-          <div>
-            <Label>Gazetted</Label>
-            <Select
-              value={st.gazetted}
-              onValueChange={(v) => updateStaff(i, "gazetted", v as any)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Gazetted">Gazetted</SelectItem>
-                <SelectItem value="Non-Gazetted">Non-Gazetted</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>No. of Staff</Label>
-            <Input
-              type="number"
-              value={st.no_of_staff as any}
-              onChange={(e) =>
-                updateStaff(
-                  i,
-                  "no_of_staff",
-                  e.target.value ? Number(e.target.value) : ""
-                )
-              }
-            />
-          </div>
-          <div className="flex items-end">
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => removeStaff(i)}
-            >
-              <X className="mr-1 h-4 w-4" /> Remove
-            </Button>
-          </div>
-        </div>
+        <StaffRow
+          key={st.id}
+          staffMember={st}
+          index={i}
+          onUpdate={updateStaff}
+          onRemove={removeStaff}
+        />
       ))}
     </div>
   );
@@ -723,6 +820,83 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
     </div>
   );
 
+  // Transport Row Component (memoized)
+  const TransportRow = memo(({ transport, index, onUpdate, onRemove }: {
+    transport: TransportRow;
+    index: number;
+    onUpdate: (index: number, field: keyof TransportRow, value: any) => void;
+    onRemove: (index: number) => void;
+  }) => {
+
+    return (
+      <div className="border rounded p-3 space-y-3">
+        <div className="grid md:grid-cols-3 gap-3">
+          <div>
+            <Label>Vehicle Type</Label>
+            <Input
+              value={transport.vehicle_type}
+              onChange={(e) => onUpdate(index, "vehicle_type", e.target.value)}
+              placeholder="Car, Van, Bus"
+            />
+          </div>
+          <div>
+            <Label>Purpose</Label>
+            <Input
+              value={transport.purpose}
+              onChange={(e) => onUpdate(index, "purpose", e.target.value)}
+              placeholder="Guest pickup, Field visit..."
+            />
+          </div>
+          <div>
+            <Label>No. of Persons</Label>
+            <Input
+              type="number"
+              value={transport.no_of_persons}
+              onChange={(e) => onUpdate(index, "no_of_persons", e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-3">
+          <div>
+            <Label>Destination</Label>
+            <Input
+              value={transport.destination}
+              onChange={(e) => onUpdate(index, "destination", e.target.value)}
+              placeholder="Location"
+            />
+          </div>
+          <div>
+            <Label>Date</Label>
+            <Input
+              type="date"
+              value={transport.date}
+              onChange={(e) => onUpdate(index, "date", e.target.value)}
+            />
+          </div>
+          <div>
+            <Label>Time</Label>
+            <Input
+              type="time"
+              value={transport.time}
+              onChange={(e) => onUpdate(index, "time", e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end">
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => onRemove(index)}
+          >
+            <X className="mr-1 h-4 w-4" /> Remove
+          </Button>
+        </div>
+      </div>
+    );
+  });
+
   /* TRANSPORT SECTION */
   const TransportSection = () => (
     <div className="space-y-2 border rounded p-4">
@@ -738,81 +912,13 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
       )}
 
       {transports.map((t, i) => (
-        <div key={i} className="border rounded p-3 space-y-3">
-          <div className="grid md:grid-cols-3 gap-3">
-            <div>
-              <Label>Vehicle Type</Label>
-              <Input
-                value={t.vehicle_type}
-                onChange={(e) =>
-                  updateTransport(i, "vehicle_type", e.target.value)
-                }
-                placeholder="Car, Van, Bus"
-              />
-            </div>
-            <div>
-              <Label>Purpose</Label>
-              <Input
-                value={t.purpose}
-                onChange={(e) => updateTransport(i, "purpose", e.target.value)}
-                placeholder="Guest pickup, Field visit..."
-              />
-            </div>
-            <div>
-              <Label>No. of Persons</Label>
-              <Input
-                type="number"
-                value={t.no_of_persons as any}
-                onChange={(e) =>
-                  updateTransport(
-                    i,
-                    "no_of_persons",
-                    e.target.value ? Number(e.target.value) : ""
-                  )
-                }
-              />
-            </div>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-3">
-            <div>
-              <Label>Destination</Label>
-              <Input
-                value={t.destination}
-                onChange={(e) =>
-                  updateTransport(i, "destination", e.target.value)
-                }
-                placeholder="Location"
-              />
-            </div>
-            <div>
-              <Label>Date</Label>
-              <Input
-                type="date"
-                value={t.date}
-                onChange={(e) => updateTransport(i, "date", e.target.value)}
-              />
-            </div>
-            <div>
-              <Label>Time</Label>
-              <Input
-                type="time"
-                value={t.time}
-                onChange={(e) => updateTransport(i, "time", e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end">
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => removeTransport(i)}
-            >
-              <X className="mr-1 h-4 w-4" /> Remove
-            </Button>
-          </div>
-        </div>
+        <TransportRow
+          key={t.id}
+          transport={t}
+          index={i}
+          onUpdate={updateTransport}
+          onRemove={removeTransport}
+        />
       ))}
     </div>
   );
@@ -1031,208 +1137,376 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
   };
 
   /* =====================================================================================
+     STEP NAVIGATION
+  ===================================================================================== */
+  
+  const StepIndicator = () => (
+    <div className="mb-6">
+      <div className="flex items-center justify-between">
+        {steps.map((step, index) => (
+          <React.Fragment key={step.number}>
+            <div className="flex items-center">
+              <button
+                type="button"
+                onClick={() => goToStep(step.number)}
+                className={`flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all ${
+                  currentStep === step.number
+                    ? "bg-university-navy text-white border-university-navy"
+                    : currentStep > step.number
+                    ? "bg-green-500 text-white border-green-500"
+                    : "bg-white text-gray-400 border-gray-300"
+                }`}
+              >
+                {currentStep > step.number ? (
+                  <CheckCircle2 className="h-5 w-5" />
+                ) : (
+                  step.number
+                )}
+              </button>
+              <span
+                className={`ml-2 text-sm font-medium ${
+                  currentStep === step.number
+                    ? "text-university-navy"
+                    : currentStep > step.number
+                    ? "text-green-600"
+                    : "text-gray-400"
+                }`}
+              >
+                {step.title}
+              </span>
+            </div>
+            {index < steps.length - 1 && (
+              <div
+                className={`flex-1 h-0.5 mx-2 ${
+                  currentStep > step.number ? "bg-green-500" : "bg-gray-300"
+                }`}
+              />
+            )}
+          </React.Fragment>
+        ))}
+      </div>
+    </div>
+  );
+
+  /* =====================================================================================
+     STEP CONTENT
+  ===================================================================================== */
+
+  const renderStepContent = () => {
+    switch (currentStep) {
+      case 1:
+        return (
+          <div className="space-y-6">
+            <h3 className="text-xl font-semibold text-university-navy mb-4">
+              Basic Event Information
+            </h3>
+            {/* Basic event info */}
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <Label>Event Name *</Label>
+                <Input
+                  name="event_name"
+                  value={main.event_name}
+                  onChange={handleMainChange}
+                  placeholder="e.g., Tech Innovation Summit"
+                />
+              </div>
+              <div>
+                <Label>Event Type *</Label>
+                <Input
+                  name="event_type"
+                  value={main.event_type}
+                  onChange={handleMainChange}
+                  placeholder="Seminar, Workshop, Lecture..."
+                />
+              </div>
+            </div>
+
+            {/* Dates & Times */}
+            <div className="grid md:grid-cols-4 gap-4">
+              <div>
+                <Label>Start Date *</Label>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Input
+                    name="date_from"
+                    type="date"
+                    value={main.date_from}
+                    onChange={handleMainChange}
+                    min={new Date().toISOString().split("T")[0]}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label>End Date</Label>
+                <Input
+                  name="date_to"
+                  type="date"
+                  value={main.date_to}
+                  onChange={handleMainChange}
+                  min={main.date_from || ""}
+                />
+              </div>
+
+              <div>
+                <Label>Start Time *</Label>
+                <div className="relative">
+                  <Clock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Input
+                    name="time_from"
+                    type="time"
+                    value={main.time_from}
+                    onChange={handleMainChange}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label>End Time</Label>
+                <Input
+                  name="time_to"
+                  type="time"
+                  value={main.time_to}
+                  onChange={handleMainChange}
+                />
+              </div>
+            </div>
+
+            {/* Venue */}
+            <div>
+              <Label>Venue *</Label>
+              <div className="relative">
+                <MapPin className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Input
+                  name="venue"
+                  value={main.venue}
+                  onChange={handleMainChange}
+                  className="pl-10"
+                  placeholder="Auditorium, Lab 301, Ground..."
+                />
+              </div>
+            </div>
+
+            {/* Collaborators */}
+            <div className="grid md:grid-cols-3 gap-4">
+              <div>
+                <Label>Collaborating Organization</Label>
+                <Input
+                  name="collaborating_org"
+                  value={main.collaborating_org}
+                  onChange={handleMainChange}
+                />
+              </div>
+              <div>
+                <Label>Sponsor Name</Label>
+                <Input
+                  name="sponsor_name"
+                  value={main.sponsor_name}
+                  onChange={handleMainChange}
+                />
+              </div>
+              <div>
+                <Label>Sponsor Amount (PKR)</Label>
+                <Input
+                  name="sponsor_amount"
+                  type="number"
+                  value={main.sponsor_amount}
+                  onChange={handleMainChange}
+                />
+              </div>
+            </div>
+
+            {/* Coordinator */}
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <Label>Coordinator Name</Label>
+                <Input
+                  name="coordinator_name"
+                  value={main.coordinator_name}
+                  onChange={handleMainChange}
+                />
+              </div>
+              <div>
+                <Label>Coordinator Contact</Label>
+                <Input
+                  name="coordinator_contact"
+                  value={main.coordinator_contact}
+                  onChange={handleMainChange}
+                />
+              </div>
+            </div>
+
+            {/* Media */}
+            <div>
+              <Label>Media Coverage (optional)</Label>
+              <Textarea
+                rows={3}
+                name="media_coverage"
+                value={main.media_coverage}
+                onChange={handleMainChange}
+                placeholder="Describe media coverage plans..."
+              />
+            </div>
+          </div>
+        );
+
+      case 2:
+        return (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-semibold text-university-navy">
+                Student Participants
+              </h3>
+              <div className="flex items-center gap-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={includeStudents}
+                    onChange={(e) => setIncludeStudents(e.target.checked)}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-sm">Include Students</span>
+                </label>
+              </div>
+            </div>
+            {includeStudents && <StudentSection />}
+            {!includeStudents && (
+              <Card className="p-6 text-center">
+                <p className="text-muted-foreground">
+                  Student participants are disabled. Enable the toggle above to add students.
+                </p>
+              </Card>
+            )}
+          </div>
+        );
+
+      case 3:
+        return (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-semibold text-university-navy">
+                Staff Participants
+              </h3>
+              <div className="flex items-center gap-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={includeStaff}
+                    onChange={(e) => setIncludeStaff(e.target.checked)}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-sm">Include Staff</span>
+                </label>
+              </div>
+            </div>
+            {includeStaff && <StaffSection />}
+            {!includeStaff && (
+              <Card className="p-6 text-center">
+                <p className="text-muted-foreground">
+                  Staff participants are disabled. Enable the toggle above to add staff.
+                </p>
+              </Card>
+            )}
+          </div>
+        );
+
+      case 4:
+        return (
+          <div className="space-y-6">
+            <h3 className="text-xl font-semibold text-university-navy mb-4">
+              Management Requirements
+            </h3>
+            <ManagementSection />
+          </div>
+        );
+
+      case 5:
+        return (
+          <div className="space-y-6">
+            <h3 className="text-xl font-semibold text-university-navy mb-4">
+              Transport Requests
+            </h3>
+            <TransportSection />
+          </div>
+        );
+
+      case 6:
+        return (
+          <div className="space-y-6">
+            <h3 className="text-xl font-semibold text-university-navy mb-4">
+              Upload Documents
+            </h3>
+            <DocumentSection />
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  /* =====================================================================================
      FINAL FORM UI
   ===================================================================================== */
 
   const form = (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Basic event info */}
-      <div className="grid md:grid-cols-2 gap-4">
-        <div>
-          <Label>Event Name *</Label>
-          <Input
-            name="event_name"
-            value={main.event_name}
-            onChange={handleMainChange}
-            placeholder="e.g., Tech Innovation Summit"
-          />
-        </div>
-        <div>
-          <Label>Event Type *</Label>
-          <Input
-            name="event_type"
-            value={main.event_type}
-            onChange={handleMainChange}
-            placeholder="Seminar, Workshop, Lecture..."
-          />
-        </div>
+      <StepIndicator />
+      
+      <div className="min-h-[400px]">
+        {renderStepContent()}
       </div>
 
-      {/* Dates & Times */}
-      <div className="grid md:grid-cols-4 gap-4">
-        <div>
-          <Label>Start Date *</Label>
-          <div className="relative">
-            <Calendar className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-            <Input
-              name="date_from"
-              type="date"
-              value={main.date_from}
-              onChange={handleMainChange}
-              min={new Date().toISOString().split("T")[0]}
-              className="pl-10"
-            />
-          </div>
-        </div>
-
-        <div>
-          <Label>End Date</Label>
-          <Input
-            name="date_to"
-            type="date"
-            value={main.date_to}
-            onChange={handleMainChange}
-            min={main.date_from || ""}
-          />
-        </div>
-
-        <div>
-          <Label>Start Time *</Label>
-          <div className="relative">
-            <Clock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-            <Input
-              name="time_from"
-              type="time"
-              value={main.time_from}
-              onChange={handleMainChange}
-              className="pl-10"
-            />
-          </div>
-        </div>
-
-        <div>
-          <Label>End Time</Label>
-          <Input
-            name="time_to"
-            type="time"
-            value={main.time_to}
-            onChange={handleMainChange}
-          />
-        </div>
-      </div>
-
-      {/* Venue */}
-      <div>
-        <Label>Venue *</Label>
-        <div className="relative">
-          <MapPin className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-          <Input
-            name="venue"
-            value={main.venue}
-            onChange={handleMainChange}
-            className="pl-10"
-            placeholder="Auditorium, Lab 301, Ground..."
-          />
-        </div>
-      </div>
-
-      {/* Collaborators */}
-      <div className="grid md:grid-cols-3 gap-4">
-        <div>
-          <Label>Collaborating Organization</Label>
-          <Input
-            name="collaborating_org"
-            value={main.collaborating_org}
-            onChange={handleMainChange}
-          />
-        </div>
-        <div>
-          <Label>Sponsor Name</Label>
-          <Input
-            name="sponsor_name"
-            value={main.sponsor_name}
-            onChange={handleMainChange}
-          />
-        </div>
-        <div>
-          <Label>Sponsor Amount (PKR)</Label>
-          <Input
-            name="sponsor_amount"
-            type="number"
-            value={main.sponsor_amount}
-            onChange={handleMainChange}
-          />
-        </div>
-      </div>
-
-      {/* Coordinator */}
-      <div className="grid md:grid-cols-2 gap-4">
-        <div>
-          <Label>Coordinator Name</Label>
-          <Input
-            name="coordinator_name"
-            value={main.coordinator_name}
-            onChange={handleMainChange}
-          />
-        </div>
-        <div>
-          <Label>Coordinator Contact</Label>
-          <Input
-            name="coordinator_contact"
-            value={main.coordinator_contact}
-            onChange={handleMainChange}
-          />
-        </div>
-      </div>
-
-      {/* Media */}
-      <div>
-        <Label>Media Coverage (optional)</Label>
-        <Textarea
-          rows={3}
-          name="media_coverage"
-          value={main.media_coverage}
-          onChange={handleMainChange}
-          placeholder="Describe media coverage plans..."
-        />
-      </div>
-
-      {/* Participant toggles */}
-      <div className="border rounded p-4 space-y-3">
-        <h4 className="font-medium">Participants</h4>
-        <p className="text-xs text-gray-500">
-          Choose which participant groups you want to include for this event.
-        </p>
-        <div className="flex flex-col sm:flex-row gap-3">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              className="w-4 h-4"
-              checked={includeStudents}
-              onChange={() => setIncludeStudents((prev) => !prev)}
-            />
-            <span className="text-sm">Include Student Participants</span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              className="w-4 h-4"
-              checked={includeStaff}
-              onChange={() => setIncludeStaff((prev) => !prev)}
-            />
-            <span className="text-sm">Include Staff Participants</span>
-          </label>
-        </div>
-      </div>
-
-      {/* SECTIONS */}
-      {includeStudents && <StudentSection />}
-      {includeStaff && <StaffSection />}
-      <ManagementSection />
-      <TransportSection />
-      <DocumentSection />
-
-      {/* Submit Button */}
-      <div className="flex justify-end">
-        <Button type="submit" disabled={loading} className="min-w-[180px]">
-          {loading ? (
-            "Submitting..."
-          ) : (
-            <>
-              <Send className="mr-2 h-4 w-4" /> Submit Request
-            </>
-          )}
+      {/* Navigation Buttons */}
+      <div className="flex justify-between items-center pt-6 border-t">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={prevStep}
+          disabled={currentStep === 1}
+          className="flex items-center gap-2"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          Previous
         </Button>
+
+        <div className="text-sm text-muted-foreground">
+          Step {currentStep} of {totalSteps}
+        </div>
+
+        {currentStep < totalSteps ? (
+          <Button
+            type="button"
+            variant="university"
+            onClick={nextStep}
+            className="flex items-center gap-2"
+          >
+            Next
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        ) : (
+          <Button
+            type="submit"
+            variant="university"
+            disabled={loading}
+            className="flex items-center gap-2"
+          >
+            {loading ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Submitting...
+              </>
+            ) : (
+              <>
+                <Send className="h-4 w-4" />
+                Submit Request
+              </>
+            )}
+          </Button>
+        )}
       </div>
     </form>
   );

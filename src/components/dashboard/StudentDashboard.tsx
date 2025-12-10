@@ -88,57 +88,10 @@ const StudentDashboard = () => {
     }
   };
 
-  // Function to get upcoming events
-  const getUpcomingEvents = async () => {
-    try {
-      setEventsLoading(true);
-      const token = localStorage.getItem("token");
-      if (!token) {
-        throw new Error("No authentication token found");
-      }
-
-      const user = localStorage.getItem("user");
-      if (!user) {
-        throw new Error("User data not found");
-      }
-
-      const userData = JSON.parse(user);
-      const userId = userData.id;
-
-      const response = await axios.post(
-        `${import.meta.env.VITE_API_URL}/user/upcoming/events`,
-        { user_id: userId },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (response.data.success) {
-        console.log("Upcoming events fetched:", response.data);
-        setUpcomingEvents(response.data.events || []);
-        // Update stats with actual count
-        setStats(prev => ({
-          ...prev,
-          upcomingEvents: response.data.count || 0
-        }));
-      } else {
-        setUpcomingEvents([]);
-      }
-    } catch (err) {
-      console.error("Error fetching upcoming events:", err);
-      setUpcomingEvents([]);
-    } finally {
-      setEventsLoading(false);
-    }
-  };
-
-  // Load all societies, joined count, and upcoming events on component mount
+  // Load all societies and joined count on component mount (events disabled for now)
   useEffect(() => {
     getAllSocieties();
     getJoinedSocietiesCount();
-    getUpcomingEvents();
   }, []);
 
   const categories = ["All", "Academic", "Arts", "Social Impact", "Cultural", "Professional", "Sports"];
@@ -190,27 +143,8 @@ const StudentDashboard = () => {
         }
       />
 
-      {/* Quick Stats - Only 2 Cards */}
-      <section className="py-4 md:py-8 px-4 bg-muted/30">
-        <div className="container mx-auto max-w-7xl">
-          <div className="grid grid-cols-2 gap-3 md:gap-4 max-w-2xl mx-auto">
-            <Card className="p-3 md:p-4 text-center shadow-card">
-              <Users className="h-6 w-6 md:h-8 md:w-8 mx-auto mb-2 text-university-navy" />
-              <div className="text-lg md:text-2xl font-bold text-university-navy">
-                {joinedSocietiesCount}
-              </div>
-              <div className="text-xs md:text-sm text-muted-foreground">Societies You Joined</div>
-            </Card>
-            <Card className="p-3 md:p-4 text-center shadow-card">
-              <Calendar className="h-6 w-6 md:h-8 md:w-8 mx-auto mb-2 text-university-gold" />
-              <div className="text-lg md:text-2xl font-bold text-university-navy">
-                {eventsLoading ? "..." : upcomingEvents.length}
-              </div>
-              <div className="text-xs md:text-sm text-muted-foreground">Upcoming Events</div>
-            </Card>
-          </div>
-        </div>
-      </section>
+      {/* Quick Stats commented out for now */}
+      {/* <section className="py-4 md:py-8 px-4 bg-muted/30"> ... </section> */}
 
       {/* Search and Filter */}
       <section className="py-4 md:py-8 px-4">
@@ -240,61 +174,8 @@ const StudentDashboard = () => {
             </div>
           </div>
 
-          {/* Upcoming Events Section */}
-          {upcomingEvents.length > 0 && (
-            <div className="mb-8">
-              <div className="mb-6">
-                <h2 className="text-xl md:text-2xl font-semibold text-university-navy">
-                  Upcoming Events ({upcomingEvents.length})
-                </h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Events from your joined societies
-                </p>
-              </div>
-
-              {eventsLoading ? (
-                <div className="text-center py-12">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-university-navy mx-auto mb-4"></div>
-                  <p className="text-lg text-muted-foreground">Loading events...</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {upcomingEvents.slice(0, 6).map((event) => (
-                    <Card key={event.event_id} className="p-4 hover:shadow-lg transition-shadow">
-                      <div className="flex items-start gap-4">
-                        {event.society_logo && (
-                          <img 
-                            src={`${import.meta.env.VITE_API_URL}/${event.society_logo.replace(/\\/g, '/')}`}
-                            alt={event.society_name}
-                            className="w-12 h-12 rounded-full object-cover"
-                          />
-                        )}
-                        <div className="flex-1">
-                          <h3 className="font-semibold text-university-navy mb-1 line-clamp-1">
-                            {event.title}
-                          </h3>
-                          <p className="text-sm text-muted-foreground mb-2">
-                            {event.society_name}
-                          </p>
-                          <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                            <div className="flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
-                              <span>{new Date(event.event_date).toLocaleDateString()}</span>
-                            </div>
-                            {event.venue && (
-                              <div className="flex items-center gap-1">
-                                <span>{event.venue}</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+          {/* Upcoming Events Section commented out for now */}
+          {/* ... */}
 
           {/* All Available Societies Grid */}
           <div className="mb-8">

@@ -78,6 +78,12 @@ const EventReportUpload = ({ eventId, eventTitle, isOpen, onClose, onSuccess }: 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!eventId) {
+      toast.error("Event ID is missing");
+      console.error("Event ID is missing:", eventId);
+      return;
+    }
+    
     if (!reportTitle.trim()) {
       toast.error("Report title is required");
       return;
@@ -99,10 +105,16 @@ const EventReportUpload = ({ eventId, eventTitle, isOpen, onClose, onSuccess }: 
       }
 
       const formData = new FormData();
-      formData.append("event_req_id", eventId.toString());
+      formData.append("event_req_id", String(eventId));
       formData.append("report_title", reportTitle);
       formData.append("report_description", reportDescription);
       formData.append("report_file", selectedFile);
+      
+      console.log("Uploading event report:", {
+        event_req_id: eventId,
+        report_title: reportTitle,
+        has_file: !!selectedFile
+      });
 
       const response = await axios.post(
         `${API_URL}/society/event-report/upload`,

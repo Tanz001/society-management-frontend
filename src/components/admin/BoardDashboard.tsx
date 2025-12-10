@@ -7,7 +7,7 @@
   import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AdminEventReportsSection from "@/components/admin/AdminEventReportsSection";
-import { 
+  import { 
     Users, 
     Building, 
     Calendar, 
@@ -20,7 +20,8 @@ import {
     FileText,
     Award,
     Edit,
-    MapPin
+    MapPin,
+    PlusCircle
   } from "lucide-react";
   import { useNavigate } from "react-router-dom";
   import axios from "axios";
@@ -347,6 +348,15 @@ import {
                 <p className="text-white/80">Review Pending Society Applications</p>
               </div>
               <div className="flex items-center space-x-3">
+                <Button 
+                  variant="secondary" 
+                  size="sm" 
+                  className="bg-white text-university-navy hover:bg-white/90"
+                  onClick={() => navigate("/society/register")}
+                >
+                  <PlusCircle className="h-4 w-4 mr-2" />
+                  Créer une société
+                </Button>
                 <Button 
                   variant="outline" 
                   size="sm" 

@@ -20,6 +20,8 @@ import VCDashboard from "@/components/admin/VCDashboard";
 import TransportOfficeDashboard from "@/components/admin/TransportOfficeDashboard";
 import ProtocolOfficeDashboard from "@/components/admin/ProtocolOfficeDashboard";
 import RoleAccess from "@/components/admin/RoleAccess";
+import AddFaculty from "@/components/admin/AddFaculty";
+import AdvisorDashboard from "@/components/admin/AdvisorDashboard";
 import NotFound from "./pages/NotFound";
 import RegisterForm from "./components/auth/RegisterForm";
 import ProfilePage from "./components/profile/ProfilePage";
@@ -86,6 +88,12 @@ const App = () => (
           } />
           
           <Route path="/dashboard/society" element={
+            <ProtectedRoute requireAuth>
+              <SocietyDashboard />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/dashboard/society/:societyId" element={
             <ProtectedRoute requireAuth>
               <SocietyDashboard />
             </ProtectedRoute>
@@ -157,6 +165,19 @@ const App = () => (
           <Route path="/dashboard/admin/role-access" element={
             <ProtectedRoute requireAuth>
               <RoleAccess />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/dashboard/admin/add-faculty" element={
+            <ProtectedRoute requireAuth>
+              <AddFaculty />
+            </ProtectedRoute>
+          } />
+          
+          {/* Advisor Dashboard */}
+          <Route path="/dashboard/advisor" element={
+            <ProtectedRoute requireAuth>
+              <AdvisorDashboard />
             </ProtectedRoute>
           } />
           

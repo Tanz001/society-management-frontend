@@ -21,7 +21,7 @@ const formSchema = z.object({
   description: z.string().min(1, "Description is required"), // required
   category: z.string().min(1, "Please select a category"),
   location: z.string().min(1, "Location is required"),
-  advisor: z.string().min(1, "Faculty advisor is required"),
+  advisor: z.string().min(1, "Faculty advisor is required"), // Will store faculty_id as string
   purpose: z.string().min(30, "Purpose must be at least 30 characters"),
   achievements: z.array(z.string()).optional(),
   events: z.array(z.object({
@@ -64,12 +64,61 @@ const SocietyRegistration = () => {
   const location = useLocation();
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Get return path from location state, default to society dashboard
-  const returnPath = (location.state as any)?.returnTo || "/dashboard/society";
+  // Get return path from location state; default depends on role (Board Secretary vs student)
+  const userFromStorage = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("user") || "{}");
+    } catch {
+      return {};
+    }
+  })();
+  const userRoles = Array.isArray(userFromStorage.roles) ? userFromStorage.roles : [];
+  const isBoardSecretary = userRoles.some(
+    (r: any) => String(r.role_name || "").toLowerCase() === "board_secretary"
+  );
+  const defaultReturnPath = isBoardSecretary ? "/dashboard/admin/board-secretary" : "/dashboard/society";
+  const returnPath = (location.state as any)?.returnTo || defaultReturnPath;
   const [societyLogo, setSocietyLogo] = useState<File | null>(null);
   const [coverPhoto, setCoverPhoto] = useState<File | null>(null);
+  const [advisors, setAdvisors] = useState<Array<{ faculty_id: number; name: string; email: string }>>([]);
+  const [loadingAdvisors, setLoadingAdvisors] = useState(false);
 
-  // ✅ Check authentication state on component load
+  // ✅ Fetch advisors on component load
+  useEffect(() => {
+    const fetchAdvisors = async () => {
+      try {
+        setLoadingAdvisors(true);
+        const token = localStorage.getItem("token");
+        if (!token) return;
+
+        const response = await axios.get(
+          `${import.meta.env.VITE_API_URL}/admin/faculty/advisors`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (response.data.success) {
+          setAdvisors(response.data.advisors || []);
+        }
+      } catch (error) {
+        console.error("Error fetching advisors:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load advisors. Please refresh the page.",
+          variant: "destructive",
+        });
+      } finally {
+        setLoadingAdvisors(false);
+      }
+    };
+
+    fetchAdvisors();
+  }, []);
+
+  // ✅ Check authentication state and role on component load
   useEffect(() => {
     const token = localStorage.getItem("token");
     const user = localStorage.getItem("user");
@@ -82,6 +131,32 @@ const SocietyRegistration = () => {
     
     if (!token || !user) {
       console.error("User not authenticated, redirecting to login");
+      navigate("/");
+      return;
+    }
+
+    // ✅ Check if user is Board Secretary - only Board Secretary can register societies
+    try {
+      const userData = JSON.parse(user);
+      const roles = userData.roles || [];
+      const isBoardSecretary = roles.some(
+        (r: any) => String(r.role_name || "").toLowerCase() === "board_secretary"
+      );
+
+      console.log("User roles:", roles);
+      console.log("Is Board Secretary:", isBoardSecretary);
+
+      if (!isBoardSecretary) {
+        console.error("User is not Board Secretary, redirecting to dashboard");
+        toast({
+          title: "Access Denied",
+          description: "Only Board Secretary can register societies.",
+          variant: "destructive",
+        });
+        navigate("/dashboard/admin/board-secretary");
+      }
+    } catch (error) {
+      console.error("Error parsing user data:", error);
       navigate("/");
     }
   }, [navigate]);
@@ -113,20 +188,16 @@ const SocietyRegistration = () => {
         throw new Error("No user data found in localStorage");
       }
   
-      let userId;
+      // Verify user data exists (faculty_id will be extracted from JWT token on backend)
       try {
         const user = JSON.parse(userStr);
-        console.log("Parsed user data:", user); // Debug log
+        console.log("Parsed user data:", user);
+        console.log("Faculty ID from user:", user.faculty_id);
         
-        // Try different possible field names for user ID
-        userId = user.id || user._id || user.userId || user.studentId;
-        
-        if (!userId) {
-          console.error("User ID not found. Available fields:", Object.keys(user));
-          throw new Error("User ID not found in parsed user data");
+        // Verify user has faculty_id (for Board Secretary)
+        if (!user.faculty_id) {
+          console.warn("Faculty ID not found in user data, but will be extracted from JWT token");
         }
-        
-        console.log("Found user ID:", userId);
       } catch (error) {
         console.error("Error parsing user data:", error);
         toast({
@@ -179,6 +250,7 @@ const SocietyRegistration = () => {
       const payload = new FormData();
       
       // Append all text fields
+      // Note: faculty_id is extracted from JWT token on backend, no need to send it
       Object.entries({
         name: values.name,
         description: values.description,
@@ -186,13 +258,14 @@ const SocietyRegistration = () => {
         location: values.location,
         advisor: values.advisor,
         purpose: values.purpose,
-        user_id: userId.toString(),
         terms: (values.terms ?? false).toString(),
         achievements: JSON.stringify(filteredAchievements),
         events: JSON.stringify(filteredEvents)
       }).forEach(([key, value]) => {
         payload.append(key, value);
       });
+      
+      console.log("FormData prepared. Faculty ID will be extracted from JWT token on backend.");
 
       // Append files
       payload.append("societyLogo", societyLogo);
@@ -210,18 +283,23 @@ const SocietyRegistration = () => {
          throw new Error("No authentication token found");
        }
 
+     console.log("Sending society registration request...");
+     console.log("API URL:", `${import.meta.env.VITE_API_URL}/society/register`);
+     
      const response = await axios.post(
-  `${import.meta.env.VITE_API_URL}/society/register`,
-  payload,
-
-         {
-           headers: {
-             Authorization: `Bearer ${token}`, // Ensure proper Bearer token format
-             'Content-Type': 'multipart/form-data',
-           },
-           withCredentials: true,
-         }
-       );
+       `${import.meta.env.VITE_API_URL}/society/register`,
+       payload,
+       {
+         headers: {
+           Authorization: `Bearer ${token}`, // Ensure proper Bearer token format
+           'Content-Type': 'multipart/form-data',
+         },
+         withCredentials: true,
+       }
+     );
+  
+     console.log("Response status:", response.status);
+     console.log("Response data:", response.data);
   
       // ✅ Success
       if (response.status === 201) {
@@ -230,14 +308,36 @@ const SocietyRegistration = () => {
           description: "Your society has been registered successfully.",
           variant: "default",
         });
-        navigate("/dashboard/student");
+
+        // If the logged-in user is Board Secretary, stay in admin dashboard
+        try {
+          const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+          const roles = storedUser.roles || [];
+          const isBoardSecretary = roles.some(
+            (r: any) => String(r.role_name || "").toLowerCase() === "board_secretary"
+          );
+
+          if (isBoardSecretary) {
+            navigate("/dashboard/admin/board-secretary");
+          } 
+        } catch {
+         
+        }
       }
     } catch (error: any) {
-      console.error("Error submitting society registration:", error);
+      console.error("=== SOCIETY REGISTRATION ERROR (Frontend) ===");
+      console.error("Error object:", error);
+      console.error("Error message:", error.message);
+      console.error("Error response:", error.response);
+      console.error("Error response data:", error.response?.data);
+      console.error("Error response status:", error.response?.status);
+      console.error("Error stack:", error.stack);
+      
       toast({
         title: "Error",
         description:
           error.response?.data?.message ||
+          error.response?.data?.error ||
           error.message ||
           "Failed to register society. Please try again.",
         variant: "destructive",
@@ -522,7 +622,24 @@ const SocietyRegistration = () => {
                 <FormItem>
                   <FormLabel>Faculty Advisor</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., Dr. Jane Smith" {...field} />
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value || undefined}
+                      disabled={loadingAdvisors || advisors.length === 0}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={loadingAdvisors ? "Loading advisors..." : advisors.length === 0 ? "No advisors available" : "Select an advisor"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {advisors.length > 0 ? (
+                          advisors.map((advisor) => (
+                            <SelectItem key={advisor.faculty_id} value={String(advisor.faculty_id)}>
+                              {advisor.name} {advisor.email ? `(${advisor.email})` : ""}
+                            </SelectItem>
+                          ))
+                        ) : null}
+                      </SelectContent>
+                    </Select>
                   </FormControl>
                   <FormMessage />
                 </FormItem>

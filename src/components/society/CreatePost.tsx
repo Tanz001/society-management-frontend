@@ -37,18 +37,27 @@ const CreatePost = () => {
   const navigate = useNavigate();
   const userData = JSON.parse(localStorage.getItem("user") || "{}");
   console.log("userrr: ",userData)
-  const societyId = location.state?.society_id;
+  // Priority: location.state > localStorage > null
+  const societyId = location.state?.society_id || localStorage.getItem("currentSocietyId");
   const societyName = location.state?.society_name;
 
   console.log("society id",societyId)
+  
+  // Get user ID - can be id, user_id, or faculty_id depending on user type
+  const userId = userData?.id || userData?.user_id || userData?.faculty_id;
+  
+  // Store society ID in localStorage if we got it from location.state
+  if (location.state?.society_id && !localStorage.getItem("currentSocietyId")) {
+    localStorage.setItem("currentSocietyId", location.state.society_id.toString());
+  }
   const token = localStorage.getItem("token");
 
   const postTypes = [
     { id: "text", label: "Text Post", icon: Type },
     { id: "photo", label: "Photo Post", icon: Image },
     { id: "poll", label: "Poll", icon: BarChart },
-    { id: "video", label: "Video Post", icon: Video },
-    { id: "document", label: "Document", icon: FileText }
+    // { id: "video", label: "Video Post", icon: Video }, // Commented out for now
+    // { id: "document", label: "Document", icon: FileText } // Commented out for now
   ];
 
   const addPollOption = () => setPollOptions([...pollOptions, ""]);
@@ -70,7 +79,14 @@ const CreatePost = () => {
   const removeTag = (tagToRemove: string) => setTags(tags.filter(tag => tag !== tagToRemove));
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFiles(e.target.files);
+    const selectedFiles = e.target.files;
+    if (selectedFiles && selectedFiles.length > 5) {
+      toast.error("Vous ne pouvez uploader que 5 images maximum");
+      // Reset input
+      e.target.value = '';
+      return;
+    }
+    setFiles(selectedFiles);
   };
 
   const handleSubmit = async () => {
@@ -83,9 +99,21 @@ const CreatePost = () => {
     try {
        const API_URL = import.meta.env.VITE_API_URL;
       const formData = new FormData();
-      formData.append("society_id", societyId);
-      formData.append("society_name", societyName);
-      formData.append("user_id", userData?.id);
+      if (!userId) {
+        toast.error("User ID not found. Please log in again.");
+        setLoading(false);
+        return;
+      }
+      
+      if (!societyId) {
+        toast.error("Society ID not found.");
+        setLoading(false);
+        return;
+      }
+      
+      formData.append("society_id", String(societyId));
+      formData.append("society_name", societyName || "");
+      formData.append("user_id", String(userId));
       formData.append("title", title);
       formData.append("content", content);
       formData.append("post_type", postType);
@@ -115,7 +143,13 @@ const CreatePost = () => {
       if (response.data.success) {
         toast.success("✅ Post created successfully!");
         setTimeout(() => {
-          navigate("/dashboard/society");  
+          // Get stored society ID and navigate to dashboard with it
+          const storedSocietyId = localStorage.getItem("currentSocietyId");
+          if (storedSocietyId) {
+            navigate(`/dashboard/society/${storedSocietyId}`);
+          } else {
+            navigate("/dashboard/society");
+          }
         }, 1200);
       } else {
         toast.error(response.data.message || "Failed to create post");
@@ -147,33 +181,93 @@ const CreatePost = () => {
         );
 
       case "photo":
-      case "video":
-      case "document":
         return (
           <div className="space-y-4">
             <Card className="p-6 border-dashed border-2 border-muted-foreground/25 hover:border-university-gold transition-colors">
               <div className="text-center">
                 <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                 <h3 className="font-medium mb-2">
-                  Upload {postType === "photo" ? "Photos" : postType === "video" ? "Video" : "Documents"}
+                  Upload Photos (max 5)
                 </h3>
                 <input
                   type="file"
                   multiple
                   onChange={handleFileChange}
-                  accept={postType === "photo" ? "image/*" : postType === "video" ? "video/*" : ".pdf,.doc,.docx,.txt,.ppt,.pptx"}
+                  accept="image/*"
                   className="block w-full text-sm text-gray-500 border border-gray-200 rounded-lg cursor-pointer focus:outline-none"
                 />
+                <p className="text-xs text-muted-foreground mt-2">
+                  Maximum 5 images 
+                </p>
+                {files && files.length > 0 && (
+                  <div className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-2">
+                    {Array.from(files).slice(0, 5).map((file, index) => (
+                      <div key={index} className="relative">
+                        <img
+                          src={URL.createObjectURL(file)}
+                          alt={`Preview ${index + 1}`}
+                          className="w-full h-24 object-cover rounded border"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const dt = new DataTransfer();
+                            Array.from(files).forEach((f, i) => {
+                              if (i !== index) dt.items.add(f);
+                            });
+                            const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+                            if (input) {
+                              input.files = dt.files;
+                              setFiles(dt.files);
+                            }
+                          }}
+                          className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </Card>
             <Textarea
-              placeholder={`Add a ${postType === "video" ? "description" : "caption"}...`}
+              placeholder="Description...."
               value={content}
               onChange={(e) => setContent(e.target.value)}
               className="min-h-24"
             />
           </div>
         );
+      
+      // Commented out for now
+      // case "video":
+      // case "document":
+      //   return (
+      //     <div className="space-y-4">
+      //       <Card className="p-6 border-dashed border-2 border-muted-foreground/25 hover:border-university-gold transition-colors">
+      //         <div className="text-center">
+      //           <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+      //           <h3 className="font-medium mb-2">
+      //             Upload {postType === "video" ? "Video" : "Documents"}
+      //           </h3>
+      //           <input
+      //             type="file"
+      //             multiple
+      //             onChange={handleFileChange}
+      //             accept={postType === "video" ? "video/*" : ".pdf,.doc,.docx,.txt,.ppt,.pptx"}
+      //             className="block w-full text-sm text-gray-500 border border-gray-200 rounded-lg cursor-pointer focus:outline-none"
+      //           />
+      //         </div>
+      //       </Card>
+      //       <Textarea
+      //         placeholder={`Add a ${postType === "video" ? "description" : "caption"}...`}
+      //         value={content}
+      //         onChange={(e) => setContent(e.target.value)}
+      //         className="min-h-24"
+      //       />
+      //     </div>
+      //   );
 
       case "poll":
         return (
@@ -233,7 +327,7 @@ const CreatePost = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3 md:space-x-4">
               <Button variant="ghost" size="sm" asChild className="text-white hover:bg-white/20">
-                <Link to="/dashboard/society">
+                <Link to={localStorage.getItem("currentSocietyId") ? `/dashboard/society/${localStorage.getItem("currentSocietyId")}` : "/dashboard/society"}>
                   <ArrowLeft className="h-4 w-4 md:mr-2" />
                   <span className="hidden md:inline">Back</span>
                 </Link>

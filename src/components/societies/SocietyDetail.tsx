@@ -37,6 +37,8 @@ const SocietyDetail = () => {
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [postsError, setPostsError] = useState(null);
   const [likedPosts, setLikedPosts] = useState({}); // Track liked posts
+  const [hasMembershipRequest, setHasMembershipRequest] = useState(false);
+  const [checkingMembership, setCheckingMembership] = useState(true);
   // Comment functionality temporarily disabled
   // const [commentingOn, setCommentingOn] = useState(null);
   // const [newComment, setNewComment] = useState("");
@@ -294,6 +296,40 @@ const SocietyDetail = () => {
     }
   };
 
+  // Check if user has existing membership request
+  const checkMembershipRequest = async (societyId) => {
+    try {
+      setCheckingMembership(true);
+      const token = localStorage.getItem("token");
+      if (!token) return;
+
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      const userId = user.id || user.user_id;
+      const rollno = user.RollNO || user.rollno || user.ROLNO;
+
+      if (!userId && !rollno) return;
+
+      const response = await axios.post(
+        `${import.meta.env.VITE_API_URL}/user/membership/requests`,
+        { user_id: userId, rollno: rollno },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (response.data.success && response.data.requests) {
+        const hasRequest = response.data.requests.some(
+          (req) => req.society_id === parseInt(societyId)
+        );
+        setHasMembershipRequest(hasRequest);
+      }
+    } catch (err) {
+      console.error("Error checking membership request:", err);
+    } finally {
+      setCheckingMembership(false);
+    }
+  };
+
   // Fetch society data from API
   useEffect(() => {
     const fetchSociety = async () => {
@@ -322,6 +358,7 @@ const SocietyDetail = () => {
         // Fetch posts after society data is loaded
         if (societyData && societyData.society_id) {
           fetchSocietyPosts(societyData.society_id);
+          checkMembershipRequest(societyData.society_id);
         }
       } catch (err) {
         console.error("Error fetching society:", err);
@@ -355,7 +392,7 @@ const SocietyDetail = () => {
         <div className="text-center">
           <h2 className="text-2xl font-bold text-university-navy mb-4">Error</h2>
           <p className="text-muted-foreground mb-4">{error}</p>
-          <Button asChild>
+          <Button asChild className="bg-university-navy hover:bg-university-navy/90">
             <Link to="/dashboard/student">Back to Dashboard</Link>
           </Button>
         </div>
@@ -370,7 +407,7 @@ const SocietyDetail = () => {
         <div className="text-center">
           <h2 className="text-2xl font-bold text-university-navy mb-4">Society Not Found</h2>
           <p className="text-muted-foreground mb-4">The society you're looking for doesn't exist.</p>
-          <Button asChild>
+          <Button asChild className="bg-university-navy hover:bg-university-navy/90">
             <Link to="/dashboard/student">Back to Dashboard</Link>
           </Button>
         </div>
@@ -384,7 +421,7 @@ const SocietyDetail = () => {
       <section className="gradient-primary text-white py-12 px-4">
         <div className="container mx-auto max-w-6xl">
           <div className="flex items-center mb-6">
-            <Button variant="ghost" size="sm" asChild className="text-white hover:bg-white/20 mr-4">
+            <Button variant="ghost" size="sm" asChild className="text-white hover:bg-white/20 border border-white/30 bg-black/20 backdrop-blur-sm mr-4">
               <Link to="/dashboard/student">
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back to Dashboard
@@ -430,12 +467,19 @@ const SocietyDetail = () => {
                   <span>Created: {new Date(society.created_at).toLocaleDateString()}</span>
                 </div>
               </div>
-              <Button variant="university" size="lg" className="w-full md:w-auto mt-6" asChild>
-                <Link to={`/membership/register/${id}`}>
-                <Users className="h-5 w-5 mr-2" />
-                Join Society
-                </Link>
-              </Button>
+              {!checkingMembership && !hasMembershipRequest && (
+                <Button variant="university" size="lg" className="w-full md:w-auto mt-6" asChild>
+                  <Link to={`/membership/register/${id}`}>
+                    <Users className="h-5 w-5 mr-2" />
+                    Join Society
+                  </Link>
+                </Button>
+              )}
+              {hasMembershipRequest && (
+                <div className="w-full md:w-auto mt-6 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-sm">
+                  Membership request already submitted
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -530,15 +574,20 @@ const SocietyDetail = () => {
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center space-x-3">
                           <div className="bg-gradient-to-br from-university-navy to-university-navy/80 text-white rounded-full w-10 h-10 flex items-center justify-center font-semibold text-sm">
-                            {post.author_name ? post.author_name.charAt(0).toUpperCase() : 'A'}
+                            {(post.advisor_name || post.author_name) ? (post.advisor_name || post.author_name).charAt(0).toUpperCase() : 'A'}
                           </div>
                           <div>
                             <h4 className="font-semibold text-university-navy">
-                              {post.author_name || 'Anonymous'}
+                              {post.advisor_name || post.author_name || 'Anonymous'}
                             </h4>
                             <div className="flex items-center space-x-2 text-xs text-muted-foreground">
                               <Clock className="h-3 w-3" />
                               <span>{new Date(post.created_at).toLocaleDateString()}</span>
+                              {post.advisor_name && (
+                                <Badge variant="secondary" className="text-xs">
+                                  Advisor
+                                </Badge>
+                              )}
                               <Badge variant="outline" className="text-xs">
                                 {post.post_type}
                               </Badge>
