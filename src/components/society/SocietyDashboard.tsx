@@ -36,10 +36,7 @@ import {
   Video,
   Download,
   BarChart3 as BarChartIcon,
-  MapPin,
-  X,
-  ChevronLeft,
-  ChevronRight
+  MapPin
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -47,7 +44,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
-import toast from "react-hot-toast";
 import EventRequestForm from "./EventRequestForm";
 import EventRequestsList from "./EventRequestsList";
 import EventReportUpload from "./EventReportUpload";
@@ -76,8 +72,6 @@ const SocietyDashboard = () => {
   const [comments, setComments] = useState<{[key: number]: any[]}>({});
   const [selectedEventForReport, setSelectedEventForReport] = useState<{id: number, title: string} | null>(null);
   const [isReportUploadOpen, setIsReportUploadOpen] = useState(false);
-  const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
-  const [selectedPostImages, setSelectedPostImages] = useState<string[]>([]);
 
   // Logout function
   const handleLogout = () => {
@@ -86,7 +80,7 @@ const SocietyDashboard = () => {
     navigate("/");
   };
 
-  // Fetch society data by user_id or society_id from URL or localStorage
+  // Fetch society data by user_id or society_id from URL
   const fetchSocietyData = async () => {
     const token = localStorage.getItem("token");
     if (!token) {
@@ -98,14 +92,10 @@ const SocietyDashboard = () => {
       const API_URL = import.meta.env.VITE_API_URL;
       setLoadingSociety(true);
       let response;
-      let currentSocietyId: string | null = null;
 
-      // Priority 1: societyId from URL params (for advisors or direct access)
+      // If societyId is in URL (for advisors), fetch by society_id
       if (societyId) {
-        currentSocietyId = societyId;
-        // Store in localStorage for persistence
-        localStorage.setItem("currentSocietyId", societyId);
-        console.log("Fetching society data for society ID from URL:", societyId);
+        console.log("Fetching society data for society ID:", societyId);
         response = await axios.get(
           `${API_URL}/society/society/data/${societyId}`,
           {
@@ -115,48 +105,33 @@ const SocietyDashboard = () => {
           }
         );
       } else {
-        // Priority 2: Check localStorage for stored society ID
-        const storedSocietyId = localStorage.getItem("currentSocietyId");
-        if (storedSocietyId) {
-          currentSocietyId = storedSocietyId;
-          console.log("Fetching society data for society ID from localStorage:", storedSocietyId);
-          response = await axios.get(
-            `${API_URL}/society/society/data/${storedSocietyId}`,
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            }
-          );
-        } else {
-          // Priority 3: Fetch by user_id (for society owners)
-          const storedUser = localStorage.getItem("user");
-          if (!storedUser) {
-            console.log("No user data available");
-            setLoadingSociety(false);
-            return;
-          }
-
-          const userData = JSON.parse(storedUser);
-          const userId = userData.id || userData.faculty_id;
-          
-          if (!userId) {
-            console.log("No user ID found in user data");
-            setLoadingSociety(false);
-            return;
-          }
-
-          console.log("Fetching society data for user ID:", userId);
-          response = await axios.post(
-            `${API_URL}/society/society/data`,
-            { user_id: userId },
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            }
-          );
+        // Otherwise, fetch by user_id (for society owners)
+        const storedUser = localStorage.getItem("user");
+        if (!storedUser) {
+          console.log("No user data available");
+          setLoadingSociety(false);
+          return;
         }
+
+        const userData = JSON.parse(storedUser);
+        const userId = userData.id || userData.faculty_id;
+        
+        if (!userId) {
+          console.log("No user ID found in user data");
+          setLoadingSociety(false);
+          return;
+        }
+
+        console.log("Fetching society data for user ID:", userId);
+        response = await axios.post(
+          `${API_URL}/society/society/data`,
+          { user_id: userId },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
       }
 
       if (response.data.success) {
@@ -168,22 +143,8 @@ const SocietyDashboard = () => {
         setSocietyInfo(societyData);
         console.log("Society data fetched:", societyData);
         
-        // If we have society data, store the ID and fetch related data
+        // If we have society data, fetch membership requests and settings using society_id
         if (societyData && societyData.society_id) {
-          // Store society ID in localStorage for persistence
-          localStorage.setItem("currentSocietyId", societyData.society_id.toString());
-          
-          // Update URL if we have societyId from localStorage but not in URL
-          if (currentSocietyId && !societyId && currentSocietyId !== societyData.society_id.toString()) {
-            // If stored ID doesn't match, update it
-            localStorage.setItem("currentSocietyId", societyData.society_id.toString());
-          }
-          
-          // If we're on /dashboard/society without ID but have society data, update URL to include ID
-          if (!societyId && societyData.society_id && window.location.pathname === "/dashboard/society") {
-            navigate(`/dashboard/society/${societyData.society_id}`, { replace: true });
-          }
-          
           fetchMembershipRequests(societyData.society_id);
           // Fetch settings using the society ID from the response
           fetchMembershipSettings(societyData.society_id);
@@ -296,15 +257,12 @@ const SocietyDashboard = () => {
       if (response.data.success) {
         // Refresh the requests list
         fetchMembershipRequests();
-        toast.success("Membership request approved successfully!");
         console.log("Request approved successfully");
       } else {
-        toast.error(response.data.message || "Failed to approve request");
         console.error("Failed to approve request:", response.data.message);
       }
     } catch (error: any) {
       console.error("Error approving request:", error.response?.data || error.message);
-      toast.error(error.response?.data?.message || "Error approving membership request");
     }
   };
 
@@ -325,15 +283,12 @@ const SocietyDashboard = () => {
       if (response.data.success) {
         // Refresh the requests list
         fetchMembershipRequests();
-        toast.success("Membership request declined successfully!");
         console.log("Request declined successfully");
       } else {
-        toast.error(response.data.message || "Failed to decline request");
         console.error("Failed to decline request:", response.data.message);
       }
     } catch (error: any) {
       console.error("Error declining request:", error.response?.data || error.message);
-      toast.error(error.response?.data?.message || "Error declining membership request");
     }
   };
 
@@ -639,7 +594,7 @@ const SocietyDashboard = () => {
               <Button 
                 variant="ghost" 
                 onClick={handleLogout}
-                className="w-full justify-start text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                className="w-full justify-start text-red-600 hover:bg-red-50"
               >
                 <LogOut className="h-4 w-4 mr-3" />
                 Logout
@@ -652,7 +607,7 @@ const SocietyDashboard = () => {
             variant="ghost" 
             size="sm" 
             onClick={handleLogout}
-            className="text-white border border-white/30 hover:bg-white/20 hover:border-white/50 hidden md:flex bg-black/20 backdrop-blur-sm"
+            className="text-white hover:bg-white/20 hidden md:flex"
           >
             <LogOut className="h-4 w-4 mr-2" />
             <span className="hidden sm:inline">Logout</span>
@@ -851,42 +806,6 @@ const SocietyDashboard = () => {
                     )}
                   </div>
                 </Card>
-
-                {/* Advisor Information Card */}
-                {societyInfo?.advisor_info && (
-                  <Card className="p-4 md:p-6 shadow-card">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="font-semibold text-university-navy text-sm md:text-base">Advisor Information</h3>
-                    </div>
-                    <div className="space-y-3">
-                      <div className="flex items-center space-x-3">
-                        <div className="bg-gradient-to-br from-university-navy to-university-navy/80 text-white rounded-full w-12 h-12 flex items-center justify-center font-bold text-base flex-shrink-0 shadow-md">
-                          {societyInfo.advisor_info.name?.charAt(0).toUpperCase() || 'A'}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-semibold text-base text-university-navy">
-                            {societyInfo.advisor_info.name || societyInfo.advisor}
-                          </h4>
-                          <p className="text-xs text-muted-foreground">Faculty Advisor</p>
-                        </div>
-                      </div>
-                      <div className="space-y-2 pt-2 border-t">
-                        {societyInfo.advisor_info.email && (
-                          <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                            <Mail className="h-4 w-4 text-university-navy/60" />
-                            <span className="truncate">{societyInfo.advisor_info.email}</span>
-                          </div>
-                        )}
-                        {societyInfo.advisor_info.phone && (
-                          <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                            <Phone className="h-4 w-4 text-university-navy/60" />
-                            <span>{societyInfo.advisor_info.phone}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </Card>
-                )}
               </div>
             </div>
           )}
@@ -1211,13 +1130,7 @@ const SocietyDashboard = () => {
                   variant="university"
                   size="sm"
                   className="w-full sm:w-auto"
-                  onClick={() => {
-                    // Ensure society ID is stored before navigating
-                    if (societyInfo?.society_id) {
-                      localStorage.setItem("currentSocietyId", societyInfo.society_id.toString());
-                    }
-                    navigate("/dashboard/society/event-request/create");
-                  }}
+                  onClick={() => navigate("/dashboard/society/event-request/create")}
                   disabled={!societyInfo?.society_id}
                 >
                   <Plus className="h-4 w-4 mr-2" />
@@ -1247,20 +1160,12 @@ const SocietyDashboard = () => {
                 <Button 
                   variant="university" 
                   size="sm"
-                  onClick={() => {
-                    // Ensure society ID is stored before navigating
-                    if (societyInfo?.society_id) {
-                      localStorage.setItem("currentSocietyId", societyInfo.society_id.toString());
-                      navigate("/society/post/create", {
-                        state: {
-                          society_id: societyInfo.society_id,
-                          society_name: societyInfo.name
-                        }
-                      });
-                    } else {
-                      navigate("/society/post/create");
+                  onClick={() => navigate("/society/post/create", {
+                    state: {
+                      society_id: societyInfo?.society_id,
+                      society_name: societyInfo?.name
                     }
-                  }}
+                  })}
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Create Post
@@ -1281,20 +1186,12 @@ const SocietyDashboard = () => {
                   </p>
                   <Button 
                     variant="university"
-                    onClick={() => {
-                      // Ensure society ID is stored before navigating
-                      if (societyInfo?.society_id) {
-                        localStorage.setItem("currentSocietyId", societyInfo.society_id.toString());
-                        navigate("/society/post/create", {
-                          state: {
-                            society_id: societyInfo.society_id,
-                            society_name: societyInfo.name
-                          }
-                        });
-                      } else {
-                        navigate("/society/post/create");
+                    onClick={() => navigate("/society/post/create", {
+                      state: {
+                        society_id: societyInfo?.society_id,
+                        society_name: societyInfo?.name
                       }
-                    }}
+                    })}
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     Create First Post
@@ -1314,16 +1211,11 @@ const SocietyDashboard = () => {
                           </Avatar>
                           <div>
                             <h4 className="font-semibold text-university-navy">
-                              {post.author_name || post.advisor_name || 'Anonymous'}
+                              {post.author_name || 'Anonymous'}
                             </h4>
                             <div className="flex items-center space-x-2 text-xs text-muted-foreground">
                               <Clock className="h-3 w-3" />
                               <span>{new Date(post.created_at).toLocaleDateString()}</span>
-                              {post.advisor_name && (
-                                <Badge variant="secondary" className="text-xs">
-                                  Advisor: {post.advisor_name}
-                                </Badge>
-                              )}
                               <Badge variant="outline" className="text-xs">
                                 {post.post_type}
                               </Badge>
@@ -1343,50 +1235,28 @@ const SocietyDashboard = () => {
                         {post.post_type === 'photo' && post.media_files && post.media_files.length > 0 && (
                           <div className="space-y-3">
                             <p className="text-muted-foreground leading-relaxed">{post.content}</p>
-                            <div className={`grid gap-3 ${
-                              post.media_files.length === 1 ? 'grid-cols-1' :
-                              post.media_files.length === 2 ? 'grid-cols-2' :
-                              post.media_files.length >= 3 ? 'grid-cols-2' : 'grid-cols-2'
-                            }`}>
-                              {post.media_files.slice(0, 5).map((file: any, index: number) => {
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {post.media_files.map((file: any) => {
                                 let imageUrl = file.file_url;
                                 if (file.file_url && !file.file_url.startsWith('http')) {
                                   imageUrl = `${import.meta.env.VITE_API_URL}/${file.file_url.replace(/\\/g, '/').replace(/^.*?\/assets\//, 'assets/')}`;
+
                                 }
                                 return (
-                                  <div 
+                                  <img 
                                     key={file.media_id}
-                                    className="relative cursor-pointer group"
-                                    onClick={() => {
-                                      const allImages = post.media_files.slice(0, 5).map((f: any) => {
-                                        let url = f.file_url;
-                                        if (f.file_url && !f.file_url.startsWith('http')) {
-                                          url = `${import.meta.env.VITE_API_URL}/${f.file_url.replace(/\\/g, '/').replace(/^.*?\/assets\//, 'assets/')}`;
-                                        }
-                                        return url;
-                                      });
-                                      setSelectedPostImages(allImages);
-                                      setSelectedImageIndex(index);
-                                    }}
-                                  >
-                                    <img 
                                     src={imageUrl}
-                                      alt={`Post ${index + 1}`}
-                                      className="w-full h-48 object-cover rounded-lg border transition-transform group-hover:scale-105"
+                                    alt="Post"
+                                    className="w-full h-48 object-cover rounded-lg border"
                                     onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                   />
-                                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded-lg flex items-center justify-center">
-                                      <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    </div>
-                                  </div>
                                 );
                               })}
                             </div>
                           </div>
                         )}
 
-                        {/* Commented out for now */}
-                        {/* {post.post_type === 'video' && post.media_files && post.media_files.length > 0 && (
+                        {post.post_type === 'video' && post.media_files && post.media_files.length > 0 && (
                           <div className="space-y-3">
                             <p className="text-muted-foreground leading-relaxed">{post.content}</p>
                             {post.media_files.map((file: any) => {
@@ -1431,7 +1301,7 @@ const SocietyDashboard = () => {
                               );
                             })}
                           </div>
-                        )} */}
+                        )}
 
                         {post.post_type === 'poll' && post.poll_data && (
                           <div className="space-y-3">
@@ -1659,90 +1529,86 @@ const SocietyDashboard = () => {
           {activeTab === "events" && (
             <div className="space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <h2 className="text-xl md:text-2xl font-semibold text-university-navy">Événements</h2>
+                <h2 className="text-xl md:text-2xl font-semibold text-university-navy">Society Events</h2>
               </div>
 
               {loadingEvents ? (
                 <div className="text-center py-12">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-university-navy mx-auto mb-4"></div>
-                  <p className="text-muted-foreground">Chargement des événements...</p>
+                  <p className="text-muted-foreground">Loading events...</p>
                 </div>
-              ) : (() => {
-                // Filter active events (status_id = 10) and completed events (status_id = 11)
-                const activeAndCompletedEvents = events.filter(event => event.status_id === 10 || event.status_id === 11);
-                return activeAndCompletedEvents.length === 0 ? (
+              ) : events.length === 0 ? (
                 <Card className="p-8 text-center shadow-card">
                   <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="font-semibold text-university-navy mb-2">Aucun événement actif</h3>
+                  <h3 className="font-semibold text-university-navy mb-2">No Events Yet</h3>
                   <p className="text-muted-foreground">
-                      Aucun événement actif pour le moment. Les événements actifs apparaîtront ici une fois approuvés.
+                    No events have been created for this society yet.
                   </p>
                 </Card>
               ) : (
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {activeAndCompletedEvents.map((event) => (
-                      <Card key={event.id} className="p-4 shadow-card hover:shadow-lg transition-shadow">
-                        <div className="flex items-start justify-between mb-2">
-                          <h3 className="font-semibold text-base text-university-navy flex-1 line-clamp-2">{event.title}</h3>
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {events.map((event) => (
+                    <Card key={event.id} className="p-6 shadow-card hover:shadow-lg transition-shadow">
+                      <div className="flex items-start justify-between mb-3">
+                        <h3 className="font-semibold text-lg text-university-navy flex-1">{event.title}</h3>
                         <Badge 
-                            variant={event.status_id === 11 ? "default" : "secondary"}
-                            className="text-xs ml-2 flex-shrink-0"
+                          variant={event.status_id === 11 ? "default" : event.status_id === 10 ? "secondary" : "outline"} 
+                          className="text-xs"
                         >
-                            {event.status_id === 11 ? 'Report Submitted' : (event.status_name || 'Active')}
+                          {event.status_name || event.status}
                         </Badge>
                       </div>
-                        <p className="text-xs text-muted-foreground mb-3 line-clamp-2">
+                      <p className="text-sm text-muted-foreground mb-4 line-clamp-3">
                         {event.description}
                       </p>
-                        <div className="space-y-1.5 text-xs mb-3">
+                      <div className="space-y-2 text-sm mb-4">
                         <div className="flex items-center text-muted-foreground">
-                            <Calendar className="h-3 w-3 mr-1.5 flex-shrink-0" />
-                            <span className="truncate">{new Date(event.event_date).toLocaleDateString('fr-FR', { 
-                              day: 'numeric',
+                          <Calendar className="h-4 w-4 mr-2" />
+                          <span>{new Date(event.event_date).toLocaleDateString('en-US', { 
+                            weekday: 'short',
+                            year: 'numeric', 
                             month: 'short', 
-                              year: 'numeric'
+                            day: 'numeric' 
                           })}</span>
                         </div>
                         {event.event_time && (
                           <div className="flex items-center text-muted-foreground">
-                              <Clock className="h-3 w-3 mr-1.5 flex-shrink-0" />
-                              <span className="truncate">{event.event_time}</span>
+                            <Clock className="h-4 w-4 mr-2" />
+                            <span>{event.event_time}</span>
                           </div>
                         )}
                         {event.venue && (
                           <div className="flex items-center text-muted-foreground">
-                              <MapPin className="h-3 w-3 mr-1.5 flex-shrink-0" />
-                              <span className="truncate">{event.venue}</span>
+                            <MapPin className="h-4 w-4 mr-2" />
+                            <span>{event.venue}</span>
                           </div>
                         )}
                       </div>
-                        {/* Complete Event Button - Only show for Active events (status_id = 10), not for completed (status_id = 11) */}
-                        {event.source_table === 'event_req' && event.status_id === 10 && (
+                      {/* Complete Event Button - Only show for Active events (status_id = 10) */}
+                      {event.status_id === 10 && event.source_table === 'event_req' && (
                         <Button
                           variant="university"
                           size="sm"
-                            className="w-full text-xs h-8"
+                          className="w-full"
                           onClick={() => {
                             setSelectedEventForReport({ id: event.id, title: event.title });
                             setIsReportUploadOpen(true);
                           }}
                         >
-                            <FileText className="h-3 w-3 mr-1.5" />
-                            Compléter
+                          <FileText className="h-4 w-4 mr-2" />
+                          Complete Event
                         </Button>
                       )}
-                        {/* Show completed message for events with status_id = 11 */}
                       {event.status_id === 11 && (
-                          <div className="w-full text-xs text-center text-green-600 font-medium py-2">
-                            <CheckCircle className="h-3 w-3 inline mr-1" />
-                            Rapport soumis
+                        <div className="flex items-center justify-center text-sm text-green-600 bg-green-50 rounded-lg p-2">
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          Report Submitted
                         </div>
                       )}
                     </Card>
                   ))}
                 </div>
-                );
-              })()}
+              )}
             </div>
           )}
 
@@ -1917,69 +1783,6 @@ const SocietyDashboard = () => {
             }
           }}
         />
-      )}
-
-      {/* Image Lightbox Modal */}
-      {selectedImageIndex !== null && selectedPostImages.length > 0 && (
-        <Dialog open={selectedImageIndex !== null} onOpenChange={() => {
-          setSelectedImageIndex(null);
-          setSelectedPostImages([]);
-        }}>
-          <DialogContent className="max-w-7xl w-full h-[90vh] p-0 bg-black/95">
-            <div className="relative w-full h-full flex items-center justify-center">
-              {/* Close Button */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute top-4 right-4 z-50 text-white hover:bg-white/20"
-                onClick={() => {
-                  setSelectedImageIndex(null);
-                  setSelectedPostImages([]);
-                }}
-              >
-                <X className="h-6 w-6" />
-              </Button>
-
-              {/* Previous Button */}
-              {selectedImageIndex > 0 && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute left-4 z-50 text-white hover:bg-white/20"
-                  onClick={() => setSelectedImageIndex(selectedImageIndex - 1)}
-                >
-                  <ChevronLeft className="h-8 w-8" />
-                </Button>
-              )}
-
-              {/* Next Button */}
-              {selectedImageIndex < selectedPostImages.length - 1 && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-4 z-50 text-white hover:bg-white/20"
-                  onClick={() => setSelectedImageIndex(selectedImageIndex + 1)}
-                >
-                  <ChevronRight className="h-8 w-8" />
-                </Button>
-              )}
-
-              {/* Image */}
-              <div className="w-full h-full flex items-center justify-center p-8">
-                <img
-                  src={selectedPostImages[selectedImageIndex]}
-                  alt={`Image ${selectedImageIndex + 1}`}
-                  className="max-w-full max-h-full object-contain"
-                />
-              </div>
-
-              {/* Image Counter */}
-              <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/50 text-white px-4 py-2 rounded-full text-sm">
-                {selectedImageIndex + 1} / {selectedPostImages.length}
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
       )}
     </div>
   );
