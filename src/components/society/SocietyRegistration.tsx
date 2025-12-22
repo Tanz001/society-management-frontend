@@ -162,13 +162,40 @@ const SocietyRegistration = () => {
   }, [navigate]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'cover') => {
-    if (event.target.files) {
+    if (event.target.files && event.target.files[0]) {
+      const file = event.target.files[0];
+      const maxSize = 5 * 1024 * 1024; // 5MB in bytes
+      
+      // Validate file size
+      if (file.size > maxSize) {
+        const fileType = type === 'logo' ? 'logo' : 'cover photo';
+        toast({
+          title: "File too large",
+          description: `${fileType.charAt(0).toUpperCase() + fileType.slice(1)} size exceeds 5MB. Please choose a smaller file.`,
+          variant: "destructive",
+        });
+        event.target.value = ''; // Reset input
+        return;
+      }
+      
+      // Validate file type
+      if (!file.type.match(/^image\/(png|jpeg|jpg)$/i)) {
+        const fileType = type === 'logo' ? 'logo' : 'cover photo';
+        toast({
+          title: "Invalid file type",
+          description: `Invalid file type for ${fileType}. Please upload PNG or JPG images only.`,
+          variant: "destructive",
+        });
+        event.target.value = ''; // Reset input
+        return;
+      }
+      
       switch (type) {
         case 'logo':
-          setSocietyLogo(event.target.files[0]);
+          setSocietyLogo(file);
           break;
         case 'cover':
-          setCoverPhoto(event.target.files[0]);
+          setCoverPhoto(file);
           break;
       }
     }
@@ -772,8 +799,11 @@ const SocietyRegistration = () => {
                 <div className="text-center">
                   <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                   <h3 className="font-medium mb-2">Society Logo <span className="text-red-500">*</span></h3>
-                  <p className="text-sm text-muted-foreground mb-4">
+                  <p className="text-sm text-muted-foreground mb-2">
                     Upload your society's logo (PNG, JPG)
+                  </p>
+                  <p className="text-xs text-muted-foreground mb-4 italic">
+                    Maximum file size: 5MB
                   </p>
                   {societyLogo && (
                     <p className="text-sm text-green-600 mb-2">
@@ -801,8 +831,11 @@ const SocietyRegistration = () => {
                 <div className="text-center">
                   <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                   <h3 className="font-medium mb-2">Cover Photo <span className="text-red-500">*</span></h3>
-                  <p className="text-sm text-muted-foreground mb-4">
+                  <p className="text-sm text-muted-foreground mb-2">
                     Upload a cover photo for your society
+                  </p>
+                  <p className="text-xs text-muted-foreground mb-4 italic">
+                    Maximum file size: 5MB
                   </p>
                   {coverPhoto && (
                     <p className="text-sm text-green-600 mb-2">
