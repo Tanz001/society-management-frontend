@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Calendar, Clock, MapPin, User, FileText, RefreshCw, History, CheckCircle, XCircle, Eye } from "lucide-react";
+import { Calendar, Clock, MapPin, User, FileText, RefreshCw, History, CheckCircle, XCircle, Eye, Pencil, Lightbulb } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import toast from "react-hot-toast";
 
@@ -27,6 +28,12 @@ interface EventRequest {
   email?: string;
   rollNo?: string;
   society_name?: string;
+  slot_status_id?: number;
+  slot_status_name?: string;
+  slot_date?: string;
+  slot_time_from?: string;
+  slot_time_to?: string;
+  slot_request_id?: number;
 }
 
 interface EventRequestsListProps {
@@ -52,12 +59,16 @@ interface StatusHistory {
 }
 
 const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
+  const navigate = useNavigate();
   const [eventRequests, setEventRequests] = useState<EventRequest[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<EventRequest | null>(null);
   const [statusHistory, setStatusHistory] = useState<StatusHistory[]>([]);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [suggestedSlots, setSuggestedSlots] = useState<any[]>([]);
+  const [loadingSuggestedSlots, setLoadingSuggestedSlots] = useState(false);
+  const [isSuggestedSlotsModalOpen, setIsSuggestedSlotsModalOpen] = useState(false);
 
   const fetchEventRequests = async () => {
     if (!societyId) return;
@@ -103,11 +114,13 @@ const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
   // Fetch status history for an event request
   const fetchStatusHistory = async (eventReqId: number) => {
     setLoadingHistory(true);
+    setIsHistoryModalOpen(false); // Reset modal state
     try {
        const API_URL = import.meta.env.VITE_API_URL;
       const token = localStorage.getItem("token");
       if (!token) {
         toast.error("Authentication required");
+        setLoadingHistory(false);
         return;
       }
 
@@ -121,16 +134,92 @@ const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
       );
 
       if (response.data.success) {
-        setStatusHistory(response.data.data || []);
-        setIsHistoryModalOpen(true);
+        const historyData = response.data.data || [];
+        // Filter out System notes on frontend as well
+        const filteredHistory = historyData.filter((history: any) => {
+          const role = history.role || history.role_display_name || history.role_name || "";
+          return role !== "System" && role !== "SYSTEM";
+        });
+        setStatusHistory(filteredHistory);
+        setIsHistoryModalOpen(true); // Open modal after data is loaded
+        setLoadingHistory(false);
       } else {
         toast.error(response.data.message || "Failed to fetch status history");
+        setLoadingHistory(false);
       }
     } catch (error: any) {
       console.error("Error fetching status history:", error);
-      toast.error(error.response?.data?.message || "Failed to fetch status history");
-    } finally {
+      const errorMessage = error.response?.data?.message || "Failed to fetch status history";
+      toast.error(errorMessage);
       setLoadingHistory(false);
+    }
+  };
+
+  // Fetch suggested slots for an event request
+  const fetchSuggestedSlots = async (slotRequestId: number) => {
+    if (!slotRequestId) return;
+    
+    setLoadingSuggestedSlots(true);
+    try {
+      const API_URL = import.meta.env.VITE_API_URL;
+      const token = localStorage.getItem("token");
+      if (!token) {
+        toast.error("Authentication required");
+        return;
+      }
+
+      // Get all suggested slots and filter by slot_request_id
+      const response = await axios.get(
+        `${API_URL}/admin/protocol/slots/suggested`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.data.success) {
+        // Filter suggested slots for this specific slot_request_id
+        const filtered = (response.data.data || []).filter(
+          (slot: any) => slot.slot_request_id === slotRequestId
+        );
+        setSuggestedSlots(filtered);
+        setIsSuggestedSlotsModalOpen(true);
+      }
+    } catch (error: any) {
+      console.error("Error fetching suggested slots:", error);
+    } finally {
+      setLoadingSuggestedSlots(false);
+    }
+  };
+
+  // Check if advisor can edit the request
+  const canEdit = (request: EventRequest) => {
+    // Check if slot is REJECTED (3) or SUGGESTED (4)
+    const slotRejectedOrSuggested = request.slot_status_id === 3 || request.slot_status_id === 4;
+    
+    // Check if event is rejected by any admin (3, 5, 7, 9, 12, 14, 16)
+    const eventRejected = [3, 5, 7, 9, 12, 14, 16].includes(request.status_id);
+    
+    return slotRejectedOrSuggested || eventRejected;
+  };
+
+  // Handle edit request
+  const handleEditRequest = (reqId: number) => {
+    navigate(`/dashboard/society/event-request/edit/${reqId}`);
+  };
+
+  // Format time to AM/PM
+  const formatTimeToAMPM = (time24: string) => {
+    if (!time24) return "";
+    try {
+      const [hours, minutes] = time24.split(":");
+      const hour = parseInt(hours);
+      const ampm = hour >= 12 ? "PM" : "AM";
+      const hour12 = hour % 12 || 12;
+      return `${hour12}:${minutes} ${ampm}`;
+    } catch (e) {
+      return time24;
     }
   };
 
@@ -207,6 +296,24 @@ const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
                   <div className="flex items-center gap-3 mb-2 flex-wrap">
                     <h3 className="text-lg font-semibold text-university-navy">{request.title}</h3>
                     {getStatusBadge(request.status_id || 1, request.status_name || 'Pending')}
+                    {request.slot_status_name && (
+                      <Badge 
+                        variant={
+                          request.slot_status_id === 2 ? "default" :
+                          request.slot_status_id === 3 ? "destructive" :
+                          request.slot_status_id === 4 ? "secondary" :
+                          "outline"
+                        }
+                        className={
+                          request.slot_status_id === 2 ? "bg-green-100 text-green-800 border-green-200" :
+                          request.slot_status_id === 3 ? "bg-red-100 text-red-800 border-red-200" :
+                          request.slot_status_id === 4 ? "bg-blue-100 text-blue-800 border-blue-200" :
+                          "bg-yellow-100 text-yellow-800 border-yellow-200"
+                        }
+                      >
+                        Slot: {request.slot_status_name}
+                      </Badge>
+                    )}
                     {request.status_description && (
                       <span className="text-xs text-muted-foreground">
                         ({request.status_description})
@@ -214,6 +321,26 @@ const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
                     )}
                   </div>
                   <p className="text-sm text-muted-foreground mb-4">{request.description}</p>
+                  
+                  {/* Slot Information */}
+                  {request.slot_date && (
+                    <div className="bg-blue-50 border-l-4 border-blue-200 p-3 mb-4 rounded">
+                      <p className="text-sm font-medium text-blue-900 mb-1">Current Slot:</p>
+                      <div className="flex flex-wrap gap-4 text-xs text-blue-800">
+                        <span className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          {new Date(request.slot_date).toLocaleDateString()}
+                        </span>
+                        {request.slot_time_from && (
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {formatTimeToAMPM(request.slot_time_from)}
+                            {request.slot_time_to && <> - {formatTimeToAMPM(request.slot_time_to)}</>}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -252,18 +379,44 @@ const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
                     <span>• Updated: {new Date(request.updated_at).toLocaleString()}</span>
                   )}
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setSelectedRequest(request);
-                    fetchStatusHistory(request.req_id);
-                  }}
-                  disabled={loadingHistory}
-                >
-                  <History className="h-4 w-4 mr-2" />
-                  View Status History
-                </Button>
+                <div className="flex items-center gap-2">
+                  {canEdit(request) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleEditRequest(request.req_id)}
+                    >
+                      <Pencil className="h-4 w-4 mr-2" />
+                      Edit Request
+                    </Button>
+                  )}
+                  {request.slot_request_id && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedRequest(request);
+                        fetchSuggestedSlots(request.slot_request_id);
+                      }}
+                      disabled={loadingSuggestedSlots}
+                    >
+                      <Lightbulb className="h-4 w-4 mr-2" />
+                      View Suggested Slots
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedRequest(request);
+                      fetchStatusHistory(request.req_id);
+                    }}
+                    disabled={loadingHistory}
+                  >
+                    <History className="h-4 w-4 mr-2" />
+                    View Status History
+                  </Button>
+                </div>
               </div>
             </Card>
           ))}
@@ -297,6 +450,11 @@ const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
                 statusHistory.forEach((history) => {
                   const note = history.note || history.remarks;
                   const role = history.role || history.role_display_name || history.role_name || "Admin";
+                  
+                  // Filter out System notes - only show admin and protocol notes
+                  if (role === "System" || role === "SYSTEM") {
+                    return; // Skip system notes
+                  }
                   
                   if (note && note.trim() !== "") {
                     if (!notesByRole[role]) {
@@ -460,6 +618,84 @@ const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
               <h3 className="text-lg font-medium mb-2">No Status History</h3>
               <p className="text-muted-foreground">
                 No status changes have been recorded for this event request yet.
+              </p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Suggested Slots Modal */}
+      <Dialog open={isSuggestedSlotsModalOpen} onOpenChange={(open) => {
+        setIsSuggestedSlotsModalOpen(open);
+        if (!open) {
+          setSuggestedSlots([]);
+        }
+      }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-university-navy">
+              Suggested Slots
+            </DialogTitle>
+            <DialogDescription>
+              Alternative slots suggested by Protocol Office for: <strong>{selectedRequest?.title}</strong>
+            </DialogDescription>
+          </DialogHeader>
+
+          {loadingSuggestedSlots ? (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-university-navy mx-auto mb-4"></div>
+              <p className="text-muted-foreground">Loading suggested slots...</p>
+            </div>
+          ) : suggestedSlots.length > 0 ? (
+            <div className="space-y-4">
+              {suggestedSlots.map((slot: any) => (
+                <Card key={slot.suggestion_id} className="p-4 shadow-card border-l-4 border-l-blue-500">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200">
+                          {slot.slot_status_name}
+                        </Badge>
+                        {slot.venue_name && (
+                          <Badge variant="outline">{slot.venue_name}</Badge>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-4 text-sm text-muted-foreground mb-2">
+                        {slot.slot_date && (
+                          <span className="flex items-center gap-1">
+                            <Calendar className="h-4 w-4" />
+                            {new Date(slot.slot_date).toLocaleDateString()}
+                          </span>
+                        )}
+                        {slot.slot_time_from && (
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-4 w-4" />
+                            {formatTimeToAMPM(slot.slot_time_from)}
+                            {slot.slot_time_to && <> - {formatTimeToAMPM(slot.slot_time_to)}</>}
+                          </span>
+                        )}
+                      </div>
+                      {slot.note && (
+                        <div className="bg-blue-50 border-l-4 border-blue-200 p-2 mt-2 rounded">
+                          <p className="text-xs font-medium text-blue-900 mb-1">Note:</p>
+                          <p className="text-xs text-blue-800">{slot.note}</p>
+                        </div>
+                      )}
+                      <div className="flex items-center text-xs text-muted-foreground mt-2">
+                        <Clock className="h-3 w-3 mr-1" />
+                        Suggested: {new Date(slot.created_at).toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <Lightbulb className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+              <h3 className="text-lg font-medium mb-2">No Suggested Slots</h3>
+              <p className="text-muted-foreground">
+                No alternative slots have been suggested for this event request yet.
               </p>
             </div>
           )}

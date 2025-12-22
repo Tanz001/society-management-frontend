@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Eye, EyeOff, User, Lock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import home2Image from "@/assets/images/home4.jpg";
+import home2Image from "@/assets/images/image5.png";
 
 const LoginForm = () => {
   const navigate = useNavigate();
@@ -138,8 +138,8 @@ const LoginForm = () => {
           backgroundImage: `url(${home2Image})`,
         }}
       >
-        {/* Overlay for better readability */}
-        <div className="absolute inset-0 bg-black/30"></div>
+        {/* Light overlay for better text readability only */}
+        <div className="absolute inset-0 bg-black/10"></div>
       </div>
 
       {/* Content Container */}
@@ -147,8 +147,6 @@ const LoginForm = () => {
         {/* Left Side - Logo and Welcome Message */}
         <div className="hidden lg:flex flex-col items-start text-white space-y-6">
           {/* Logo with Welcome Message */}
-
-
           {!logoError ? (
               <img 
                 src="/gcu.png" 
@@ -157,16 +155,33 @@ const LoginForm = () => {
                 onError={() => setLogoError(true)}
               />
             ) : (
-              <div className="h-24 w-24 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
-                <User className="h-12 w-12" />
+              <div 
+                className="h-24 w-24 rounded-full flex items-center justify-center flex-shrink-0 backdrop-blur-sm border border-white/20"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                }}
+              >
+                <User className="h-12 w-12 text-white" />
               </div>
             )}
           <div className="space-x-4 mb-8">
-          
             <div className="flex flex-col">
-              <span className="text-5xl font-lincoln mb-1 drop-shadow-lg">Government College University Lahore</span>
-               <p className="text-lg text-white/90 leading-relaxed drop-shadow-md mt-2 text-[#caac70]">
-                Welcome to the GCU Societies Portal, use your LMS credentials to log in and access services.
+              <span 
+                className="text-5xl font-lincoln mb-1 drop-shadow-2xl"
+                style={{
+                  textShadow: '0 4px 8px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.3)'
+                }}
+              >
+                Government College University Lahore
+              </span>
+              <p 
+                className="text-lg leading-relaxed drop-shadow-lg mt-2"
+                style={{
+                  color: 'rgba(206, 173, 114, 1)',
+                  textShadow: '0 2px 4px rgba(0, 0, 0, 0.3)'
+                }}
+              >
+                Welcome to the GCU Societies Portal, access your societies and events.
               </p>
             </div>
           </div>
@@ -175,9 +190,10 @@ const LoginForm = () => {
         {/* Right Side - Login Card */}
         <div className="flex items-center justify-center w-full">
           <div 
-            className="w-full max-w-sm p-8 rounded-lg shadow-2xl"
+            className="w-full max-w-sm p-8 rounded-2xl shadow-2xl backdrop-blur-xl border border-white/20"
             style={{
-              backgroundColor: '#CAAC70',
+              background: 'linear-gradient(135deg, rgba(0, 0, 92, 0.25) 0%, rgba(91, 0, 7, 0.25) 50%, rgba(206, 173, 114, 0.2) 100%)',
+              boxShadow: '0 8px 32px 0 rgba(0, 0, 92, 0.37), 0 4px 16px 0 rgba(91, 0, 7, 0.2)',
             }}
           >
             {/* Mobile Logo */}
@@ -186,16 +202,38 @@ const LoginForm = () => {
                 <img 
                   src="/gcu.png" 
                   alt="GCU Logo" 
-                  className="h-16 w-16 object-contain flex-shrink-0"
+                  className="h-16 w-16 object-contain flex-shrink-0 drop-shadow-lg"
                   onError={() => setLogoError(true)}
                 />
               ) : (
-                <User className="h-12 w-12 text-[#59111C] flex-shrink-0" />
+                <User className="h-12 w-12 text-white flex-shrink-0 drop-shadow-lg" />
               )}
               <div className="text-center">
-                <div className="text-lg font-lincoln text-[#59111C]">Government College</div>
-                <div className="text-lg font-lincoln text-[#59111C] mb-2">University Lahore</div>
-                <p className="text-sm text-[#59111C] mt-1">
+                <div 
+                  className="text-lg font-lincoln drop-shadow-lg"
+                  style={{ 
+                    color: 'rgba(255, 255, 255, 0.95)',
+                    textShadow: '0 2px 4px rgba(0, 0, 0, 0.3)'
+                  }}
+                >
+                  Government College
+                </div>
+                <div 
+                  className="text-lg font-lincoln mb-2 drop-shadow-lg"
+                  style={{ 
+                    color: 'rgba(255, 255, 255, 0.95)',
+                    textShadow: '0 2px 4px rgba(0, 0, 0, 0.3)'
+                  }}
+                >
+                  University Lahore
+                </div>
+                <p 
+                  className="text-sm mt-1 drop-shadow-md"
+                  style={{ 
+                    color: 'rgba(206, 173, 114, 1)',
+                    textShadow: '0 1px 2px rgba(0, 0, 0, 0.2)'
+                  }}
+                >
                   Welcome to the GCU Societies Portal
                 </p>
               </div>
@@ -204,18 +242,27 @@ const LoginForm = () => {
             {/* Card Title */}
             <div className="mb-6">
               <h2 
-                className="text-2xl font-bold mb-1 font-sans text-center"
-                style={{ color: '#59111C' }}
+                className="text-2xl font-bold mb-1 font-sans text-center drop-shadow-lg"
+                style={{ 
+                  color: '#ffffff',
+                  textShadow: '0 2px 4px rgba(0, 0, 0, 0.3)'
+                }}
               >
                 GCU SOCIETIES PORTAL
               </h2>
               <div 
-                className="h-0.5 w-full mb-2"
-                style={{ backgroundColor: '#59111C' }}
+                className="h-0.5 w-full mb-2 rounded-full"
+                style={{ 
+                  background: 'linear-gradient(90deg, rgba(206, 173, 114, 0.8) 0%, rgba(91, 0, 7, 0.8) 50%, rgba(0, 0, 92, 0.8) 100%)',
+                  boxShadow: '0 2px 4px rgba(206, 173, 114, 0.4)'
+                }}
               ></div>
               <p 
-                className="text-sm"
-                style={{ color: '#59111C' }}
+                className="text-sm text-center"
+                style={{ 
+                  color: 'rgba(255, 255, 255, 0.95)',
+                  textShadow: '0 1px 2px rgba(0, 0, 0, 0.2)'
+                }}
               >
                 Sign in to continue
               </p>
@@ -227,20 +274,21 @@ const LoginForm = () => {
               <div className="space-y-2">
                 <div className="relative">
                   <User 
-                    className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5"
-                    style={{ color: '#59111C' }}
+                    className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 z-10"
+                    style={{ color: 'rgba(0, 0, 92, 0.8)' }}
                   />
                   <Input
                     type="text"
-                    placeholder="0012-BS-SP-CS-24"
+                    placeholder="email/username"
                     value={formData.email}
                     onChange={(e) =>
                       setFormData({ ...formData, email: e.target.value })
                     }
-                    className="pl-10 h-12 border-2 rounded-md"
+                    className="pl-10 h-12 border-2 rounded-lg backdrop-blur-sm"
                     style={{ 
-                      borderColor: '#59111C',
-                      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                      borderColor: 'rgba(206, 173, 114, 0.5)',
+                      backgroundColor: 'rgba(255, 255, 255, 0.85)',
+                      boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
                     }}
                     required
                   />
@@ -251,8 +299,8 @@ const LoginForm = () => {
               <div className="space-y-2 relative">
                 <div className="relative">
                   <Lock 
-                    className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5"
-                    style={{ color: '#59111C' }}
+                    className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 z-10"
+                    style={{ color: 'rgba(0, 0, 92, 0.8)' }}
                   />
                   <Input
                     type={showPassword ? "text" : "password"}
@@ -261,18 +309,19 @@ const LoginForm = () => {
                     onChange={(e) =>
                       setFormData({ ...formData, password: e.target.value })
                     }
-                    className="pl-10 pr-10 h-12 border-2 rounded-md"
+                    className="pl-10 pr-10 h-12 border-2 rounded-lg backdrop-blur-sm"
                     style={{ 
-                      borderColor: '#59111C',
-                      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                      borderColor: 'rgba(206, 173, 114, 0.5)',
+                      backgroundColor: 'rgba(255, 255, 255, 0.85)',
+                      boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
                     }}
                     required
                   />
                   <button
                     type="button"
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 z-10 hover:opacity-70 transition-opacity"
                     onClick={() => setShowPassword(!showPassword)}
-                    style={{ color: '#59111C' }}
+                    style={{ color: 'rgba(0, 0, 92, 0.8)' }}
                   >
                     {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
@@ -296,9 +345,11 @@ const LoginForm = () => {
               {/* Login Button */}
               <Button 
                 type="submit" 
-                className="w-full h-12 text-white font-bold text-lg rounded-md shadow-lg hover:shadow-xl transition-all"
+                className="w-full h-12 text-white font-bold text-lg rounded-lg shadow-lg hover:shadow-xl transition-all hover:scale-[1.02]"
                 style={{
-                  background: 'linear-gradient(135deg, #59111C 0%, #1e3a8a 100%)',
+                  background: 'linear-gradient(135deg, rgba(0, 0, 92, 0.9) 0%, rgba(91, 0, 7, 0.9) 50%, rgba(206, 173, 114, 0.8) 100%)',
+                  border: '1px solid rgba(206, 173, 114, 0.3)',
+                  boxShadow: '0 4px 15px rgba(0, 0, 92, 0.4), 0 2px 8px rgba(91, 0, 7, 0.3)',
                 }}
               >
                 LOGIN
@@ -309,19 +360,28 @@ const LoginForm = () => {
             <div className="mt-6 text-center space-y-1">
               <p 
                 className="text-xs"
-                style={{ color: '#59111C' }}
+                style={{ 
+                  color: 'rgba(255, 255, 255, 0.9)',
+                  textShadow: '0 1px 2px rgba(0, 0, 0, 0.2)'
+                }}
               >
                 Note: If login does not work, contact DIT
               </p>
               <p 
                 className="text-xs"
-                style={{ color: '#59111C' }}
+                style={{ 
+                  color: 'rgba(255, 255, 255, 0.9)',
+                  textShadow: '0 1px 2px rgba(0, 0, 0, 0.2)'
+                }}
               >
                 Need help?{' '}
                 <a 
                   href="#" 
-                  className="underline font-semibold hover:opacity-80"
-                  style={{ color: '#1e3a8a' }}
+                  className="underline font-semibold hover:opacity-80 transition-opacity"
+                  style={{ 
+                    color: 'rgba(206, 173, 114, 1)',
+                    textShadow: '0 1px 2px rgba(0, 0, 0, 0.2)'
+                  }}
                 >
                   Login Guide
                 </a>

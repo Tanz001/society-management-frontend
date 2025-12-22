@@ -44,6 +44,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
+import toast from "react-hot-toast";
 import EventRequestForm from "./EventRequestForm";
 import EventRequestsList from "./EventRequestsList";
 import EventReportUpload from "./EventReportUpload";
@@ -72,6 +73,7 @@ const SocietyDashboard = () => {
   const [comments, setComments] = useState<{[key: number]: any[]}>({});
   const [selectedEventForReport, setSelectedEventForReport] = useState<{id: number, title: string} | null>(null);
   const [isReportUploadOpen, setIsReportUploadOpen] = useState(false);
+  const [completingEvent, setCompletingEvent] = useState<number | null>(null);
 
   // Logout function
   const handleLogout = () => {
@@ -93,11 +95,23 @@ const SocietyDashboard = () => {
       setLoadingSociety(true);
       let response;
 
-      // If societyId is in URL (for advisors), fetch by society_id
-      if (societyId) {
-        console.log("Fetching society data for society ID:", societyId);
+      // Priority 1: Use societyId from URL params (for advisors)
+      // Priority 2: Use stored societyId from localStorage
+      // Priority 3: Fetch by user_id (for society owners)
+      let currentSocietyId = societyId;
+      
+      if (!currentSocietyId) {
+        const storedSocietyId = localStorage.getItem("currentSocietyId");
+        if (storedSocietyId) {
+          currentSocietyId = storedSocietyId;
+          console.log("Using stored society ID from localStorage:", currentSocietyId);
+        }
+      }
+
+      if (currentSocietyId) {
+        console.log("Fetching society data for society ID:", currentSocietyId);
         response = await axios.get(
-          `${API_URL}/society/society/data/${societyId}`,
+          `${API_URL}/society/society/data/${currentSocietyId}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -143,8 +157,13 @@ const SocietyDashboard = () => {
         setSocietyInfo(societyData);
         console.log("Society data fetched:", societyData);
         
-        // If we have society data, fetch membership requests and settings using society_id
+        // If we have society data, save it to localStorage for persistence
         if (societyData && societyData.society_id) {
+          // Save society ID to localStorage for persistence across navigation
+          localStorage.setItem("currentSocietyId", societyData.society_id.toString());
+          // Save full society data to localStorage for quick access
+          localStorage.setItem("currentSocietyData", JSON.stringify(societyData));
+          
           fetchMembershipRequests(societyData.society_id);
           // Fetch settings using the society ID from the response
           fetchMembershipSettings(societyData.society_id);
@@ -520,6 +539,19 @@ const SocietyDashboard = () => {
 
   // Fetch data when component loads or when societyId changes
   useEffect(() => {
+    // First, try to load from localStorage for instant display
+    const storedSocietyData = localStorage.getItem("currentSocietyData");
+    if (storedSocietyData) {
+      try {
+        const parsedData = JSON.parse(storedSocietyData);
+        setSocietyInfo(parsedData);
+        console.log("Loaded society data from localStorage:", parsedData);
+        // Still fetch fresh data
+      } catch (e) {
+        console.error("Error parsing stored society data:", e);
+      }
+    }
+    
     // Fetch society data first, which will trigger fetching members and requests
     fetchSocietyData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1584,25 +1616,88 @@ const SocietyDashboard = () => {
                           </div>
                         )}
                       </div>
-                      {/* Complete Event Button - Only show for Active events (status_id = 10) */}
+                      {/* Mark as Complete Button - Only show for Active events (status_id = 10) */}
                       {event.status_id === 10 && event.source_table === 'event_req' && (
                         <Button
                           variant="university"
                           size="sm"
                           className="w-full"
+                          onClick={async () => {
+                            try {
+                              setCompletingEvent(event.id);
+                              const API_URL = import.meta.env.VITE_API_URL;
+                              const token = localStorage.getItem("token");
+                              
+                              if (!token) {
+                                toast.error("Authentication required");
+                                return;
+                              }
+                              
+                              const response = await axios.post(
+                                `${API_URL}/society/event-request/complete`,
+                                { event_req_id: event.id },
+                                {
+                                  headers: {
+                                    Authorization: `Bearer ${token}`,
+                                  },
+                                }
+                              );
+                              
+                              if (response.data.success) {
+                                toast.success("Event marked as completed. Report pending.");
+                                fetchEvents(); // Refresh events list
+                              } else {
+                                toast.error(response.data.message || "Failed to mark event as complete");
+                              }
+                            } catch (error: any) {
+                              console.error("Error marking event as complete:", error);
+                              toast.error(error.response?.data?.message || "Failed to mark event as complete");
+                            } finally {
+                              setCompletingEvent(null);
+                            }
+                          }}
+                          disabled={completingEvent === event.id}
+                        >
+                          {completingEvent === event.id ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Marking...
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle className="h-4 w-4 mr-2" />
+                              Mark as Complete
+                            </>
+                          )}
+                        </Button>
+                      )}
+                      {/* Submit Report Button - Only show for Completed events (status_id = 17) */}
+                      {event.status_id === 17 && event.source_table === 'event_req' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full border-green-500 text-green-700 hover:bg-green-50"
                           onClick={() => {
                             setSelectedEventForReport({ id: event.id, title: event.title });
                             setIsReportUploadOpen(true);
                           }}
                         >
                           <FileText className="h-4 w-4 mr-2" />
-                          Complete Event
+                          Submit Report
                         </Button>
                       )}
+                      {/* Report Submitted - Show for status_id = 11 */}
                       {event.status_id === 11 && (
                         <div className="flex items-center justify-center text-sm text-green-600 bg-green-50 rounded-lg p-2">
                           <CheckCircle className="h-4 w-4 mr-2" />
                           Report Submitted
+                        </div>
+                      )}
+                      {/* Completed with Report Pending - Show for status_id = 17 */}
+                      {event.status_id === 17 && (
+                        <div className="flex items-center justify-center text-sm text-yellow-600 bg-yellow-50 rounded-lg p-2">
+                          <AlertCircle className="h-4 w-4 mr-2" />
+                          Completed - Report Pending
                         </div>
                       )}
                     </Card>

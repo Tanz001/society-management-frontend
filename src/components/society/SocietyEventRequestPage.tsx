@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, ArrowLeft } from "lucide-react";
@@ -12,15 +12,33 @@ interface SocietyInfo {
 }
 
 const SocietyEventRequestPage = () => {
+  const { reqId } = useParams<{ reqId?: string }>();
+  const isEditMode = !!reqId;
   const [societyInfo, setSocietyInfo] = useState<SocietyInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
     const fetchSocietyData = async () => {
+      // First, try to load from localStorage for instant display
+      const storedSocietyData = localStorage.getItem("currentSocietyData");
+      if (storedSocietyData) {
+        try {
+          const parsedData = JSON.parse(storedSocietyData);
+          setSocietyInfo(parsedData);
+          console.log("Loaded society data from localStorage:", parsedData);
+          setLoading(false);
+          // Still fetch fresh data in background
+        } catch (e) {
+          console.error("Error parsing stored society data:", e);
+        }
+      }
+
       const token = localStorage.getItem("token");
       if (!token) {
-        setLoading(false);
+        if (!storedSocietyData) {
+          setLoading(false);
+        }
         return;
       }
 
@@ -44,18 +62,23 @@ const SocietyEventRequestPage = () => {
           // Priority 2: Fetch by user_id (for society owners)
           const storedUser = localStorage.getItem("user");
           if (!storedUser) {
-            setLoading(false);
+            if (!storedSocietyData) {
+              setLoading(false);
+            }
             return;
           }
 
           const userData = JSON.parse(storedUser);
-          const userId = userData.id;
+          const userId = userData.id || userData.faculty_id;
 
           if (!userId) {
-            setLoading(false);
+            if (!storedSocietyData) {
+              setLoading(false);
+            }
             return;
           }
 
+          console.log("Fetching society data for user ID:", userId);
           response = await axios.post(
             `${API_URL}/society/society/data`,
             { user_id: userId },
@@ -78,18 +101,21 @@ const SocietyEventRequestPage = () => {
           
           setSocietyInfo(societyData);
           
-          // Store society ID in localStorage if we got it
+          // Store society ID and full data in localStorage for persistence
           if (societyData && societyData.society_id) {
             localStorage.setItem("currentSocietyId", societyData.society_id.toString());
+            localStorage.setItem("currentSocietyData", JSON.stringify(societyData));
           }
         } else {
           console.error("Failed to fetch society data:", response.data.message);
-          // Still try to set loading to false even if response is not successful
         }
       } catch (error: any) {
         console.error("Error fetching society data for event request page:", error);
         console.error("Error details:", error.response?.data || error.message);
-        // Don't prevent the form from showing if we have stored data
+        // If we have stored data, keep using it even if fetch fails
+        if (!storedSocietyData) {
+          setLoading(false);
+        }
       } finally {
         setLoading(false);
       }
@@ -126,10 +152,12 @@ const SocietyEventRequestPage = () => {
               Back to Dashboard
             </Button>
             <h1 className="text-2xl font-semibold">
-              Create Event Request
+              {isEditMode ? "Edit Event Request" : "Create Event Request"}
             </h1>
             <p className="text-sm text-muted-foreground">
-              Submit a detailed request for your upcoming society event.
+              {isEditMode 
+                ? "Update your event request details. Status will be reset to pending after update."
+                : "Submit a detailed request for your upcoming society event."}
             </p>
           </div>
         </div>
@@ -172,6 +200,7 @@ const SocietyEventRequestPage = () => {
             <EventRequestForm
               societyId={societyInfo.society_id}
               userId={userId || undefined}
+              reqId={reqId ? parseInt(reqId) : undefined}
               onSubmitSuccess={() => {
                 // Get stored society ID and navigate to dashboard with it
                 const storedSocietyId = localStorage.getItem("currentSocietyId");

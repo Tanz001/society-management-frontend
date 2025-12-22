@@ -1,4 +1,4 @@
-import React, { useState, useMemo, memo } from "react";
+import React, { useState, useMemo, memo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -73,6 +73,7 @@ interface EventFullFormProps {
   userId?: number;
   onSubmitSuccess?: () => void;
   showCard?: boolean;
+  reqId?: number; // For edit mode
 }
 
 /* =====================================================================================
@@ -126,7 +127,9 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
   userId,
   onSubmitSuccess,
   showCard = true,
+  reqId,
 }) => {
+  const isEditMode = !!reqId;
   /* ------------------ MAIN FIELDS ------------------ */
   const [main, setMain] = useState({
     event_name: "",
@@ -135,7 +138,7 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
     date_to: "",
     time_from: "",
     time_to: "",
-    venue: "",
+    venue_id: "",
     collaborating_org: "",
     sponsor_name: "",
     sponsor_amount: "",
@@ -143,6 +146,12 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
     coordinator_contact: "",
     media_coverage: "",
   });
+
+  /* ------------------ VENUES & SLOTS ------------------ */
+  const [venues, setVenues] = useState<Array<{ venue_id: number; venue_name: string; capacity?: number; location?: string }>>([]);
+  const [occupiedSlots, setOccupiedSlots] = useState<Array<{ slot_id: number; time_from: string; time_to: string; status_name: string }>>([]);
+  const [loadingVenues, setLoadingVenues] = useState(false);
+  const [loadingSlots, setLoadingSlots] = useState(false);
 
   const genId = () =>
     typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
@@ -182,6 +191,268 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
   });
 
   const [loading, setLoading] = useState(false);
+
+  /* =====================================================================================
+     FETCH VENUES AND OCCUPIED SLOTS
+  ===================================================================================== */
+
+  // Fetch venues on component mount
+  useEffect(() => {
+    const fetchVenues = async () => {
+      setLoadingVenues(true);
+      try {
+        const API_URL = import.meta.env.VITE_API_URL;
+        const token = localStorage.getItem("token");
+        if (!token) {
+          setLoadingVenues(false);
+          return;
+        }
+
+        const response = await axios.get(`${API_URL}/society/venues`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (response.data.success) {
+          setVenues(response.data.data || []);
+        }
+      } catch (error: any) {
+        console.error("Error fetching venues:", error);
+        toast.error("Failed to load venues");
+      } finally {
+        setLoadingVenues(false);
+      }
+    };
+
+    fetchVenues();
+  }, []);
+
+  // Load existing event request data in edit mode
+  useEffect(() => {
+    if (!reqId) return;
+
+    const loadEventRequestData = async () => {
+      setLoading(true);
+      try {
+        const API_URL = import.meta.env.VITE_API_URL;
+        const token = localStorage.getItem("token");
+        if (!token) {
+          toast.error("Authentication required");
+          setLoading(false);
+          return;
+        }
+
+        const response = await axios.get(`${API_URL}/admin/event-requests/${reqId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (response.data.success) {
+          const data = response.data.data;
+          
+          // Populate main fields
+          setMain({
+            event_name: data.event_name || "",
+            event_type: data.event_type || "",
+            date_from: data.date_from ? new Date(data.date_from).toISOString().split('T')[0] : "",
+            date_to: data.date_to ? new Date(data.date_to).toISOString().split('T')[0] : "",
+            time_from: data.time_from || "",
+            time_to: data.time_to || "",
+            venue_id: data.venue_id ? String(data.venue_id) : "",
+            collaborating_org: data.collaborating_org || "",
+            sponsor_name: data.sponsor_name || "",
+            sponsor_amount: data.sponsor_amount || "",
+            coordinator_name: data.coordinator_name || "",
+            coordinator_contact: data.coordinator_contact || "",
+            media_coverage: data.media_coverage || "",
+          });
+
+          // Populate student participants
+          if (data.student_participants && Array.isArray(data.student_participants) && data.student_participants.length > 0) {
+            setStudents(data.student_participants.map((s: any) => ({
+              id: genId(),
+              academic_program: s.academic_program || "",
+              semester: s.semester || "",
+              no_of_students: String(s.no_of_students || ""),
+            })));
+            setIncludeStudents(true);
+          }
+
+          // Populate staff participants
+          if (data.staff_participants && Array.isArray(data.staff_participants) && data.staff_participants.length > 0) {
+            setStaff(data.staff_participants.map((s: any) => ({
+              id: genId(),
+              department: s.department || "",
+              gazetted: s.gazetted || "",
+              no_of_staff: String(s.no_of_staff || ""),
+            })));
+            setIncludeStaff(true);
+          }
+
+          // Populate transport requests
+          if (data.transport_requests && Array.isArray(data.transport_requests) && data.transport_requests.length > 0) {
+            setTransports(data.transport_requests.map((t: any) => ({
+              id: genId(),
+              vehicle_type: t.vehicle_type || "",
+              purpose: t.purpose || "",
+              no_of_persons: String(t.no_of_persons || ""),
+              destination: t.destination || "",
+              date: t.date ? new Date(t.date).toISOString().split('T')[0] : "",
+              time: t.time || "",
+            })));
+          }
+
+          // Populate management requirements
+          if (data.management_requirements) {
+            setManagement({
+              sound_system: data.management_requirements.sound_system || false,
+              recording: data.management_requirements.recording || false,
+              special_arrangements: data.management_requirements.special_arrangements || false,
+              special_arrangements_detail: data.management_requirements.special_arrangements_detail || "",
+              refreshment_required: data.management_requirements.refreshment_required || false,
+              refreshment_category: data.management_requirements.refreshment_category || "",
+              refreshment_persons: data.management_requirements.refreshment_persons || "",
+              bouquet: data.management_requirements.bouquet || false,
+              souvenirs: data.management_requirements.souvenirs || false,
+              university_photographer: data.management_requirements.university_photographer || false,
+              any_other: data.management_requirements.any_other || "",
+            });
+          }
+
+          // Note: Documents are not loaded as they are files - user can re-upload if needed
+        }
+      } catch (error: any) {
+        console.error("Error loading event request data:", error);
+        toast.error(error.response?.data?.message || "Failed to load event request data");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadEventRequestData();
+  }, [reqId]);
+
+  // Fetch occupied slots when venue and date are selected
+  useEffect(() => {
+    const fetchOccupiedSlots = async () => {
+      if (!main.venue_id || !main.date_from) {
+        setOccupiedSlots([]);
+        setTimeSlotError("");
+        return;
+      }
+
+      setLoadingSlots(true);
+      try {
+        const API_URL = import.meta.env.VITE_API_URL;
+        const token = localStorage.getItem("token");
+        if (!token) {
+          setLoadingSlots(false);
+          return;
+        }
+
+        const response = await axios.get(
+          `${API_URL}/society/venues/${main.venue_id}/slots?date=${main.date_from}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (response.data.success) {
+          const slots = response.data.data || [];
+          setOccupiedSlots(slots);
+          
+          // Re-check if current time slot is still occupied after fetching new slots
+          if (main.time_from && main.time_to && slots.length > 0) {
+            // Check overlap directly with new slots
+            const normalizeTime = (time: string) => time ? time.substring(0, 5) : null;
+            const timeToMinutes = (timeStr: string) => {
+              const [hours, minutes] = timeStr.split(':').map(Number);
+              return hours * 60 + minutes;
+            };
+            
+            const normalizedFrom = normalizeTime(main.time_from);
+            const normalizedTo = normalizeTime(main.time_to);
+            
+            if (normalizedFrom && normalizedTo) {
+              const reqStart = timeToMinutes(normalizedFrom);
+              const reqEnd = timeToMinutes(normalizedTo);
+              
+              const hasOverlap = slots.some((slot: any) => {
+                const slotFrom = normalizeTime(slot.time_from);
+                const slotTo = normalizeTime(slot.time_to);
+                if (!slotFrom || !slotTo) return false;
+                const slotStart = timeToMinutes(slotFrom);
+                const slotEnd = timeToMinutes(slotTo);
+                return (reqStart < slotEnd && reqEnd > slotStart);
+              });
+              
+              if (hasOverlap) {
+                setTimeSlotError("This time slot overlaps with an occupied slot. Please choose a different time.");
+              } else {
+                setTimeSlotError("");
+              }
+            }
+          } else if (main.time_from && main.time_to && slots.length === 0) {
+            setTimeSlotError("");
+          }
+        }
+      } catch (error: any) {
+        console.error("Error fetching occupied slots:", error);
+        setOccupiedSlots([]);
+        setTimeSlotError("");
+      } finally {
+        setLoadingSlots(false);
+      }
+    };
+
+    fetchOccupiedSlots();
+  }, [main.venue_id, main.date_from]);
+
+  // Check if a time slot is occupied (with better overlap detection)
+  const isTimeSlotOccupied = (timeFrom: string, timeTo: string) => {
+    if (!timeFrom || !timeTo || occupiedSlots.length === 0) return false;
+    
+    // Normalize time format to HH:MM
+    const normalizeTime = (time: string) => {
+      if (!time) return null;
+      // If time is in HH:MM:SS format, take only HH:MM
+      return time.substring(0, 5);
+    };
+    
+    const normalizedFrom = normalizeTime(timeFrom);
+    const normalizedTo = normalizeTime(timeTo);
+    
+    if (!normalizedFrom || !normalizedTo) return false;
+    
+    return occupiedSlots.some((slot) => {
+      const slotFrom = normalizeTime(slot.time_from);
+      const slotTo = normalizeTime(slot.time_to);
+      
+      if (!slotFrom || !slotTo) return false;
+      
+      // Convert to minutes for easier comparison
+      const timeToMinutes = (timeStr: string) => {
+        const [hours, minutes] = timeStr.split(':').map(Number);
+        return hours * 60 + minutes;
+      };
+      
+      const reqStart = timeToMinutes(normalizedFrom);
+      const reqEnd = timeToMinutes(normalizedTo);
+      const slotStart = timeToMinutes(slotFrom);
+      const slotEnd = timeToMinutes(slotTo);
+      
+      // Check for any overlap: two time ranges overlap if one starts before the other ends
+      // and one ends after the other starts
+      return (reqStart < slotEnd && reqEnd > slotStart);
+    });
+  };
+
+  // State to track if current time slot is occupied
+  const [timeSlotError, setTimeSlotError] = useState<string>("");
   
   // Step management
   const [currentStep, setCurrentStep] = useState(1);
@@ -199,6 +470,9 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
   const nextStep = () => {
     if (currentStep < totalSteps) {
       setCurrentStep(currentStep + 1);
+    } else {
+      // If somehow on last step, don't allow going further
+      console.warn("Already on last step");
     }
   };
   
@@ -222,7 +496,28 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
-    setMain((prev) => ({ ...prev, [name]: value }));
+    setMain((prev) => {
+      const updated = { ...prev, [name]: value };
+      
+      // Check for time slot conflict when time_from or time_to changes
+      if ((name === 'time_from' || name === 'time_to') && updated.venue_id && updated.date_from) {
+        if (updated.time_from && updated.time_to) {
+          if (isTimeSlotOccupied(updated.time_from, updated.time_to)) {
+            setTimeSlotError("This time slot overlaps with an occupied slot. Please choose a different time.");
+          } else {
+            setTimeSlotError("");
+          }
+        } else {
+          setTimeSlotError("");
+        }
+      }
+      
+      return updated;
+    });
+  };
+
+  const handleVenueChange = (venueId: string) => {
+    setMain((prev) => ({ ...prev, venue_id: venueId }));
   };
 
   /* =====================================================================================
@@ -336,8 +631,23 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
       toast.error("Start time is required");
       return false;
     }
-    if (!main.venue.trim()) {
+    if (!main.venue_id) {
       toast.error("Venue is required");
+      return false;
+    }
+
+    // Check if selected time slot is occupied
+    if (main.time_from && main.time_to) {
+      if (isTimeSlotOccupied(main.time_from, main.time_to)) {
+        toast.error("The selected time slot overlaps with an occupied slot. Please choose a different time.");
+        setTimeSlotError("This time slot overlaps with an occupied slot. Please choose a different time.");
+        return false;
+      }
+    }
+    
+    // Also check if time_to is required when time_from is set
+    if (main.time_from && !main.time_to) {
+      toast.error("End time is required when start time is set.");
       return false;
     }
 
@@ -407,6 +717,13 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Prevent submission if not on the last step
+    if (currentStep !== totalSteps) {
+      toast.error("Please complete all steps before submitting");
+      return;
+    }
+    
     if (!validate()) return;
     setLoading(true);
 
@@ -476,56 +793,77 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
       documents.guest_profile.forEach((file) => fd.append("guest_profile", file));
       documents.other.forEach((file) => fd.append("other", file));
 
-      const res = await axios.post(
-        `${import.meta.env.VITE_API_URL}/society/event-request/create`,
-        fd,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
+      let res;
+      if (isEditMode && reqId) {
+        // Update existing event request
+        fd.append("req_id", String(reqId));
+        res = await axios.put(
+          `${import.meta.env.VITE_API_URL}/society/event-request/update`,
+          fd,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "multipart/form-data",
+            },
+          }
+        );
+      } else {
+        // Create new event request
+        res = await axios.post(
+          `${import.meta.env.VITE_API_URL}/society/event-request/create`,
+          fd,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "multipart/form-data",
+            },
+          }
+        );
+      }
 
       if (res.data.success) {
-        toast.success("Event Request Submitted Successfully!");
+        toast.success(isEditMode ? "Event Request Updated Successfully!" : "Event Request Submitted Successfully!");
 
-        // RESET FORM
-        setMain({
-          event_name: "",
-          event_type: "",
-          date_from: "",
-          date_to: "",
-          time_from: "",
-          time_to: "",
-          venue: "",
-          collaborating_org: "",
-          sponsor_name: "",
-          sponsor_amount: "",
-          coordinator_name: "",
-          coordinator_contact: "",
-          media_coverage: "",
-        });
+        // RESET FORM only if not in edit mode
+        if (!isEditMode) {
+          setMain({
+            event_name: "",
+            event_type: "",
+            date_from: "",
+            date_to: "",
+            time_from: "",
+            time_to: "",
+            venue_id: "",
+            collaborating_org: "",
+            sponsor_name: "",
+            sponsor_amount: "",
+            coordinator_name: "",
+            coordinator_contact: "",
+            media_coverage: "",
+          });
+          setOccupiedSlots([]);
+          setTimeSlotError("");
 
-        setStudents([{ ...defaultStudent, id: genId() }]);
-        setStaff([{ ...defaultStaff, id: genId() }]);
-        setTransports([]);
-        setManagement({ ...defaultManagement });
-        setDocuments({
-          brochure: [],
-          script: [],
-          schedule: [],
-          invitation: [],
-          guest_profile: [],
-          other: [],
-        });
-        setIncludeStudents(true);
-        setIncludeStaff(false);
-        setHasGuestSpeaker(false);
+          setStudents([{ ...defaultStudent, id: genId() }]);
+          setStaff([{ ...defaultStaff, id: genId() }]);
+          setTransports([]);
+          setManagement({ ...defaultManagement });
+          setDocuments({
+            brochure: [],
+            script: [],
+            schedule: [],
+            invitation: [],
+            guest_profile: [],
+            other: [],
+          });
+          setIncludeStudents(true);
+          setIncludeStaff(false);
+          setHasGuestSpeaker(false);
+        }
 
         if (onSubmitSuccess) onSubmitSuccess();
       } else {
-        toast.error(res.data.message || "Failed to submit");
+        toast.error(res.data.message || (isEditMode ? "Failed to update" : "Failed to submit"));
       }
     } catch (err: any) {
       console.error(err);
@@ -1264,35 +1602,83 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
                     type="time"
                     value={main.time_from}
                     onChange={handleMainChange}
-                    className="pl-10"
+                    className={`pl-10 ${timeSlotError ? 'border-red-500' : ''}`}
                   />
                 </div>
+                {timeSlotError && main.time_from && main.time_to && (
+                  <p className="text-sm text-red-600 mt-1">{timeSlotError}</p>
+                )}
               </div>
 
               <div>
-                <Label>End Time</Label>
+                <Label>End Time *</Label>
                 <Input
                   name="time_to"
                   type="time"
                   value={main.time_to}
                   onChange={handleMainChange}
+                  min={main.time_from || undefined}
+                  className={timeSlotError ? 'border-red-500' : ''}
                 />
+                {timeSlotError && main.time_from && main.time_to && (
+                  <p className="text-sm text-red-600 mt-1">{timeSlotError}</p>
+                )}
               </div>
             </div>
 
             {/* Venue */}
-            <div>
-              <Label>Venue *</Label>
-              <div className="relative">
-                <MapPin className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  name="venue"
-                  value={main.venue}
-                  onChange={handleMainChange}
-                  className="pl-10"
-                  placeholder="Auditorium, Lab 301, Ground..."
-                />
+            <div className="space-y-3">
+              <div>
+                <Label>Venue *</Label>
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-3 h-4 w-4 text-gray-400 z-10" />
+                  <Select
+                    value={main.venue_id}
+                    onValueChange={handleVenueChange}
+                    disabled={loadingVenues}
+                  >
+                    <SelectTrigger className="pl-10">
+                      <SelectValue placeholder={loadingVenues ? "Loading venues..." : "Select a venue"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {venues.map((venue) => (
+                        <SelectItem key={venue.venue_id} value={String(venue.venue_id)}>
+                          {venue.venue_name}
+                          {venue.capacity && ` (Capacity: ${venue.capacity})`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
+
+              {/* Display occupied slots */}
+              {main.venue_id && main.date_from && (
+                <div className="border rounded p-3 bg-gray-50">
+                  <Label className="text-sm font-semibold mb-2 block">
+                    Occupied slots for {main.date_from}
+                  </Label>
+                  {loadingSlots ? (
+                    <p className="text-sm text-gray-500">Loading slots...</p>
+                  ) : occupiedSlots.length > 0 ? (
+                    <div className="space-y-1">
+                      {occupiedSlots.map((slot) => (
+                        <div
+                          key={slot.slot_id}
+                          className="text-sm p-2 bg-red-50 border border-red-200 rounded"
+                        >
+                          <span className="font-medium">
+                            {slot.time_from.substring(0, 5)} - {slot.time_to ? slot.time_to.substring(0, 5) : "N/A"}
+                          </span>
+                          <span className="ml-2 text-red-600">({slot.status_name})</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-green-600">No occupied slots for this date</p>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Collaborators */}
@@ -1458,7 +1844,28 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
   ===================================================================================== */
 
   const form = (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form 
+      onSubmit={(e) => {
+        e.preventDefault();
+        // Only allow submission on the last step
+        if (currentStep === totalSteps) {
+          handleSubmit(e);
+        } else {
+          toast.error("Please complete all steps before submitting. You are on step " + currentStep + " of " + totalSteps);
+        }
+      }}
+      onKeyDown={(e) => {
+        // Prevent form submission on Enter key unless on last step
+        if (e.key === 'Enter') {
+          if (currentStep !== totalSteps) {
+            e.preventDefault();
+            e.stopPropagation();
+            nextStep();
+          }
+        }
+      }}
+      className="space-y-6"
+    >
       <StepIndicator />
       
       <div className="min-h-[400px]">
@@ -1502,12 +1909,12 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
             {loading ? (
               <>
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                Submitting...
+                {isEditMode ? "Updating..." : "Submitting..."}
               </>
             ) : (
               <>
                 <Send className="h-4 w-4" />
-                Submit Request
+                {isEditMode ? "Update Request" : "Submit Request"}
               </>
             )}
           </Button>

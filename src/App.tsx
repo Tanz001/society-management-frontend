@@ -105,6 +105,12 @@ const App = () => (
             </ProtectedRoute>
           } />
           
+          <Route path="/dashboard/society/event-request/edit/:reqId" element={
+            <ProtectedRoute requireAuth>
+              <SocietyEventRequestPage />
+            </ProtectedRoute>
+          } />
+          
           <Route path="/society/post/create" element={
             <ProtectedRoute requireAuth>
               <CreatePost />

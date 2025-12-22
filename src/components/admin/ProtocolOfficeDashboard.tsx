@@ -2,7 +2,18 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { 
   Calendar, 
   Eye,
@@ -11,18 +22,52 @@ import {
   Clock,
   FileText,
   MapPin,
-  Shield
+  Shield,
+  CheckCircle,
+  XCircle,
+  Lightbulb,
+  Filter,
+  MoreVertical,
+  Pencil,
+  User
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { useToast } from "@/components/ui/use-toast";
 
 const ProtocolOfficeDashboard = () => {
+  const { toast } = useToast();
   const [eventRequests, setEventRequests] = useState([]);
   const [selectedEventRequest, setSelectedEventRequest] = useState(null);
   const [isEventRequestModalOpen, setIsEventRequestModalOpen] = useState(false);
+  const [isSlotStatusModalOpen, setIsSlotStatusModalOpen] = useState(false);
+  const [isSuggestSlotModalOpen, setIsSuggestSlotModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState("");
   const navigate = useNavigate();
+  
+  // Filters
+  const [selectedVenueId, setSelectedVenueId] = useState<string>("all");
+  const [selectedDate, setSelectedDate] = useState<string>("");
+  const [selectedSlotStatus, setSelectedSlotStatus] = useState<string>("all"); // Default: All statuses
+  
+  // Venues list
+  const [venues, setVenues] = useState<Array<{ venue_id: number; venue_name: string }>>([]);
+  const [availableSlots, setAvailableSlots] = useState([]);
+  
+  // Slot status update
+  const [slotStatusNote, setSlotStatusNote] = useState("");
+  const [selectedSlotStatusId, setSelectedSlotStatusId] = useState<string>("2"); // Default: GRANTED
+  
+  // Suggest slot - manual entry
+  const [suggestSlotNote, setSuggestSlotNote] = useState("");
+  const [suggestSlotDate, setSuggestSlotDate] = useState<string>("");
+  const [suggestSlotTimeFrom, setSuggestSlotTimeFrom] = useState<string>("");
+  const [suggestSlotTimeTo, setSuggestSlotTimeTo] = useState<string>("");
+  const [suggestSlotVenueId, setSuggestSlotVenueId] = useState<string>("");
+  
+  // Stats
   const [eventRequestStats, setEventRequestStats] = useState({
     total: 0,
     pending: 0,
@@ -30,26 +75,59 @@ const ProtocolOfficeDashboard = () => {
     rejected: 0
   });
   const [statsLoading, setStatsLoading] = useState(false);
-  const [eventRequestFilter, setEventRequestFilter] = useState<string>("all"); // all, pending, approved, rejected
+  
+  // Suggested slots tab
+  const [suggestedSlots, setSuggestedSlots] = useState([]);
+  const [suggestedSlotsLoading, setSuggestedSlotsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState("requests");
 
-  // Helper functions for event requester details
-  const getRequesterName = (request) => {
+  // Helper function to convert 24h time to AM/PM
+  const formatTimeToAMPM = (time24: string) => {
+    if (!time24) return "";
+    try {
+      const [hours, minutes] = time24.split(":");
+      const hour = parseInt(hours);
+      const ampm = hour >= 12 ? "PM" : "AM";
+      const hour12 = hour % 12 || 12;
+      return `${hour12}:${minutes} ${ampm}`;
+    } catch (e) {
+      return time24;
+    }
+  };
+
+  // Check if advisor can edit the request
+  const canAdvisorEdit = (request: any) => {
+    if (!request) return false;
+    
+    // Check if slot is REJECTED (3) or SUGGESTED (4)
+    const slotRejectedOrSuggested = request.slot_status_id === 3 || request.slot_status_id === 4;
+    
+    // Check if event is rejected by any admin (3, 5, 7, 9, 12, 14)
+    const eventRejected = [3, 5, 7, 9, 12, 14].includes(request.event_status_id);
+    
+    return slotRejectedOrSuggested || eventRejected;
+  };
+
+  // Handle edit request - redirect to edit form
+  const handleEditRequest = (reqId: number) => {
+    // Navigate to event request edit page - advisor can edit when slot is rejected/suggested or event is rejected
+    navigate(`/dashboard/society/event-request/edit/${reqId}`);
+  };
+
+  // Helper functions for advisor (faculty) details
+  const getAdvisorName = (request) => {
     if (!request) return "Not available";
-    const name = `${request.firstName || ""} ${request.lastName || ""}`.trim();
-    if (name) return name;
-    if (request.president_name) return request.president_name;
-    if (request.submitted_by_name) return request.submitted_by_name;
-    return "Not available";
+    return request.advisor_name || "Not available";
   };
 
-  const getRequesterEmail = (request) => {
+  const getAdvisorEmail = (request) => {
     if (!request) return "Not provided";
-    return request.email || request.president_email || request.submitted_by_email || "Not provided";
+    return request.advisor_email || "Not provided";
   };
 
-  const getRequesterRoll = (request) => {
+  const getAdvisorPhone = (request) => {
     if (!request) return null;
-    return request.rollNo || request.RollNO || request.student_rollno || request.submitted_by_rollno || null;
+    return request.advisor_phone || null;
   };
 
   // Get status badge variant
@@ -60,38 +138,89 @@ const ProtocolOfficeDashboard = () => {
     return "outline";
   };
 
-  // Fetch all event requests (read-only view)
-  const fetchAllEventRequests = async () => {
+  // Fetch venues
+  const fetchVenues = async () => {
     try {
-       const API_URL = import.meta.env.VITE_API_URL;
+      const API_URL = import.meta.env.VITE_API_URL;
+      const token = localStorage.getItem("token");
+      if (!token) return;
+
+      const response = await axios.get(`${API_URL}/society/venues`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.data.success) {
+        setVenues(response.data.data || []);
+      }
+    } catch (err) {
+      console.error("Error fetching venues:", err);
+    }
+  };
+
+  // Fetch protocol event requests with filters
+  const fetchProtocolEventRequests = async () => {
+    try {
+      const API_URL = import.meta.env.VITE_API_URL;
       setLoading(true);
       setError("");
-  
+
       const token = localStorage.getItem("token");
       if (!token) {
         throw new Error("No authentication token found");
       }
-  
-      const response = await axios.post(
-        `${API_URL}/admin/event-requests`,
-        { 
-          role: "protocol_office_view", // Special role for read-only view
-          filter: eventRequestFilter
-        },
+
+    const params: any = {};
+    if (selectedVenueId && selectedVenueId !== "all") params.venue_id = selectedVenueId;
+    if (selectedDate) params.date = selectedDate;
+    // Only send status_id if not "all" - don't send status_id at all to get all statuses
+    if (selectedSlotStatus && selectedSlotStatus !== "all") {
+      params.status_id = selectedSlotStatus;
+    }
+    // If "all" is selected, don't send status_id parameter at all
+
+      const response = await axios.get(
+        `${API_URL}/admin/protocol/event-requests`,
         {
+          params,
           headers: {
             Authorization: `Bearer ${token}`,
           },
         }
       );
-  
-      console.log("Event requests fetched:", response.data);
-      setEventRequests(response.data.data || []);
-    } catch (err) {
-      console.error("Error fetching event requests:", err);
+
+      if (response.data.success) {
+        setEventRequests(response.data.data || []);
+      }
+    } catch (err: any) {
+      console.error("Error fetching protocol event requests:", err);
       setError(err.response?.data?.message || err.message || "Failed to fetch event requests");
+      toast({
+        title: "Error",
+        description: err.response?.data?.message || "Failed to fetch event requests",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Fetch available slots for suggesting
+  const fetchAvailableSlots = async (venueId: number, date: string) => {
+    try {
+      const API_URL = import.meta.env.VITE_API_URL;
+      const token = localStorage.getItem("token");
+      if (!token) return;
+
+      const response = await axios.get(`${API_URL}/admin/protocol/slots/available`, {
+        params: { venue_id: venueId, date },
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.data.success) {
+        setAvailableSlots(response.data.data || []);
+      }
+    } catch (err) {
+      console.error("Error fetching available slots:", err);
     }
   };
 
@@ -126,9 +255,10 @@ const ProtocolOfficeDashboard = () => {
         throw new Error("No authentication token found");
       }
 
-      const response = await axios.get(`${API_URL}/admin/event-requests/stats`, {
-        headers: { Authorization: `Bearer ${token}` },
-        params: { role: "protocol_office_view" }
+      const response = await axios.post(`${API_URL}/admin/event-requests/stats`, {
+        role: "protocol_office_view"
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
       });
 
       setEventRequestStats(response.data.data || { total: 0, pending: 0, approved: 0, rejected: 0 });
@@ -139,10 +269,204 @@ const ProtocolOfficeDashboard = () => {
     }
   };
 
+  // Handle slot status update
+  const handleUpdateSlotStatus = async () => {
+    if (!selectedEventRequest) return;
+
+    try {
+      setActionLoading(true);
+      const API_URL = import.meta.env.VITE_API_URL;
+      const token = localStorage.getItem("token");
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      const changed_by = user.faculty_id || user.id;
+
+      if (!changed_by) {
+        toast({
+          title: "Error",
+          description: "User information not found",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const response = await axios.put(
+        `${API_URL}/admin/protocol/slots/${selectedEventRequest.slot_id}/status`,
+        {
+          status_id: parseInt(selectedSlotStatusId),
+          note: slotStatusNote,
+          changed_by,
+          event_req_id: selectedEventRequest.req_id,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (response.data.success) {
+        // If slot is GRANTED (status_id = 2), forward event request to Board Secretary (status_id = 1)
+        if (parseInt(selectedSlotStatusId) === 2) {
+          try {
+            await axios.put(
+              `${API_URL}/admin/board-secretary/event-requests/${selectedEventRequest.req_id}/review`,
+              {
+                action: "approve",
+                note: "Slot granted by Protocol Office. Forwarding to Board Secretary.",
+                changed_by,
+              },
+              {
+                headers: { Authorization: `Bearer ${token}` },
+              }
+            );
+            toast({
+              title: "Success",
+              description: "Slot granted and event request forwarded to Board Secretary",
+            });
+          } catch (err: any) {
+            console.error("Error forwarding to Board Secretary:", err);
+            toast({
+              title: "Warning",
+              description: "Slot granted but failed to forward to Board Secretary. Please check manually.",
+              variant: "destructive",
+            });
+          }
+        } else {
+          toast({
+            title: "Success",
+            description: "Slot status updated successfully",
+          });
+        }
+        setIsSlotStatusModalOpen(false);
+        setSlotStatusNote("");
+        fetchProtocolEventRequests();
+      }
+    } catch (err: any) {
+      console.error("Error updating slot status:", err);
+      toast({
+        title: "Error",
+        description: err.response?.data?.message || "Failed to update slot status",
+        variant: "destructive",
+      });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Handle suggest slot - manual entry
+  const handleSuggestSlot = async () => {
+    if (!selectedEventRequest || !suggestSlotDate || !suggestSlotTimeFrom || !suggestSlotTimeTo || !suggestSlotVenueId) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields (Date, Time From, Time To, and Venue)",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      const API_URL = import.meta.env.VITE_API_URL;
+      const token = localStorage.getItem("token");
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      const suggested_by = user.faculty_id || user.id;
+
+      if (!suggested_by) {
+        toast({
+          title: "Error",
+          description: "User information not found",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const response = await axios.post(
+        `${API_URL}/admin/protocol/slots/suggest`,
+        {
+          slot_request_id: selectedEventRequest.slot_request_id,
+          venue_id: parseInt(suggestSlotVenueId),
+          slot_date: suggestSlotDate,
+          slot_time_from: suggestSlotTimeFrom,
+          slot_time_to: suggestSlotTimeTo,
+          suggested_by,
+          note: suggestSlotNote,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (response.data.success) {
+        toast({
+          title: "Success",
+          description: "Slot suggestion created successfully",
+        });
+        setIsSuggestSlotModalOpen(false);
+        setSuggestSlotNote("");
+        setSuggestSlotDate("");
+        setSuggestSlotTimeFrom("");
+        setSuggestSlotTimeTo("");
+        setSuggestSlotVenueId("");
+        fetchProtocolEventRequests();
+        fetchSuggestedSlots();
+      }
+    } catch (err: any) {
+      console.error("Error suggesting slot:", err);
+      toast({
+        title: "Error",
+        description: err.response?.data?.message || "Failed to suggest slot",
+        variant: "destructive",
+      });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Fetch suggested slots
+  const fetchSuggestedSlots = async () => {
+    try {
+      setSuggestedSlotsLoading(true);
+      const API_URL = import.meta.env.VITE_API_URL;
+      const token = localStorage.getItem("token");
+      if (!token) return;
+
+      const response = await axios.get(`${API_URL}/admin/protocol/slots/suggested`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.data.success) {
+        setSuggestedSlots(response.data.data || []);
+      }
+    } catch (err) {
+      console.error("Error fetching suggested slots:", err);
+    } finally {
+      setSuggestedSlotsLoading(false);
+    }
+  };
+
+  // Open slot status modal
+  const handleOpenSlotStatusModal = (request: any) => {
+    setSelectedEventRequest(request);
+    setSelectedSlotStatusId("2"); // Default to GRANTED
+    setSlotStatusNote("");
+    setIsSlotStatusModalOpen(true);
+  };
+
+  // Open suggest slot modal
+  const handleOpenSuggestSlotModal = async (request: any) => {
+    setSelectedEventRequest(request);
+    setSuggestSlotNote("");
+    setSuggestSlotDate(request.slot_date ? new Date(request.slot_date).toISOString().split('T')[0] : "");
+    setSuggestSlotTimeFrom(request.slot_time_from || "");
+    setSuggestSlotTimeTo(request.slot_time_to || "");
+    setSuggestSlotVenueId(request.venue_id ? String(request.venue_id) : "");
+    setIsSuggestSlotModalOpen(true);
+  };
+
   useEffect(() => {
-    fetchAllEventRequests();
+    fetchVenues();
+    fetchProtocolEventRequests();
     fetchEventRequestStats();
-  }, [eventRequestFilter]);
+    fetchSuggestedSlots();
+  }, [selectedVenueId, selectedDate, selectedSlotStatus]);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -246,70 +570,102 @@ const ProtocolOfficeDashboard = () => {
             </div>
           </Card> */}
 
-          {/* Actions */}
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-semibold text-university-navy">All Event Requests</h2>
-            <Button 
-              variant="outline" 
-              onClick={fetchAllEventRequests}
-              disabled={loading}
-            >
-              {loading ? "Loading..." : "Refresh"}
-            </Button>
-          </div>
+          {/* Filters Section */}
+          <Card className="p-4 mb-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Filter className="h-5 w-5 text-university-navy" />
+              <h3 className="text-lg font-semibold text-university-navy">Filters</h3>
+            </div>
+            <div className="grid md:grid-cols-4 gap-4">
+              <div>
+                <Label>Venue</Label>
+                <Select value={selectedVenueId} onValueChange={setSelectedVenueId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Venues" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Venues</SelectItem>
+                    {venues.map((venue) => (
+                      <SelectItem key={venue.venue_id} value={String(venue.venue_id)}>
+                        {venue.venue_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Date</Label>
+                <Input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  placeholder="Select date"
+                />
+              </div>
+              <div>
+                <Label>Slot Status</Label>
+                <Select value={selectedSlotStatus} onValueChange={setSelectedSlotStatus}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="1">REQUESTED</SelectItem>
+                    <SelectItem value="2">GRANTED</SelectItem>
+                    <SelectItem value="3">REJECTED</SelectItem>
+                    <SelectItem value="4">SUGGESTED</SelectItem>
+                    <SelectItem value="5">CANCELLED</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-end">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSelectedVenueId("all");
+                    setSelectedDate("");
+                    setSelectedSlotStatus("all");
+                  }}
+                  className="w-full"
+                >
+                  Clear Filters
+                </Button>
+              </div>
+            </div>
+          </Card>
 
-          {/* Filter Buttons */}
-          <div className="flex gap-2 mb-6">
-            <Button
-              variant={eventRequestFilter === "all" ? "university" : "outline"}
-              size="sm"
-              onClick={() => {
-                setEventRequestFilter("all");
-                fetchAllEventRequests();
-              }}
-            >
-              All
-            </Button>
-            <Button
-              variant={eventRequestFilter === "pending" ? "university" : "outline"}
-              size="sm"
-              onClick={() => {
-                setEventRequestFilter("pending");
-                fetchAllEventRequests();
-              }}
-            >
-              Pending
-            </Button>
-            <Button
-              variant={eventRequestFilter === "approved" ? "university" : "outline"}
-              size="sm"
-              onClick={() => {
-                setEventRequestFilter("approved");
-                fetchAllEventRequests();
-              }}
-            >
-              Approved
-            </Button>
-            <Button
-              variant={eventRequestFilter === "rejected" ? "university" : "outline"}
-              size="sm"
-              onClick={() => {
-                setEventRequestFilter("rejected");
-                fetchAllEventRequests();
-              }}
-            >
-              Rejected
-            </Button>
-          </div>
+          {/* Tabs for Requests and Suggested Slots */}
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <TabsList>
+                <TabsTrigger value="requests">Slot Requests</TabsTrigger>
+                <TabsTrigger value="suggested">Suggested Slots</TabsTrigger>
+              </TabsList>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  if (activeTab === "requests") {
+                    fetchProtocolEventRequests();
+                  } else {
+                    fetchSuggestedSlots();
+                  }
+                }}
+                disabled={loading || suggestedSlotsLoading}
+              >
+                {loading || suggestedSlotsLoading ? "Loading..." : "Refresh"}
+              </Button>
+            </div>
 
-          {/* Error Display */}
-          {error && (
-            <Card className="p-4 border-red-200 bg-red-50 mb-6">
-              <p className="text-red-600">Error: {error}</p>
-            </Card>
-          )}
+            {/* Error Display */}
+            {error && (
+              <Card className="p-4 border-red-200 bg-red-50 mb-6">
+                <p className="text-red-600">Error: {error}</p>
+              </Card>
+            )}
 
-          {/* Event Requests List */}
+            {/* Event Requests Tab */}
+            <TabsContent value="requests" className="space-y-4">
+              {/* Event Requests List */}
           {loading && eventRequests.length === 0 ? (
             <div className="text-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-university-navy mx-auto mb-4"></div>
@@ -322,25 +678,56 @@ const ProtocolOfficeDashboard = () => {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center mb-2 flex-wrap gap-2">
-                        <h3 className="text-lg font-semibold text-university-navy">{request.title}</h3>
-                        {request.status_name && (
-                          <Badge variant={getStatusVariant(request.status_id)}>
-                            {request.status_name}
+                        <h3 className="text-lg font-semibold text-university-navy">
+                          {request.event_name || request.title || "Event Request"}
+                        </h3>
+                        {request.slot_status_name && (
+                          <Badge variant={getStatusVariant(request.slot_status_id)}>
+                            Slot: {request.slot_status_name}
+                          </Badge>
+                        )}
+                        {request.event_status_id && (
+                          <Badge variant={getStatusVariant(request.event_status_id)}>
+                            Event: {request.status_name || "Pending"}
                           </Badge>
                         )}
                         {request.society_name && (
                           <Badge variant="outline">{request.society_name}</Badge>
                         )}
                       </div>
-                      <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                        {request.description}
-                      </p>
+                      {request.event_type && (
+                        <p className="text-sm text-muted-foreground mb-2">
+                          Type: {request.event_type}
+                        </p>
+                      )}
                       <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mb-2">
-                        <span>📅 {new Date(request.event_date).toLocaleDateString()}</span>
-                        <span>🕐 {request.event_time}</span>
-                        <span>📍 {request.venue}</span>
-                        {request.firstName && request.lastName && (
-                          <span>👤 {request.firstName} {request.lastName}</span>
+                        {request.date_from && (
+                          <span className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            {new Date(request.date_from).toLocaleDateString()}
+                            {request.date_to && request.date_to !== request.date_from && (
+                              <> - {new Date(request.date_to).toLocaleDateString()}</>
+                            )}
+                          </span>
+                        )}
+                        {request.time_from && (
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {formatTimeToAMPM(request.time_from)}
+                            {request.time_to && <> - {formatTimeToAMPM(request.time_to)}</>}
+                          </span>
+                        )}
+                        {request.venue_name && (
+                          <span className="flex items-center gap-1">
+                            <MapPin className="h-3 w-3" />
+                            {request.venue_name}
+                          </span>
+                        )}
+                        {request.advisor_name && (
+                          <span className="flex items-center gap-1">
+                            👤 Advisor: {request.advisor_name}
+                            {request.advisor_email && <> ({request.advisor_email})</>}
+                          </span>
                         )}
                       </div>
                       {request.note && (
@@ -354,16 +741,50 @@ const ProtocolOfficeDashboard = () => {
                         Created: {new Date(request.created_at).toLocaleString()}
                       </div>
                     </div>
-                    <div className="flex flex-col space-y-2 ml-4">
-                      <Button 
-                        size="sm" 
-                        variant="university"
-                        onClick={() => handleViewEventRequest(request.req_id)}
-                        disabled={loading}
-                      >
-                        <Eye className="h-3 w-3 mr-1" />
-                        View Details
-                      </Button>
+                    <div className="flex items-start gap-2 ml-4">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem 
+                            onClick={() => handleViewEventRequest(request.req_id)}
+                            disabled={loading}
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            View Details
+                          </DropdownMenuItem>
+                          {canAdvisorEdit(request) && (
+                            <DropdownMenuItem 
+                              onClick={() => handleEditRequest(request.req_id)}
+                              disabled={loading}
+                            >
+                              <Pencil className="h-4 w-4 mr-2" />
+                              Edit Request
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem 
+                            onClick={() => handleOpenSlotStatusModal(request)}
+                            disabled={loading}
+                          >
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                            Update Status
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => handleOpenSuggestSlotModal(request)}
+                            disabled={loading}
+                          >
+                            <Lightbulb className="h-4 w-4 mr-2" />
+                            Suggest Slot
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </div>
                 </Card>
@@ -378,6 +799,77 @@ const ProtocolOfficeDashboard = () => {
               </p>
             </div>
           )}
+            </TabsContent>
+
+            {/* Suggested Slots Tab */}
+            <TabsContent value="suggested" className="space-y-4">
+              {suggestedSlotsLoading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-university-navy mx-auto mb-4"></div>
+                  <p className="text-muted-foreground">Loading suggested slots...</p>
+                </div>
+              ) : suggestedSlots.length > 0 ? (
+                <div className="grid gap-4">
+                  {suggestedSlots.map((slot: any) => (
+                    <Card key={slot.suggested_slot_id || slot.id} className="p-4 shadow-card">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center mb-2 flex-wrap gap-2">
+                            <h3 className="text-lg font-semibold text-university-navy">
+                              {slot.event_name || "Event"}
+                            </h3>
+                            {slot.society_name && (
+                              <Badge variant="outline">{slot.society_name}</Badge>
+                            )}
+                            {slot.slot_status_name && (
+                              <Badge variant={getStatusVariant(slot.slot_status_id)}>
+                                {slot.slot_status_name}
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mb-2">
+                            {slot.venue_name && (
+                              <span className="flex items-center gap-1">
+                                <MapPin className="h-3 w-3" />
+                                {slot.venue_name}
+                              </span>
+                            )}
+                            {slot.slot_date && (
+                              <span className="flex items-center gap-1">
+                                <Calendar className="h-3 w-3" />
+                                {new Date(slot.slot_date).toLocaleDateString()}
+                              </span>
+                            )}
+                            {slot.slot_time_from && (
+                              <span className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {formatTimeToAMPM(slot.slot_time_from)}
+                                {slot.slot_time_to && <> - {formatTimeToAMPM(slot.slot_time_to)}</>}
+                              </span>
+                            )}
+                          </div>
+                          {slot.note && (
+                            <div className="bg-blue-50 border-l-4 border-blue-200 p-2 mt-2 rounded">
+                              <p className="text-xs font-medium text-blue-900 mb-1">Note:</p>
+                              <p className="text-xs text-blue-800">{slot.note}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <Lightbulb className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <h3 className="text-lg font-medium mb-2">No Suggested Slots Found</h3>
+                  <p className="text-muted-foreground">
+                    No slot suggestions have been made yet.
+                  </p>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
         </div>
       </section>
 
@@ -401,30 +893,51 @@ const ProtocolOfficeDashboard = () => {
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center mb-2 flex-wrap gap-2">
-                      <Badge variant="secondary" className="bg-white/20 text-white">
-                        {selectedEventRequest.status_name}
-                      </Badge>
+                      {selectedEventRequest.slot_status_name && (
+                        <Badge variant="secondary" className="bg-white/20 text-white">
+                          Slot: {selectedEventRequest.slot_status_name}
+                        </Badge>
+                      )}
+                      {selectedEventRequest.status_name && (
+                        <Badge variant="secondary" className="bg-white/20 text-white">
+                          Event: {selectedEventRequest.status_name}
+                        </Badge>
+                      )}
                       {selectedEventRequest.society_name && (
                         <Badge variant="outline" className="text-white border-white">
                           {selectedEventRequest.society_name}
                         </Badge>
                       )}
                     </div>
-                    <h2 className="text-2xl font-bold mb-2">{selectedEventRequest.title}</h2>
-                    <p className="text-white/90 mb-4">{selectedEventRequest.description}</p>
+                    <h2 className="text-2xl font-bold mb-2">
+                      {selectedEventRequest.event_name || selectedEventRequest.title || "Event Request"}
+                    </h2>
+                    {selectedEventRequest.description && (
+                      <p className="text-white/90 mb-4">{selectedEventRequest.description}</p>
+                    )}
                     <div className="flex items-center flex-wrap gap-4 text-sm">
-                      <div className="flex items-center space-x-1">
-                        <Calendar className="h-4 w-4" />
-                        <span>{new Date(selectedEventRequest.event_date).toLocaleDateString()}</span>
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        <Clock className="h-4 w-4" />
-                        <span>{selectedEventRequest.event_time}</span>
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        <MapPin className="h-4 w-4" />
-                        <span>{selectedEventRequest.venue}</span>
-                      </div>
+                      {selectedEventRequest.date_from && (
+                        <div className="flex items-center space-x-1">
+                          <Calendar className="h-4 w-4" />
+                          <span>{new Date(selectedEventRequest.date_from).toLocaleDateString()}</span>
+                          {selectedEventRequest.date_to && selectedEventRequest.date_to !== selectedEventRequest.date_from && (
+                            <> - {new Date(selectedEventRequest.date_to).toLocaleDateString()}</>
+                          )}
+                        </div>
+                      )}
+                      {selectedEventRequest.time_from && (
+                        <div className="flex items-center space-x-1">
+                          <Clock className="h-4 w-4" />
+                          <span>{formatTimeToAMPM(selectedEventRequest.time_from)}</span>
+                          {selectedEventRequest.time_to && <> - {formatTimeToAMPM(selectedEventRequest.time_to)}</>}
+                        </div>
+                      )}
+                      {selectedEventRequest.venue_name && (
+                        <div className="flex items-center space-x-1">
+                          <MapPin className="h-4 w-4" />
+                          <span>{selectedEventRequest.venue_name}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -461,34 +974,28 @@ const ProtocolOfficeDashboard = () => {
                     )}
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Time From:</span>
-                      <span className="font-medium">{selectedEventRequest.time_from || selectedEventRequest.event_time || "Not specified"}</span>
+                      <span className="font-medium">
+                        {selectedEventRequest.time_from 
+                          ? formatTimeToAMPM(selectedEventRequest.time_from)
+                          : selectedEventRequest.event_time 
+                          ? formatTimeToAMPM(selectedEventRequest.event_time)
+                          : "Not specified"}
+                      </span>
                     </div>
                     {selectedEventRequest.time_to && (
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Time To:</span>
-                        <span className="font-medium">{selectedEventRequest.time_to}</span>
+                        <span className="font-medium">{formatTimeToAMPM(selectedEventRequest.time_to)}</span>
                       </div>
                     )}
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Venue:</span>
-                      <span className="font-medium">{selectedEventRequest.venue || "Not specified"}</span>
+                      <span className="font-medium">{selectedEventRequest.venue_name || selectedEventRequest.venue || "Not specified"}</span>
                     </div>
                     {selectedEventRequest.collaborating_org && (
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Collaborating Org:</span>
                         <span className="font-medium">{selectedEventRequest.collaborating_org}</span>
-                      </div>
-                    )}
-                    {selectedEventRequest.sponsor_name && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Sponsor:</span>
-                        <span className="font-medium">{selectedEventRequest.sponsor_name}</span>
-                      </div>
-                    )}
-                    {selectedEventRequest.sponsor_amount && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Sponsor Amount:</span>
-                        <span className="font-medium">{selectedEventRequest.sponsor_amount}</span>
                       </div>
                     )}
                     {selectedEventRequest.coordinator_name && (
@@ -516,33 +1023,118 @@ const ProtocolOfficeDashboard = () => {
                   </div>
                 </Card>
 
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-3 text-university-navy">Submitted By</h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Name:</span>
-                      <span className="font-medium">
-                        {getRequesterName(selectedEventRequest)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Email:</span>
-                      <span className="font-medium">{getRequesterEmail(selectedEventRequest)}</span>
-                    </div>
-                    {getRequesterRoll(selectedEventRequest) && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Roll No:</span>
-                        <span className="font-medium">{getRequesterRoll(selectedEventRequest)}</span>
+                {/* Advisor Information Box */}
+                <Card className="p-4 border-l-4 border-l-blue-500">
+                  <h3 className="font-semibold mb-3 text-university-navy flex items-center gap-2">
+                    <User className="h-5 w-5" />
+                    Advisor Information
+                  </h3>
+                  <div className="space-y-3 text-sm">
+                    {selectedEventRequest.society_name && (
+                      <div className="pb-3 border-b">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground font-medium">Society Name:</span>
+                          <span className="font-semibold text-university-navy">{selectedEventRequest.society_name}</span>
+                        </div>
                       </div>
                     )}
-                    {selectedEventRequest.society_name && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Society:</span>
-                        <span className="font-medium">{selectedEventRequest.society_name}</span>
-                      </div>
+                    {selectedEventRequest.advisor_name || getAdvisorName(selectedEventRequest) ? (
+                      <>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Advisor Name:</span>
+                          <span className="font-medium">
+                            {selectedEventRequest.advisor_name || getAdvisorName(selectedEventRequest)}
+                          </span>
+                        </div>
+                        {(selectedEventRequest.advisor_email || getAdvisorEmail(selectedEventRequest)) && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Advisor Email:</span>
+                            <span className="font-medium">
+                              {selectedEventRequest.advisor_email || getAdvisorEmail(selectedEventRequest)}
+                            </span>
+                          </div>
+                        )}
+                        {(selectedEventRequest.advisor_phone || getAdvisorPhone(selectedEventRequest)) && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Advisor Phone:</span>
+                            <span className="font-medium">
+                              {selectedEventRequest.advisor_phone || getAdvisorPhone(selectedEventRequest)}
+                            </span>
+                          </div>
+                        )}
+                        {selectedEventRequest.advisor_faculty_id && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Faculty ID:</span>
+                            <span className="font-medium">{selectedEventRequest.advisor_faculty_id}</span>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-muted-foreground italic">Advisor information not available</p>
                     )}
                   </div>
                 </Card>
+
+                {/* Sponsor Information Box */}
+                {(selectedEventRequest.sponsor_name || selectedEventRequest.sponsor_amount) && (
+                  <Card className="p-4 border-l-4 border-l-green-500">
+                    <h3 className="font-semibold mb-3 text-university-navy flex items-center gap-2">
+                      <FileText className="h-5 w-5" />
+                      Sponsor Information
+                    </h3>
+                    <div className="space-y-2 text-sm">
+                      {selectedEventRequest.sponsor_name && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Sponsor Name:</span>
+                          <span className="font-medium">{selectedEventRequest.sponsor_name}</span>
+                        </div>
+                      )}
+                      {selectedEventRequest.sponsor_amount && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Sponsor Amount:</span>
+                          <span className="font-medium text-green-600">
+                            {typeof selectedEventRequest.sponsor_amount === 'string' && selectedEventRequest.sponsor_amount.startsWith('$')
+                              ? selectedEventRequest.sponsor_amount
+                              : `$${selectedEventRequest.sponsor_amount}`}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </Card>
+                )}
+
+                {/* Slot Status Information */}
+                {selectedEventRequest.slot_status_name && (
+                  <Card className="p-4">
+                    <h3 className="font-semibold mb-3 text-university-navy">Slot Status</h3>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Current Slot Status:</span>
+                        <Badge variant={getStatusVariant(selectedEventRequest.slot_status_id)}>
+                          {selectedEventRequest.slot_status_name}
+                        </Badge>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Slot Date:</span>
+                        <span className="font-medium">
+                          {selectedEventRequest.slot_date 
+                            ? new Date(selectedEventRequest.slot_date).toLocaleDateString()
+                            : "Not specified"}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Slot Time:</span>
+                        <span className="font-medium">
+                          {selectedEventRequest.slot_time_from 
+                            ? formatTimeToAMPM(selectedEventRequest.slot_time_from)
+                            : ""} - {selectedEventRequest.slot_time_to 
+                            ? formatTimeToAMPM(selectedEventRequest.slot_time_to)
+                            : ""}
+                        </span>
+                      </div>
+                    </div>
+                  </Card>
+                )}
               </div>
 
               {/* Description / Media Coverage */}
@@ -818,6 +1410,164 @@ const ProtocolOfficeDashboard = () => {
               <div className="flex justify-end space-x-3 pt-4 border-t">
                 <Button variant="outline" onClick={() => setIsEventRequestModalOpen(false)}>
                   Close
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Slot Status Update Modal */}
+      <Dialog open={isSlotStatusModalOpen} onOpenChange={setIsSlotStatusModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update Slot Status</DialogTitle>
+            <DialogDescription>
+              Update the slot status for {selectedEventRequest?.event_name}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedEventRequest && (
+            <div className="space-y-4">
+              <div>
+                <Label>Current Slot</Label>
+                <p className="text-sm text-muted-foreground">
+                  {selectedEventRequest.slot_time_from 
+                    ? formatTimeToAMPM(selectedEventRequest.slot_time_from)
+                    : ""} - {selectedEventRequest.slot_time_to 
+                    ? formatTimeToAMPM(selectedEventRequest.slot_time_to)
+                    : ""} on {selectedEventRequest.slot_date 
+                    ? new Date(selectedEventRequest.slot_date).toLocaleDateString()
+                    : ""}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Status: <Badge>{selectedEventRequest.slot_status_name}</Badge>
+                </p>
+              </div>
+              <div>
+                <Label>New Status *</Label>
+                <Select value={selectedSlotStatusId} onValueChange={setSelectedSlotStatusId}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">REQUESTED</SelectItem>
+                    <SelectItem value="2">GRANTED</SelectItem>
+                    <SelectItem value="3">REJECTED</SelectItem>
+                    <SelectItem value="4">SUGGESTED</SelectItem>
+                    <SelectItem value="5">CANCELLED</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Note: If status is GRANTED, the event request will be forwarded to Board Secretary.
+                </p>
+              </div>
+              <div>
+                <Label>Note</Label>
+                <Textarea
+                  value={slotStatusNote}
+                  onChange={(e) => setSlotStatusNote(e.target.value)}
+                  placeholder="Add a note about this status change..."
+                  rows={3}
+                />
+              </div>
+              <div className="flex justify-end space-x-3 pt-4 border-t">
+                <Button variant="outline" onClick={() => setIsSlotStatusModalOpen(false)} disabled={actionLoading}>
+                  Cancel
+                </Button>
+                <Button onClick={handleUpdateSlotStatus} disabled={actionLoading}>
+                  {actionLoading ? "Updating..." : "Update Status"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Suggest Slot Modal */}
+      <Dialog open={isSuggestSlotModalOpen} onOpenChange={setIsSuggestSlotModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Suggest Alternative Slot</DialogTitle>
+            <DialogDescription>
+              Suggest an alternative slot for {selectedEventRequest?.event_name}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedEventRequest && (
+            <div className="space-y-4">
+              <div>
+                <Label>Original Slot</Label>
+                <p className="text-sm text-muted-foreground">
+                  {selectedEventRequest.slot_time_from 
+                    ? formatTimeToAMPM(selectedEventRequest.slot_time_from)
+                    : ""} - {selectedEventRequest.slot_time_to 
+                    ? formatTimeToAMPM(selectedEventRequest.slot_time_to)
+                    : ""} on {selectedEventRequest.slot_date 
+                    ? new Date(selectedEventRequest.slot_date).toLocaleDateString()
+                    : ""}
+                </p>
+              </div>
+              <div>
+                <Label>Venue *</Label>
+                <Select value={suggestSlotVenueId} onValueChange={setSuggestSlotVenueId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a venue" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {venues.map((venue) => (
+                      <SelectItem key={venue.venue_id} value={String(venue.venue_id)}>
+                        {venue.venue_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Slot Date *</Label>
+                <Input
+                  type="date"
+                  value={suggestSlotDate}
+                  onChange={(e) => setSuggestSlotDate(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Time From *</Label>
+                  <Input
+                    type="time"
+                    value={suggestSlotTimeFrom}
+                    onChange={(e) => setSuggestSlotTimeFrom(e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label>Time To *</Label>
+                  <Input
+                    type="time"
+                    value={suggestSlotTimeTo}
+                    onChange={(e) => setSuggestSlotTimeTo(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+              <div>
+                <Label>Note</Label>
+                <Textarea
+                  value={suggestSlotNote}
+                  onChange={(e) => setSuggestSlotNote(e.target.value)}
+                  placeholder="Add a note about this suggestion..."
+                  rows={3}
+                />
+              </div>
+              <div className="flex justify-end space-x-3 pt-4 border-t">
+                <Button variant="outline" onClick={() => setIsSuggestSlotModalOpen(false)} disabled={actionLoading}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleSuggestSlot} 
+                  disabled={actionLoading || !suggestSlotDate || !suggestSlotTimeFrom || !suggestSlotTimeTo || !suggestSlotVenueId}
+                >
+                  {actionLoading ? "Suggesting..." : "Suggest Slot"}
                 </Button>
               </div>
             </div>

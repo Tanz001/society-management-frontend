@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
   import { Card } from "@/components/ui/card";
   import { Badge } from "@/components/ui/badge";
+  import { Input } from "@/components/ui/input";
   import { Textarea } from "@/components/ui/textarea";
   import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
   import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -87,6 +88,27 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
   });
   const [statsLoading, setStatsLoading] = useState(false);
   const [eventRequestFilter, setEventRequestFilter] = useState<string>("all"); // all, pending, approved, rejected
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [societyToEdit, setSocietyToEdit] = useState<Society | null>(null);
+  const [editFormData, setEditFormData] = useState({
+    name: "",
+    description: "",
+    category: "",
+    location: "",
+    advisor: "",
+    purpose: "",
+  });
+  const [advisors, setAdvisors] = useState<Array<{ faculty_id: number; name: string; email: string }>>([]);
+  const [loadingAdvisors, setLoadingAdvisors] = useState(false);
+
+    // Format time to AM/PM
+    const formatTimeToAMPM = (time24: string) => {
+      if (!time24) return "N/A";
+      const [hours, minutes] = time24.split(':').map(Number);
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      const formattedHours = hours % 12 === 0 ? 12 : hours % 12;
+      return `${formattedHours}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+    };
 
     // Helper functions for event requester details
     // Get advisor info (priority) or submitted by info (fallback)
@@ -256,6 +278,152 @@ const API_URL = import.meta.env.VITE_API_URL;
         setStatuses(response.data.statuses || []);
       } catch (err: any) {
         console.error("Error fetching statuses:", err);
+      }
+    };
+
+    // Fetch advisors for edit form
+    const fetchAdvisors = async () => {
+      try {
+        setLoadingAdvisors(true);
+        const token = localStorage.getItem("token");
+        if (!token) return;
+
+        const response = await axios.get(
+          `${import.meta.env.VITE_API_URL}/admin/faculty/advisors`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (response.data.success) {
+          // API returns 'advisors' not 'faculty'
+          const advisorsList = response.data.advisors || response.data.faculty || [];
+          console.log("Fetched advisors:", advisorsList);
+          setAdvisors(advisorsList);
+        }
+      } catch (err: any) {
+        console.error("Error fetching advisors:", err);
+        toast({
+          title: "Error",
+          description: "Failed to fetch advisors",
+          variant: "destructive",
+        });
+      } finally {
+        setLoadingAdvisors(false);
+      }
+    };
+
+    // Handle edit button click
+    const handleEditClick = async (society: Society) => {
+      try {
+        setLoading(true);
+        const token = localStorage.getItem("token");
+        if (!token) return;
+
+        // Fetch detailed society information
+        const response = await axios.get(
+          `${import.meta.env.VITE_API_URL}/admin/societies/${society.society_id}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+
+        const societyData = response.data.data;
+        
+        // Get advisor faculty_id from the society data
+        const advisorFacultyId = societyData.faculty_id || null;
+        
+        console.log("Society data:", societyData);
+        console.log("Advisor faculty_id:", advisorFacultyId);
+        
+        setEditFormData({
+          name: societyData.name || "",
+          description: societyData.description || "",
+          category: societyData.category || "",
+          location: societyData.location || "",
+          advisor: advisorFacultyId ? String(advisorFacultyId) : "",
+          purpose: societyData.purpose || "",
+        });
+
+        setSocietyToEdit(society);
+        
+        // Always fetch advisors to ensure we have the latest list before opening modal
+        await fetchAdvisors();
+        
+        // Open modal after advisors are loaded
+        setIsEditModalOpen(true);
+      } catch (err: any) {
+        console.error("Error fetching society details:", err);
+        toast({
+          title: "Error",
+          description: "Failed to load society details",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // Handle update society
+    const handleUpdateSociety = async () => {
+      if (!societyToEdit) return;
+
+      try {
+        setActionLoading(true);
+        const token = localStorage.getItem("token");
+        if (!token) {
+          toast({
+            title: "Error",
+            description: "No authentication token found",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        // Send as JSON instead of FormData since we're not uploading files
+        const payload = {
+          name: editFormData.name,
+          description: editFormData.description,
+          category: editFormData.category,
+          location: editFormData.location,
+          advisor: editFormData.advisor,
+          purpose: editFormData.purpose,
+        };
+
+        console.log("Updating society with payload:", payload);
+
+        const response = await axios.put(
+          `${import.meta.env.VITE_API_URL}/admin/societies/${societyToEdit.society_id}`,
+          payload,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        if (response.data.success) {
+          toast({
+            title: "Success",
+            description: "Society updated successfully!",
+            variant: "default",
+          });
+          setIsEditModalOpen(false);
+          setSocietyToEdit(null);
+          await fetchAllSocieties();
+        }
+      } catch (err: any) {
+        console.error("Error updating society:", err);
+        toast({
+          title: "Error",
+          description: err.response?.data?.message || "Failed to update society",
+          variant: "destructive",
+        });
+      } finally {
+        setActionLoading(false);
       }
     };
 
@@ -449,7 +617,7 @@ const API_URL = import.meta.env.VITE_API_URL;
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-2xl font-bold">Board Secretary Dashboard</h1>
-                <p className="text-white/80">Review Pending Society Applications</p>
+                <p className="text-white/80">Manage Society Applications and Event Requests</p>
               </div>
               <div className="flex items-center space-x-3">
                 <Button 
@@ -478,59 +646,6 @@ const API_URL = import.meta.env.VITE_API_URL;
         {/* Dashboard Content */}
         <section className="py-8 px-4">
           <div className="container mx-auto max-w-7xl">
-            {/* Stats Overview - Event Requests */}
-            {activeTab === "event-requests" && (
-              <div className="grid md:grid-cols-4 gap-6 mb-8">
-                <Card className="p-6 shadow-card">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Total Requests</p>
-                      <p className="text-2xl font-bold text-university-navy">
-                        {statsLoading ? "..." : eventRequestStats.total}
-                      </p>
-                    </div>
-                    <FileText className="h-8 w-8 text-university-navy" />
-                  </div>
-                </Card>
-
-                <Card className="p-6 shadow-card">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Pending</p>
-                      <p className="text-2xl font-bold text-university-navy">
-                        {statsLoading ? "..." : eventRequestStats.pending}
-                      </p>
-                    </div>
-                    <Clock className="h-8 w-8 text-university-maroon" />
-                  </div>
-                </Card>
-
-                <Card className="p-6 shadow-card">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Approved</p>
-                      <p className="text-2xl font-bold text-university-navy">
-                        {statsLoading ? "..." : eventRequestStats.approved}
-                      </p>
-                    </div>
-                    <CheckCircle className="h-8 w-8 text-green-600" />
-                  </div>
-                </Card>
-
-                <Card className="p-6 shadow-card">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Rejected</p>
-                      <p className="text-2xl font-bold text-university-navy">
-                        {statsLoading ? "..." : eventRequestStats.rejected}
-                      </p>
-                    </div>
-                    <XCircle className="h-8 w-8 text-red-600" />
-                  </div>
-                </Card>
-              </div>
-            )}
-
             {/* Tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="mb-6">
@@ -543,7 +658,7 @@ const API_URL = import.meta.env.VITE_API_URL;
               <TabsContent value="overview">
                 {/* Actions */}
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-semibold text-university-navy">Pending Society Applications</h2>
+                  <h2 className="text-2xl font-semibold text-university-navy">All Societies</h2>
                   <Button 
                     variant="outline" 
                     onClick={fetchAllSocieties}
@@ -593,9 +708,9 @@ const API_URL = import.meta.env.VITE_API_URL;
                           <p className="text-sm text-muted-foreground mb-2">
                             📍 {society.location} • 👨‍🏫 {society.advisor}
                           </p>
-                          <p className="text-sm text-muted-foreground mb-2">
+                          {/* <p className="text-sm text-muted-foreground mb-2">
                             📧 {society.student_info.firstName} {society.student_info.lastName} ({society.student_info.rollNo})
-                          </p>
+                          </p> */}
                           <p className="text-sm text-muted-foreground mb-3">
                             {society.description.length > 150 
                               ? `${society.description.substring(0, 150)}...` 
@@ -609,8 +724,17 @@ const API_URL = import.meta.env.VITE_API_URL;
                         </div>
                       </div>
                       <div className="flex space-x-2 ml-4">
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => handleEditClick(society)}
+                          disabled={loading}
+                        >
+                          <Edit className="h-3 w-3 mr-1" />
+                          Edit
+                        </Button>
                         {/* Only show Review button for Pending (status 1) - Board Secretary's pending items */}
-                        {society.status_id === 1 ? (
+                        {/* {society.status_id === 1 ? (
                           <Button 
                             size="sm" 
                             variant="university"
@@ -624,7 +748,7 @@ const API_URL = import.meta.env.VITE_API_URL;
                           <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
                             Tracked: {society.status_name}
                           </Badge>
-                        )}
+                        )} */}
                       </div>
                     </div>
                   </Card>
@@ -650,6 +774,57 @@ const API_URL = import.meta.env.VITE_API_URL;
                   >
                     {loadingEventRequests ? "Loading..." : "Refresh"}
                   </Button>
+                </div>
+
+                {/* Stats Overview - Event Requests */}
+                <div className="grid md:grid-cols-4 gap-6 mb-8">
+                  <Card className="p-6 shadow-card">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Total Requests</p>
+                        <p className="text-2xl font-bold text-university-navy">
+                          {statsLoading ? "..." : eventRequestStats.total}
+                        </p>
+                      </div>
+                      <FileText className="h-8 w-8 text-university-navy" />
+                    </div>
+                  </Card>
+
+                  <Card className="p-6 shadow-card">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Pending</p>
+                        <p className="text-2xl font-bold text-university-navy">
+                          {statsLoading ? "..." : eventRequestStats.pending}
+                        </p>
+                      </div>
+                      <Clock className="h-8 w-8 text-university-maroon" />
+                    </div>
+                  </Card>
+
+                  <Card className="p-6 shadow-card">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Approved</p>
+                        <p className="text-2xl font-bold text-university-navy">
+                          {statsLoading ? "..." : eventRequestStats.approved}
+                        </p>
+                      </div>
+                      <CheckCircle className="h-8 w-8 text-green-600" />
+                    </div>
+                  </Card>
+
+                  <Card className="p-6 shadow-card">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Rejected</p>
+                        <p className="text-2xl font-bold text-university-navy">
+                          {statsLoading ? "..." : eventRequestStats.rejected}
+                        </p>
+                      </div>
+                      <XCircle className="h-8 w-8 text-red-600" />
+                    </div>
+                  </Card>
                 </div>
 
                 {/* Filter Buttons */}
@@ -723,7 +898,7 @@ const API_URL = import.meta.env.VITE_API_URL;
                             </p>
                             <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mb-2">
                               <span>📅 {new Date(request.event_date).toLocaleDateString()}</span>
-                              <span>🕐 {request.event_time}</span>
+                              <span>🕐 {request.event_time ? formatTimeToAMPM(request.event_time) : request.time_from ? formatTimeToAMPM(request.time_from) : "N/A"}</span>
                               <span>📍 {request.venue}</span>
                               {request.firstName && request.lastName && (
                                 <span>👤 {request.firstName} {request.lastName}</span>
@@ -751,7 +926,7 @@ const API_URL = import.meta.env.VITE_API_URL;
                               View Details
                             </Button>
                             {/* Show Update Status button for Pending (status 1), show status badge for others */}
-                            {request.status_id === 1 ? (
+                            {/* {request.status_id === 1 ? (
                               <Button 
                                 size="sm" 
                                 variant="outline"
@@ -773,7 +948,7 @@ const API_URL = import.meta.env.VITE_API_URL;
                               <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-center">
                                 {request.status_name}
                               </Badge>
-                            )}
+                            )} */}
                           </div>
                         </div>
                       </Card>
@@ -990,7 +1165,7 @@ const API_URL = import.meta.env.VITE_API_URL;
                         </div>
                         <div className="flex items-center space-x-1">
                           <Clock className="h-4 w-4" />
-                          <span>{selectedEventRequest.event_time}</span>
+                          <span>{selectedEventRequest.event_time ? formatTimeToAMPM(selectedEventRequest.event_time) : selectedEventRequest.time_from ? formatTimeToAMPM(selectedEventRequest.time_from) : "N/A"}</span>
                         </div>
                         <div className="flex items-center space-x-1">
                           <MapPin className="h-4 w-4" />
@@ -1032,12 +1207,18 @@ const API_URL = import.meta.env.VITE_API_URL;
                       )}
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Time From:</span>
-                        <span className="font-medium">{selectedEventRequest.time_from || selectedEventRequest.event_time || "Not specified"}</span>
+                        <span className="font-medium">
+                          {selectedEventRequest.time_from 
+                            ? formatTimeToAMPM(selectedEventRequest.time_from)
+                            : selectedEventRequest.event_time 
+                            ? formatTimeToAMPM(selectedEventRequest.event_time)
+                            : "Not specified"}
+                        </span>
                       </div>
                       {selectedEventRequest.time_to && (
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Time To:</span>
-                          <span className="font-medium">{selectedEventRequest.time_to}</span>
+                          <span className="font-medium">{formatTimeToAMPM(selectedEventRequest.time_to)}</span>
                         </div>
                       )}
                       <div className="flex justify-between">
@@ -1048,18 +1229,6 @@ const API_URL = import.meta.env.VITE_API_URL;
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Collaborating Org:</span>
                           <span className="font-medium">{selectedEventRequest.collaborating_org}</span>
-                        </div>
-                      )}
-                      {selectedEventRequest.sponsor_name && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Sponsor:</span>
-                          <span className="font-medium">{selectedEventRequest.sponsor_name}</span>
-                        </div>
-                      )}
-                      {selectedEventRequest.sponsor_amount && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Sponsor Amount:</span>
-                          <span className="font-medium">{selectedEventRequest.sponsor_amount}</span>
                         </div>
                       )}
                       {selectedEventRequest.coordinator_name && (
@@ -1087,10 +1256,82 @@ const API_URL = import.meta.env.VITE_API_URL;
                     </div>
                   </Card>
 
-                  <Card className="p-4">
-                    <h3 className="font-semibold mb-3 text-university-navy">
-                      {selectedEventRequest?.advisor_name ? "Advisor Information" : "Submitted By"}
+                  {/* Advisor Information Box */}
+                  <Card className="p-4 border-l-4 border-l-blue-500">
+                    <h3 className="font-semibold mb-3 text-university-navy flex items-center gap-2">
+                      <Users className="h-5 w-5" />
+                      Advisor Information
                     </h3>
+                    <div className="space-y-3 text-sm">
+                      {selectedEventRequest.society_name && (
+                        <div className="pb-3 border-b">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground font-medium">Society Name:</span>
+                            <span className="font-semibold text-university-navy">{selectedEventRequest.society_name}</span>
+                          </div>
+                        </div>
+                      )}
+                      {selectedEventRequest.advisor_name ? (
+                        <>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Advisor Name:</span>
+                            <span className="font-medium">{selectedEventRequest.advisor_name}</span>
+                          </div>
+                          {selectedEventRequest.advisor_email && (
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Advisor Email:</span>
+                              <span className="font-medium">{selectedEventRequest.advisor_email}</span>
+                            </div>
+                          )}
+                          {selectedEventRequest.advisor_phone && (
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Advisor Phone:</span>
+                              <span className="font-medium">{selectedEventRequest.advisor_phone}</span>
+                            </div>
+                          )}
+                          {selectedEventRequest.advisor_faculty_id && (
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Faculty ID:</span>
+                              <span className="font-medium">{selectedEventRequest.advisor_faculty_id}</span>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-muted-foreground italic">Advisor information not available</p>
+                      )}
+                    </div>
+                  </Card>
+
+                  {/* Sponsor Information Box */}
+                  {(selectedEventRequest.sponsor_name || selectedEventRequest.sponsor_amount) && (
+                    <Card className="p-4 border-l-4 border-l-green-500">
+                      <h3 className="font-semibold mb-3 text-university-navy flex items-center gap-2">
+                        <FileText className="h-5 w-5" />
+                        Sponsor Information
+                      </h3>
+                      <div className="space-y-2 text-sm">
+                        {selectedEventRequest.sponsor_name && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Sponsor Name:</span>
+                            <span className="font-medium">{selectedEventRequest.sponsor_name}</span>
+                          </div>
+                        )}
+                        {selectedEventRequest.sponsor_amount && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Sponsor Amount:</span>
+                            <span className="font-medium text-green-600">
+                              {typeof selectedEventRequest.sponsor_amount === 'string' && selectedEventRequest.sponsor_amount.startsWith('$')
+                                ? selectedEventRequest.sponsor_amount
+                                : `$${selectedEventRequest.sponsor_amount}`}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </Card>
+                  )}
+
+                  <Card className="p-4">
+                    <h3 className="font-semibold mb-3 text-university-navy">Submitted By (Student)</h3>
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Name:</span>
@@ -1100,28 +1341,36 @@ const API_URL = import.meta.env.VITE_API_URL;
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Email:</span>
-                        <span className="font-medium">{getRequesterEmail(selectedEventRequest)}</span>
+                        <span className="font-medium">{selectedEventRequest.president_email || getRequesterEmail(selectedEventRequest)}</span>
                       </div>
-                      {getRequesterPhone(selectedEventRequest) && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Phone:</span>
-                          <span className="font-medium">{getRequesterPhone(selectedEventRequest)}</span>
-                        </div>
-                      )}
                       {getRequesterRoll(selectedEventRequest) && (
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Roll No:</span>
                           <span className="font-medium">{getRequesterRoll(selectedEventRequest)}</span>
                         </div>
                       )}
-                      {selectedEventRequest.society_name && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Society:</span>
-                          <span className="font-medium">{selectedEventRequest.society_name}</span>
-                        </div>
-                      )}
                     </div>
                   </Card>
+
+                  {/* Slot Status Information */}
+                  {selectedEventRequest.slot_status_name && (
+                    <Card className="p-4">
+                      <h3 className="font-semibold mb-3 text-university-navy">Slot Status</h3>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Slot Status:</span>
+                          <Badge variant={selectedEventRequest.slot_status_id === 2 ? "default" : "secondary"}>
+                            {selectedEventRequest.slot_status_name}
+                          </Badge>
+                        </div>
+                        {selectedEventRequest.slot_status_id === 2 && (
+                          <p className="text-xs text-green-600 mt-2">
+                            ✓ Slot has been granted by Protocol Office. This request is ready for review.
+                          </p>
+                        )}
+                      </div>
+                    </Card>
+                  )}
                 </div>
 
                 {/* Description / Media Coverage */}
@@ -1474,6 +1723,128 @@ const API_URL = import.meta.env.VITE_API_URL;
                 </div>
               </div>
             )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Society Modal */}
+        <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Society</DialogTitle>
+              <DialogDescription>
+                Update the society information below
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium mb-2 block">Society Name</label>
+                <Input
+                  value={editFormData.name}
+                  onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                  placeholder="Enter society name"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-2 block">Description</label>
+                <Textarea
+                  value={editFormData.description}
+                  onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
+                  placeholder="Enter description"
+                  rows={3}
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-2 block">Category</label>
+                <Select
+                  value={editFormData.category}
+                  onValueChange={(value) => setEditFormData({ ...editFormData, category: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Academic">Academic</SelectItem>
+                    <SelectItem value="Cultural">Cultural</SelectItem>
+                    <SelectItem value="Sports">Sports</SelectItem>
+                    <SelectItem value="Social">Social</SelectItem>
+                    <SelectItem value="Technical">Technical</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-2 block">Location</label>
+                <Input
+                  value={editFormData.location}
+                  onChange={(e) => setEditFormData({ ...editFormData, location: e.target.value })}
+                  placeholder="Enter location"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-2 block">Faculty Advisor</label>
+                {loadingAdvisors ? (
+                  <div className="text-sm text-muted-foreground">Loading advisors...</div>
+                ) : advisors.length === 0 ? (
+                  <div className="text-sm text-muted-foreground">No advisors available</div>
+                ) : (
+                  <Select
+                    value={editFormData.advisor || undefined}
+                    onValueChange={(value) => {
+                      console.log("Advisor changed to:", value);
+                      setEditFormData({ ...editFormData, advisor: value });
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={editFormData.advisor ? "Select advisor" : "Select advisor"}>
+                        {editFormData.advisor && advisors.find(a => String(a.faculty_id) === editFormData.advisor)
+                          ? `${advisors.find(a => String(a.faculty_id) === editFormData.advisor)?.name} (${advisors.find(a => String(a.faculty_id) === editFormData.advisor)?.email})`
+                          : "Select advisor"}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {advisors.map((advisor) => (
+                        <SelectItem key={advisor.faculty_id} value={String(advisor.faculty_id)}>
+                          {advisor.name} ({advisor.email})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {editFormData.advisor && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Current advisor ID: {editFormData.advisor}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-2 block">Purpose</label>
+                <Textarea
+                  value={editFormData.purpose}
+                  onChange={(e) => setEditFormData({ ...editFormData, purpose: e.target.value })}
+                  placeholder="Enter purpose (minimum 30 characters)"
+                  rows={4}
+                />
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-4">
+                <Button variant="outline" onClick={() => setIsEditModalOpen(false)} disabled={actionLoading}>
+                  Cancel
+                </Button>
+                <Button 
+                  variant="university" 
+                  onClick={handleUpdateSociety}
+                  disabled={actionLoading || !editFormData.name || !editFormData.description || !editFormData.category || !editFormData.location || !editFormData.advisor || !editFormData.purpose || editFormData.purpose.length < 30}
+                >
+                  {actionLoading ? "Updating..." : "Update Society"}
+                </Button>
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
       </div>
