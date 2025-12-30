@@ -7,6 +7,7 @@ import { Calendar, Clock, MapPin, User, FileText, RefreshCw, History, CheckCircl
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import toast from "react-hot-toast";
+import { formatTimeToAMPM } from "@/lib/utils";
 
 interface EventRequest {
   req_id: number;
@@ -209,19 +210,6 @@ const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
     navigate(`/dashboard/society/event-request/edit/${reqId}`);
   };
 
-  // Format time to AM/PM
-  const formatTimeToAMPM = (time24: string) => {
-    if (!time24) return "";
-    try {
-      const [hours, minutes] = time24.split(":");
-      const hour = parseInt(hours);
-      const ampm = hour >= 12 ? "PM" : "AM";
-      const hour12 = hour % 12 || 12;
-      return `${hour12}:${minutes} ${ampm}`;
-    } catch (e) {
-      return time24;
-    }
-  };
 
   const getStatusBadge = (statusId: number, statusName: string) => {
     let variant: "default" | "secondary" | "destructive" | "outline" = "outline";
@@ -351,7 +339,7 @@ const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
                 </div>
                 <div className="flex items-center text-sm text-muted-foreground">
                   <Clock className="h-4 w-4 mr-2 text-university-navy" />
-                  <span>{request.event_time}</span>
+                  <span>{request.event_time ? formatTimeToAMPM(request.event_time) : request.time_from ? formatTimeToAMPM(request.time_from) : "N/A"}</span>
                 </div>
                 <div className="flex items-center text-sm text-muted-foreground">
                   <MapPin className="h-4 w-4 mr-2 text-university-navy" />

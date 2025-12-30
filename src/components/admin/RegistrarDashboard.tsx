@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +28,15 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { useToast } from "@/components/ui/use-toast";
 
 interface Society {
@@ -99,6 +108,11 @@ const RegistrarDashboard = () => {
   });
   const [statsLoading, setStatsLoading] = useState(false);
   const [eventRequestFilter, setEventRequestFilter] = useState<string>("all"); // all, pending, approved, rejected
+  
+  // Pagination states
+  const [societiesCurrentPage, setSocietiesCurrentPage] = useState(1);
+  const [eventRequestsCurrentPage, setEventRequestsCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
 
   // Get current user info
   const getCurrentUser = () => {
@@ -360,6 +374,7 @@ const RegistrarDashboard = () => {
   
       console.log("Event requests fetched:", response.data);
       setEventRequests(response.data.data || []);
+      setEventRequestsCurrentPage(1); // Reset to first page when data changes
     } catch (err: any) {
       console.error("Error fetching event requests:", err);
       setError(err.response?.data?.message || err.message || "Failed to fetch event requests");
@@ -746,8 +761,9 @@ const RegistrarDashboard = () => {
                   <p className="text-muted-foreground">Loading societies...</p>
                 </div>
               ) : societies.length > 0 ? (
+                <>
                 <div className="grid gap-6">
-                  {societies.map((society) => (
+                  {societies.slice((societiesCurrentPage - 1) * itemsPerPage, societiesCurrentPage * itemsPerPage).map((society) => (
                     <Card key={society.society_id} className="p-6 shadow-card hover:shadow-lg transition-shadow">
                       <div className="flex items-start justify-between">
                         <div className="flex items-start space-x-4 flex-1">
@@ -833,6 +849,61 @@ const RegistrarDashboard = () => {
                     </Card>
                   ))}
                 </div>
+                
+                {/* Pagination for Societies */}
+                {societies.length > itemsPerPage && (
+                  <div className="flex items-center justify-between mt-6">
+                    <div className="text-sm text-muted-foreground">
+                      Showing {(societiesCurrentPage - 1) * itemsPerPage + 1} to {Math.min(societiesCurrentPage * itemsPerPage, societies.length)} of {societies.length} societies
+                    </div>
+                    <Pagination>
+                      <PaginationContent>
+                        <PaginationItem>
+                          <PaginationPrevious 
+                            onClick={() => setSocietiesCurrentPage(prev => Math.max(1, prev - 1))}
+                            className={societiesCurrentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                          />
+                        </PaginationItem>
+                        {Array.from({ length: Math.ceil(societies.length / itemsPerPage) }, (_, i) => i + 1)
+                          .filter(page => {
+                            return page === 1 || 
+                                   page === Math.ceil(societies.length / itemsPerPage) ||
+                                   (page >= societiesCurrentPage - 1 && page <= societiesCurrentPage + 1);
+                          })
+                          .map((page, idx, array) => {
+                            const prevPage = array[idx - 1];
+                            const showEllipsisBefore = prevPage && page - prevPage > 1;
+                            
+                            return (
+                              <React.Fragment key={page}>
+                                {showEllipsisBefore && (
+                                  <PaginationItem>
+                                    <PaginationEllipsis />
+                                  </PaginationItem>
+                                )}
+                                <PaginationItem>
+                                  <PaginationLink
+                                    onClick={() => setSocietiesCurrentPage(page)}
+                                    isActive={societiesCurrentPage === page}
+                                    className="cursor-pointer"
+                                  >
+                                    {page}
+                                  </PaginationLink>
+                                </PaginationItem>
+                              </React.Fragment>
+                            );
+                          })}
+                        <PaginationItem>
+                          <PaginationNext 
+                            onClick={() => setSocietiesCurrentPage(prev => Math.min(Math.ceil(societies.length / itemsPerPage), prev + 1))}
+                            className={societiesCurrentPage >= Math.ceil(societies.length / itemsPerPage) ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                          />
+                        </PaginationItem>
+                      </PaginationContent>
+                    </Pagination>
+                  </div>
+                )}
+                </>
               ) : (
                 <div className="text-center py-12">
                   <Building className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
@@ -958,8 +1029,9 @@ const RegistrarDashboard = () => {
                   <p className="text-muted-foreground">Loading event requests...</p>
                 </div>
               ) : eventRequests.length > 0 ? (
+                <>
                 <div className="grid gap-6">
-                  {eventRequests.map((request: any) => (
+                  {eventRequests.slice((eventRequestsCurrentPage - 1) * itemsPerPage, eventRequestsCurrentPage * itemsPerPage).map((request: any) => (
                     <Card key={request.req_id} className="p-6 shadow-card hover:shadow-lg transition-shadow">
                       <div className="flex items-start justify-between">
                         <div className="flex items-start space-x-4 flex-1">
@@ -1052,6 +1124,61 @@ const RegistrarDashboard = () => {
                     </Card>
                   ))}
                 </div>
+                
+                {/* Pagination for Event Requests */}
+                {eventRequests.length > itemsPerPage && (
+                  <div className="flex items-center justify-between mt-6">
+                    <div className="text-sm text-muted-foreground">
+                      Showing {(eventRequestsCurrentPage - 1) * itemsPerPage + 1} to {Math.min(eventRequestsCurrentPage * itemsPerPage, eventRequests.length)} of {eventRequests.length} event requests
+                    </div>
+                    <Pagination>
+                      <PaginationContent>
+                        <PaginationItem>
+                          <PaginationPrevious 
+                            onClick={() => setEventRequestsCurrentPage(prev => Math.max(1, prev - 1))}
+                            className={eventRequestsCurrentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                          />
+                        </PaginationItem>
+                        {Array.from({ length: Math.ceil(eventRequests.length / itemsPerPage) }, (_, i) => i + 1)
+                          .filter(page => {
+                            return page === 1 || 
+                                   page === Math.ceil(eventRequests.length / itemsPerPage) ||
+                                   (page >= eventRequestsCurrentPage - 1 && page <= eventRequestsCurrentPage + 1);
+                          })
+                          .map((page, idx, array) => {
+                            const prevPage = array[idx - 1];
+                            const showEllipsisBefore = prevPage && page - prevPage > 1;
+                            
+                            return (
+                              <React.Fragment key={page}>
+                                {showEllipsisBefore && (
+                                  <PaginationItem>
+                                    <PaginationEllipsis />
+                                  </PaginationItem>
+                                )}
+                                <PaginationItem>
+                                  <PaginationLink
+                                    onClick={() => setEventRequestsCurrentPage(page)}
+                                    isActive={eventRequestsCurrentPage === page}
+                                    className="cursor-pointer"
+                                  >
+                                    {page}
+                                  </PaginationLink>
+                                </PaginationItem>
+                              </React.Fragment>
+                            );
+                          })}
+                        <PaginationItem>
+                          <PaginationNext 
+                            onClick={() => setEventRequestsCurrentPage(prev => Math.min(Math.ceil(eventRequests.length / itemsPerPage), prev + 1))}
+                            className={eventRequestsCurrentPage >= Math.ceil(eventRequests.length / itemsPerPage) ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                          />
+                        </PaginationItem>
+                      </PaginationContent>
+                    </Pagination>
+                  </div>
+                )}
+                </>
               ) : (
                 <div className="text-center py-12">
                   <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
@@ -1438,7 +1565,13 @@ const RegistrarDashboard = () => {
                     {selectedEventRequest.sponsor_amount && (
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Sponsor Amount:</span>
-                        <span className="font-medium">{selectedEventRequest.sponsor_amount}</span>
+                        <span className="font-medium text-green-600">
+                          {typeof selectedEventRequest.sponsor_amount === 'string' 
+                            ? (selectedEventRequest.sponsor_amount.startsWith('PKR') || selectedEventRequest.sponsor_amount.startsWith('$')
+                                ? selectedEventRequest.sponsor_amount.replace(/^\$/, 'PKR ')
+                                : `PKR ${selectedEventRequest.sponsor_amount}`)
+                            : `PKR ${selectedEventRequest.sponsor_amount}`}
+                        </span>
                       </div>
                     )}
                     {selectedEventRequest.coordinator_name && (

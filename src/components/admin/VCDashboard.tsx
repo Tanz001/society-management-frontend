@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +26,16 @@ import {
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useToast } from "@/components/ui/use-toast";
+import { formatTimeToAMPM } from "@/lib/utils";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 interface Society {
   society_id: number;
@@ -92,6 +102,11 @@ const VCDashboard = () => {
   const [loadingEventReports, setLoadingEventReports] = useState(false);
   const [selectedReport, setSelectedReport] = useState<any | null>(null);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  
+  // Pagination states
+  const [societiesCurrentPage, setSocietiesCurrentPage] = useState(1);
+  const [eventRequestsCurrentPage, setEventRequestsCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
 
   // Get current user info
   const getCurrentUser = () => {
@@ -266,6 +281,7 @@ const fetchSocietiesForVC = async () => {
   
       console.log("Event requests fetched:", response.data);
       setEventRequests(response.data.data || []);
+      setEventRequestsCurrentPage(1); // Reset to first page when data changes
     } catch (err: any) {
       console.error("Error fetching event requests:", err);
       setError(err.response?.data?.message || err.message || "Failed to fetch event requests");
@@ -593,8 +609,9 @@ const fetchSocietiesForVC = async () => {
               <p className="text-muted-foreground">Loading societies...</p>
             </div>
           ) : societies.length > 0 ? (
+            <>
             <div className="grid gap-6">
-              {societies.map((society) => (
+              {societies.slice((societiesCurrentPage - 1) * itemsPerPage, societiesCurrentPage * itemsPerPage).map((society) => (
                 <Card key={society.society_id} className="p-6 shadow-card border-l-4 border-l-university-gold">
                   <div className="flex items-start justify-between">
                     <div className="flex items-start space-x-4 flex-1">
@@ -657,6 +674,61 @@ const fetchSocietiesForVC = async () => {
                 </Card>
               ))}
             </div>
+            
+            {/* Pagination for Societies */}
+            {societies.length > itemsPerPage && (
+              <div className="flex items-center justify-between mt-6">
+                <div className="text-sm text-muted-foreground">
+                  Showing {(societiesCurrentPage - 1) * itemsPerPage + 1} to {Math.min(societiesCurrentPage * itemsPerPage, societies.length)} of {societies.length} societies
+                </div>
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious 
+                        onClick={() => setSocietiesCurrentPage(prev => Math.max(1, prev - 1))}
+                        className={societiesCurrentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                      />
+                    </PaginationItem>
+                    {Array.from({ length: Math.ceil(societies.length / itemsPerPage) }, (_, i) => i + 1)
+                      .filter(page => {
+                        return page === 1 || 
+                               page === Math.ceil(societies.length / itemsPerPage) ||
+                               (page >= societiesCurrentPage - 1 && page <= societiesCurrentPage + 1);
+                      })
+                      .map((page, idx, array) => {
+                        const prevPage = array[idx - 1];
+                        const showEllipsisBefore = prevPage && page - prevPage > 1;
+                        
+                        return (
+                          <React.Fragment key={page}>
+                            {showEllipsisBefore && (
+                              <PaginationItem>
+                                <PaginationEllipsis />
+                              </PaginationItem>
+                            )}
+                            <PaginationItem>
+                              <PaginationLink
+                                onClick={() => setSocietiesCurrentPage(page)}
+                                isActive={societiesCurrentPage === page}
+                                className="cursor-pointer"
+                              >
+                                {page}
+                              </PaginationLink>
+                            </PaginationItem>
+                          </React.Fragment>
+                        );
+                      })}
+                    <PaginationItem>
+                      <PaginationNext 
+                        onClick={() => setSocietiesCurrentPage(prev => Math.min(Math.ceil(societies.length / itemsPerPage), prev + 1))}
+                        className={societiesCurrentPage >= Math.ceil(societies.length / itemsPerPage) ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            )}
+            </>
           ) : (
             <div className="text-center py-12">
               <Crown className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
@@ -729,8 +801,9 @@ const fetchSocietiesForVC = async () => {
                   <p className="text-muted-foreground">Loading event requests...</p>
                 </div>
               ) : eventRequests.length > 0 ? (
+                <>
                 <div className="grid gap-4">
-                  {eventRequests.map((request) => (
+                  {eventRequests.slice((eventRequestsCurrentPage - 1) * itemsPerPage, eventRequestsCurrentPage * itemsPerPage).map((request) => (
                     <Card key={request.req_id} className="p-4 shadow-card">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
@@ -750,7 +823,7 @@ const fetchSocietiesForVC = async () => {
                           </p>
                           <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mb-2">
                             <span>📅 {new Date(request.event_date).toLocaleDateString()}</span>
-                            <span>🕐 {request.event_time}</span>
+                            <span>🕐 {request.event_time ? formatTimeToAMPM(request.event_time) : request.time_from ? formatTimeToAMPM(request.time_from) : "N/A"}</span>
                             <span>📍 {request.venue}</span>
                             {request.firstName && request.lastName && (
                               <span>👤 {request.firstName} {request.lastName}</span>
@@ -806,6 +879,61 @@ const fetchSocietiesForVC = async () => {
                     </Card>
                   ))}
                 </div>
+                
+                {/* Pagination for Event Requests */}
+                {eventRequests.length > itemsPerPage && (
+                  <div className="flex items-center justify-between mt-6">
+                    <div className="text-sm text-muted-foreground">
+                      Showing {(eventRequestsCurrentPage - 1) * itemsPerPage + 1} to {Math.min(eventRequestsCurrentPage * itemsPerPage, eventRequests.length)} of {eventRequests.length} event requests
+                    </div>
+                    <Pagination>
+                      <PaginationContent>
+                        <PaginationItem>
+                          <PaginationPrevious 
+                            onClick={() => setEventRequestsCurrentPage(prev => Math.max(1, prev - 1))}
+                            className={eventRequestsCurrentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                          />
+                        </PaginationItem>
+                        {Array.from({ length: Math.ceil(eventRequests.length / itemsPerPage) }, (_, i) => i + 1)
+                          .filter(page => {
+                            return page === 1 || 
+                                   page === Math.ceil(eventRequests.length / itemsPerPage) ||
+                                   (page >= eventRequestsCurrentPage - 1 && page <= eventRequestsCurrentPage + 1);
+                          })
+                          .map((page, idx, array) => {
+                            const prevPage = array[idx - 1];
+                            const showEllipsisBefore = prevPage && page - prevPage > 1;
+                            
+                            return (
+                              <React.Fragment key={page}>
+                                {showEllipsisBefore && (
+                                  <PaginationItem>
+                                    <PaginationEllipsis />
+                                  </PaginationItem>
+                                )}
+                                <PaginationItem>
+                                  <PaginationLink
+                                    onClick={() => setEventRequestsCurrentPage(page)}
+                                    isActive={eventRequestsCurrentPage === page}
+                                    className="cursor-pointer"
+                                  >
+                                    {page}
+                                  </PaginationLink>
+                                </PaginationItem>
+                              </React.Fragment>
+                            );
+                          })}
+                        <PaginationItem>
+                          <PaginationNext 
+                            onClick={() => setEventRequestsCurrentPage(prev => Math.min(Math.ceil(eventRequests.length / itemsPerPage), prev + 1))}
+                            className={eventRequestsCurrentPage >= Math.ceil(eventRequests.length / itemsPerPage) ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                          />
+                        </PaginationItem>
+                      </PaginationContent>
+                    </Pagination>
+                  </div>
+                )}
+                </>
               ) : (
                 <div className="text-center py-12">
                   <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
@@ -974,7 +1102,7 @@ const fetchSocietiesForVC = async () => {
                       {selectedReport.event_time && (
                         <div className="flex items-center space-x-1">
                           <Clock className="h-4 w-4" />
-                          <span>{selectedReport.event_time}</span>
+                          <span>{formatTimeToAMPM(selectedReport.event_time)}</span>
                         </div>
                       )}
                       {selectedReport.venue && (
@@ -1334,7 +1462,7 @@ const fetchSocietiesForVC = async () => {
                       </div>
                       <div className="flex items-center space-x-1">
                         <Clock className="h-4 w-4" />
-                        <span>{selectedEventRequest.event_time}</span>
+                        <span>{selectedEventRequest.event_time ? formatTimeToAMPM(selectedEventRequest.event_time) : selectedEventRequest.time_from ? formatTimeToAMPM(selectedEventRequest.time_from) : "N/A"}</span>
                       </div>
                       <div className="flex items-center space-x-1">
                         <MapPin className="h-4 w-4" />
@@ -1376,12 +1504,18 @@ const fetchSocietiesForVC = async () => {
                     )}
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Time From:</span>
-                      <span className="font-medium">{selectedEventRequest.time_from || selectedEventRequest.event_time || "Not specified"}</span>
+                      <span className="font-medium">
+                        {selectedEventRequest.time_from 
+                          ? formatTimeToAMPM(selectedEventRequest.time_from)
+                          : selectedEventRequest.event_time 
+                          ? formatTimeToAMPM(selectedEventRequest.event_time)
+                          : "Not specified"}
+                      </span>
                     </div>
                     {selectedEventRequest.time_to && (
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Time To:</span>
-                        <span className="font-medium">{selectedEventRequest.time_to}</span>
+                        <span className="font-medium">{formatTimeToAMPM(selectedEventRequest.time_to)}</span>
                       </div>
                     )}
                     <div className="flex justify-between">
@@ -1403,7 +1537,13 @@ const fetchSocietiesForVC = async () => {
                     {selectedEventRequest.sponsor_amount && (
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Sponsor Amount:</span>
-                        <span className="font-medium">{selectedEventRequest.sponsor_amount}</span>
+                        <span className="font-medium text-green-600">
+                          {typeof selectedEventRequest.sponsor_amount === 'string' 
+                            ? (selectedEventRequest.sponsor_amount.startsWith('PKR') || selectedEventRequest.sponsor_amount.startsWith('$')
+                                ? selectedEventRequest.sponsor_amount.replace(/^\$/, 'PKR ')
+                                : `PKR ${selectedEventRequest.sponsor_amount}`)
+                            : `PKR ${selectedEventRequest.sponsor_amount}`}
+                        </span>
                       </div>
                     )}
                     {selectedEventRequest.coordinator_name && (

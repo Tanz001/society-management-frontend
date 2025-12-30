@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +31,15 @@ import {
   Pencil,
   User
 } from "lucide-react";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useToast } from "@/components/ui/use-toast";
@@ -80,6 +89,11 @@ const ProtocolOfficeDashboard = () => {
   const [suggestedSlots, setSuggestedSlots] = useState([]);
   const [suggestedSlotsLoading, setSuggestedSlotsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("requests");
+  
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
+  const [currentSuggestedPage, setCurrentSuggestedPage] = useState(1);
 
   // Helper function to convert 24h time to AM/PM
   const formatTimeToAMPM = (time24: string) => {
@@ -190,6 +204,7 @@ const ProtocolOfficeDashboard = () => {
 
       if (response.data.success) {
         setEventRequests(response.data.data || []);
+        setCurrentPage(1); // Reset to first page when data changes
       }
     } catch (err: any) {
       console.error("Error fetching protocol event requests:", err);
@@ -303,38 +318,12 @@ const ProtocolOfficeDashboard = () => {
       );
 
       if (response.data.success) {
-        // If slot is GRANTED (status_id = 2), forward event request to Board Secretary (status_id = 1)
-        if (parseInt(selectedSlotStatusId) === 2) {
-          try {
-            await axios.put(
-              `${API_URL}/admin/board-secretary/event-requests/${selectedEventRequest.req_id}/review`,
-              {
-                action: "approve",
-                note: "Slot granted by Protocol Office. Forwarding to Board Secretary.",
-                changed_by,
-              },
-              {
-                headers: { Authorization: `Bearer ${token}` },
-              }
-            );
-            toast({
-              title: "Success",
-              description: "Slot granted and event request forwarded to Board Secretary",
-            });
-          } catch (err: any) {
-            console.error("Error forwarding to Board Secretary:", err);
-            toast({
-              title: "Warning",
-              description: "Slot granted but failed to forward to Board Secretary. Please check manually.",
-              variant: "destructive",
-            });
-          }
-        } else {
-          toast({
-            title: "Success",
-            description: "Slot status updated successfully",
-          });
-        }
+        // Slot status updated successfully - event request status remains unchanged
+        // Event request should remain in pending status (1) for Board Secretary to review
+        toast({
+          title: "Success",
+          description: "Slot status updated successfully. Event request remains pending for Board Secretary review.",
+        });
         setIsSlotStatusModalOpen(false);
         setSlotStatusNote("");
         fetchProtocolEventRequests();
@@ -434,6 +423,7 @@ const ProtocolOfficeDashboard = () => {
 
       if (response.data.success) {
         setSuggestedSlots(response.data.data || []);
+        setCurrentSuggestedPage(1); // Reset to first page when data changes
       }
     } catch (err) {
       console.error("Error fetching suggested slots:", err);
@@ -672,8 +662,9 @@ const ProtocolOfficeDashboard = () => {
               <p className="text-muted-foreground">Loading event requests...</p>
             </div>
           ) : eventRequests.length > 0 ? (
+            <>
             <div className="grid gap-4">
-              {eventRequests.map((request) => (
+              {eventRequests.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((request) => (
                 <Card key={request.req_id} className="p-4 shadow-card">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -790,6 +781,63 @@ const ProtocolOfficeDashboard = () => {
                 </Card>
               ))}
             </div>
+            
+            {/* Pagination */}
+            {eventRequests.length > itemsPerPage && (
+              <div className="flex items-center justify-between mt-6">
+                <div className="text-sm text-muted-foreground">
+                  Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, eventRequests.length)} of {eventRequests.length} event requests
+                </div>
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious 
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                      />
+                    </PaginationItem>
+                    {Array.from({ length: Math.ceil(eventRequests.length / itemsPerPage) }, (_, i) => i + 1)
+                      .filter(page => {
+                        // Show first page, last page, current page, and pages around current
+                        return page === 1 || 
+                               page === Math.ceil(eventRequests.length / itemsPerPage) ||
+                               (page >= currentPage - 1 && page <= currentPage + 1);
+                      })
+                      .map((page, idx, array) => {
+                        // Add ellipsis if there's a gap
+                        const prevPage = array[idx - 1];
+                        const showEllipsisBefore = prevPage && page - prevPage > 1;
+                        
+                        return (
+                          <React.Fragment key={page}>
+                            {showEllipsisBefore && (
+                              <PaginationItem>
+                                <PaginationEllipsis />
+                              </PaginationItem>
+                            )}
+                            <PaginationItem>
+                              <PaginationLink
+                                onClick={() => setCurrentPage(page)}
+                                isActive={currentPage === page}
+                                className="cursor-pointer"
+                              >
+                                {page}
+                              </PaginationLink>
+                            </PaginationItem>
+                          </React.Fragment>
+                        );
+                      })}
+                    <PaginationItem>
+                      <PaginationNext 
+                        onClick={() => setCurrentPage(prev => Math.min(Math.ceil(eventRequests.length / itemsPerPage), prev + 1))}
+                        className={currentPage >= Math.ceil(eventRequests.length / itemsPerPage) ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            )}
+            </>
           ) : (
             <div className="text-center py-12">
               <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
@@ -809,8 +857,9 @@ const ProtocolOfficeDashboard = () => {
                   <p className="text-muted-foreground">Loading suggested slots...</p>
                 </div>
               ) : suggestedSlots.length > 0 ? (
+                <>
                 <div className="grid gap-4">
-                  {suggestedSlots.map((slot: any) => (
+                  {suggestedSlots.slice((currentSuggestedPage - 1) * itemsPerPage, currentSuggestedPage * itemsPerPage).map((slot: any) => (
                     <Card key={slot.suggested_slot_id || slot.id} className="p-4 shadow-card">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
@@ -859,6 +908,61 @@ const ProtocolOfficeDashboard = () => {
                     </Card>
                   ))}
                 </div>
+                
+                {/* Pagination for Suggested Slots */}
+                {suggestedSlots.length > itemsPerPage && (
+                  <div className="flex items-center justify-between mt-6">
+                    <div className="text-sm text-muted-foreground">
+                      Showing {(currentSuggestedPage - 1) * itemsPerPage + 1} to {Math.min(currentSuggestedPage * itemsPerPage, suggestedSlots.length)} of {suggestedSlots.length} suggested slots
+                    </div>
+                    <Pagination>
+                      <PaginationContent>
+                        <PaginationItem>
+                          <PaginationPrevious 
+                            onClick={() => setCurrentSuggestedPage(prev => Math.max(1, prev - 1))}
+                            className={currentSuggestedPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                          />
+                        </PaginationItem>
+                        {Array.from({ length: Math.ceil(suggestedSlots.length / itemsPerPage) }, (_, i) => i + 1)
+                          .filter(page => {
+                            return page === 1 || 
+                                   page === Math.ceil(suggestedSlots.length / itemsPerPage) ||
+                                   (page >= currentSuggestedPage - 1 && page <= currentSuggestedPage + 1);
+                          })
+                          .map((page, idx, array) => {
+                            const prevPage = array[idx - 1];
+                            const showEllipsisBefore = prevPage && page - prevPage > 1;
+                            
+                            return (
+                              <React.Fragment key={page}>
+                                {showEllipsisBefore && (
+                                  <PaginationItem>
+                                    <PaginationEllipsis />
+                                  </PaginationItem>
+                                )}
+                                <PaginationItem>
+                                  <PaginationLink
+                                    onClick={() => setCurrentSuggestedPage(page)}
+                                    isActive={currentSuggestedPage === page}
+                                    className="cursor-pointer"
+                                  >
+                                    {page}
+                                  </PaginationLink>
+                                </PaginationItem>
+                              </React.Fragment>
+                            );
+                          })}
+                        <PaginationItem>
+                          <PaginationNext 
+                            onClick={() => setCurrentSuggestedPage(prev => Math.min(Math.ceil(suggestedSlots.length / itemsPerPage), prev + 1))}
+                            className={currentSuggestedPage >= Math.ceil(suggestedSlots.length / itemsPerPage) ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                          />
+                        </PaginationItem>
+                      </PaginationContent>
+                    </Pagination>
+                  </div>
+                )}
+                </>
               ) : (
                 <div className="text-center py-12">
                   <Lightbulb className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
@@ -1093,9 +1197,11 @@ const ProtocolOfficeDashboard = () => {
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Sponsor Amount:</span>
                           <span className="font-medium text-green-600">
-                            {typeof selectedEventRequest.sponsor_amount === 'string' && selectedEventRequest.sponsor_amount.startsWith('$')
-                              ? selectedEventRequest.sponsor_amount
-                              : `$${selectedEventRequest.sponsor_amount}`}
+                            {typeof selectedEventRequest.sponsor_amount === 'string' 
+                              ? (selectedEventRequest.sponsor_amount.startsWith('PKR') || selectedEventRequest.sponsor_amount.startsWith('$')
+                                  ? selectedEventRequest.sponsor_amount.replace(/^\$/, 'PKR ')
+                                  : `PKR ${selectedEventRequest.sponsor_amount}`)
+                              : `PKR ${selectedEventRequest.sponsor_amount}`}
                           </span>
                         </div>
                       )}

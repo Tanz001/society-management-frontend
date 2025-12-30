@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -17,6 +17,8 @@ const AdminEventReportsSection = ({ isActive }: AdminEventReportsSectionProps) =
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [loadingReportDetails, setLoadingReportDetails] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const hasFetchedRef = useRef(false);
+  const previousIsActiveRef = useRef(false);
 
   const fetchAllEventReports = useCallback(async () => {
     try {
@@ -34,10 +36,14 @@ const AdminEventReportsSection = ({ isActive }: AdminEventReportsSectionProps) =
       });
 
       setEventReports(response.data.data || response.data.eventReports || []);
+      hasFetchedRef.current = true;
     } catch (err: any) {
       console.error("Error fetching event reports:", err);
       setError(err.response?.data?.message || err.message || "Failed to fetch event reports");
-      setEventReports([]);
+      // Don't set eventReports to empty array on error to prevent infinite loop
+      // Only set to empty if we haven't fetched successfully before
+      setEventReports(prev => prev.length === 0 ? [] : prev);
+      hasFetchedRef.current = true; // Mark as fetched even on error to prevent loop
     } finally {
       setLoadingEventReports(false);
     }
@@ -71,10 +77,20 @@ const AdminEventReportsSection = ({ isActive }: AdminEventReportsSectionProps) =
   );
 
   useEffect(() => {
-    if (isActive && eventReports.length === 0 && !loadingEventReports) {
+    // Only fetch when tab becomes active for the first time
+    const justBecameActive = isActive && !previousIsActiveRef.current;
+    
+    if (justBecameActive && !loadingEventReports && !hasFetchedRef.current) {
       fetchAllEventReports();
     }
-  }, [isActive, fetchAllEventReports, eventReports.length, loadingEventReports]);
+    
+    // Reset fetch flag when tab becomes inactive so we can fetch again when it becomes active
+    if (!isActive && previousIsActiveRef.current) {
+      hasFetchedRef.current = false;
+    }
+    
+    previousIsActiveRef.current = isActive;
+  }, [isActive, fetchAllEventReports, loadingEventReports]);
 
   return (
     <>

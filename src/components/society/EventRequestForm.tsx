@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import axios from "axios";
 import toast from "react-hot-toast";
+import { formatTimeToAMPM } from "@/lib/utils";
 
 /* =====================================================================================
    TYPES
@@ -717,10 +718,18 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     
-    // Prevent submission if not on the last step
+    // Prevent submission if not on the last step - double check
     if (currentStep !== totalSteps) {
-      toast.error("Please complete all steps before submitting");
+      console.warn(`Form submission blocked: Current step is ${currentStep}, but must be ${totalSteps}`);
+      toast.error(`Please complete all steps before submitting. You are on step ${currentStep} of ${totalSteps}`);
+      return;
+    }
+    
+    // Additional safety check
+    if (currentStep < totalSteps) {
+      console.warn(`Form submission blocked: Current step ${currentStep} is less than total steps ${totalSteps}`);
       return;
     }
     
@@ -1179,6 +1188,12 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
             <Input
               value={transport.vehicle_type}
               onChange={(e) => onUpdate(index, "vehicle_type", e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }
+              }}
               placeholder="Car, Van, Bus"
             />
           </div>
@@ -1187,6 +1202,12 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
             <Input
               value={transport.purpose}
               onChange={(e) => onUpdate(index, "purpose", e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }
+              }}
               placeholder="Guest pickup, Field visit..."
             />
           </div>
@@ -1206,6 +1227,12 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
             <Input
               value={transport.destination}
               onChange={(e) => onUpdate(index, "destination", e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }
+              }}
               placeholder="Location"
             />
           </div>
@@ -1229,9 +1256,14 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
 
         <div className="flex justify-end">
           <Button
+            type="button"
             variant="destructive"
             size="sm"
-            onClick={() => onRemove(index)}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onRemove(index);
+            }}
           >
             <X className="mr-1 h-4 w-4" /> Remove
           </Button>
@@ -1668,7 +1700,7 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
                           className="text-sm p-2 bg-red-50 border border-red-200 rounded"
                         >
                           <span className="font-medium">
-                            {slot.time_from.substring(0, 5)} - {slot.time_to ? slot.time_to.substring(0, 5) : "N/A"}
+                            {formatTimeToAMPM(slot.time_from)} - {slot.time_to ? formatTimeToAMPM(slot.time_to) : "N/A"}
                           </span>
                           <span className="ml-2 text-red-600">({slot.status_name})</span>
                         </div>
@@ -1847,11 +1879,14 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
     <form 
       onSubmit={(e) => {
         e.preventDefault();
-        // Only allow submission on the last step
-        if (currentStep === totalSteps) {
+        e.stopPropagation();
+        
+        // Only allow submission on the last step - strict check
+        if (currentStep === totalSteps && currentStep === 6) {
           handleSubmit(e);
         } else {
-          toast.error("Please complete all steps before submitting. You are on step " + currentStep + " of " + totalSteps);
+          console.warn(`Form submission prevented: Current step is ${currentStep}, required step is ${totalSteps}`);
+          toast.error(`Please complete all steps before submitting. You are on step ${currentStep} of ${totalSteps}`);
         }
       }}
       onKeyDown={(e) => {
@@ -1860,7 +1895,8 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
           if (currentStep !== totalSteps) {
             e.preventDefault();
             e.stopPropagation();
-            nextStep();
+            // Don't auto-advance, let user click Next button
+            return false;
           }
         }
       }}
@@ -1893,7 +1929,11 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
           <Button
             type="button"
             variant="university"
-            onClick={nextStep}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              nextStep();
+            }}
             className="flex items-center gap-2"
           >
             Next
@@ -1903,7 +1943,16 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
           <Button
             type="submit"
             variant="university"
-            disabled={loading}
+            disabled={loading || currentStep !== totalSteps}
+            onClick={(e) => {
+              // Additional safety: only submit if on last step
+              if (currentStep !== totalSteps) {
+                e.preventDefault();
+                e.stopPropagation();
+                toast.error(`Please complete all steps. You are on step ${currentStep} of ${totalSteps}`);
+                return false;
+              }
+            }}
             className="flex items-center gap-2"
           >
             {loading ? (

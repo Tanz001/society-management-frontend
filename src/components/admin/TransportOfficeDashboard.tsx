@@ -490,7 +490,13 @@ const TransportOfficeDashboard = () => {
                     {selectedEventRequest.sponsor_amount && (
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Sponsor Amount:</span>
-                        <span className="font-medium">{selectedEventRequest.sponsor_amount}</span>
+                        <span className="font-medium text-green-600">
+                          {typeof selectedEventRequest.sponsor_amount === 'string' 
+                            ? (selectedEventRequest.sponsor_amount.startsWith('PKR') || selectedEventRequest.sponsor_amount.startsWith('$')
+                                ? selectedEventRequest.sponsor_amount.replace(/^\$/, 'PKR ')
+                                : `PKR ${selectedEventRequest.sponsor_amount}`)
+                            : `PKR ${selectedEventRequest.sponsor_amount}`}
+                        </span>
                       </div>
                     )}
                     {selectedEventRequest.coordinator_name && (
