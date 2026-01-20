@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
+import { Input } from "@/components/ui/input";
 import { 
   Users, 
   Calendar, 
@@ -23,7 +24,10 @@ import {
   User,
   ThumbsUp,
   Download,
-  Loader2
+  Loader2,
+  Share2,
+  Search,
+  TrendingUp
 } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import axios from "axios";
@@ -44,6 +48,8 @@ const SocietyDetail = () => {
   // const [newComment, setNewComment] = useState("");
   // const [submittingComment, setSubmittingComment] = useState(false);
   const [likingPost, setLikingPost] = useState(null); // Track which post is being liked
+  const [activeTab, setActiveTab] = useState("posts"); // Tab state for posts/about/events
+  const [postSearchQuery, setPostSearchQuery] = useState(""); // Search filter for posts
   // const [comments, setComments] = useState({});
 
   // Helper function to safely parse JSON or comma-separated strings
@@ -415,34 +421,53 @@ const SocietyDetail = () => {
     );
   }
 
+  const coverPhotoUrl = society.cover_photo 
+    ? `${import.meta.env.VITE_API_URL}/${society.cover_photo.replace(/\\/g, '/')}`
+    : null;
+  const logoUrl = society.society_logo 
+    ? `${import.meta.env.VITE_API_URL}/${society.society_logo.replace(/\\/g, '/')}`
+    : null;
+
   return (
     <div className="min-h-screen bg-background">
-      {/* Hero Section */}
-      <section className="gradient-primary text-white py-12 px-4">
-        <div className="container mx-auto max-w-6xl">
-          <div className="flex items-center mb-6">
-            <Button variant="ghost" size="sm" asChild className="text-white hover:bg-white/20 border border-white/30 bg-black/20 backdrop-blur-sm mr-4">
-              <Link to="/dashboard/student">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Dashboard
-              </Link>
-            </Button>
+      {/* Hero Section with Cover Photo */}
+      <section className="relative">
+        {/* Cover Photo */}
+        {coverPhotoUrl ? (
+          <div className="relative h-64 md:h-80 lg:h-96 w-full overflow-hidden">
+            <img 
+              src={coverPhotoUrl}
+              alt={`${society.name} cover`}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
           </div>
-          
-          <div className="space-y-6">
-            <div>
-              <div className="flex items-center mb-2">
-                <Badge variant="secondary" className="bg-white/20 text-white capitalize">
-                  {society.category}
-                </Badge>
-              </div>
-              
-              {/* Society Name and Logo in Row */}
-              <div className="flex items-center gap-4 mb-4">
-                {society.society_logo && (
-                  <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-white/30 shadow-lg flex-shrink-0">
+        ) : (
+          <div className="h-64 md:h-80 lg:h-96 w-full bg-gradient-to-br from-university-navy via-university-navy/90 to-university-maroon"></div>
+        )}
+        
+        {/* Hero Content */}
+        <div className="absolute inset-0 flex items-end">
+          <div className="container mx-auto max-w-6xl px-4 pb-8">
+            <div className="flex items-center mb-6">
+              <Button variant="ghost" size="sm" asChild className="text-white hover:bg-white/20 border border-white/30 bg-black/20 backdrop-blur-sm">
+                <Link to="/dashboard/student">
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Back to Dashboard
+                </Link>
+              </Button>
+            </div>
+            
+            <div className="flex flex-col md:flex-row items-start md:items-end gap-6">
+              {/* Logo */}
+              {logoUrl && (
+                <div className="relative">
+                  <div className="w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden border-4 border-white shadow-2xl bg-white flex-shrink-0">
                     <img 
-                      src={`${import.meta.env.VITE_API_URL}/${society.society_logo.replace(/\\/g, '/')}`} 
+                      src={logoUrl}
                       alt={society.name}
                       className="w-full h-full object-cover"
                       onError={(e) => {
@@ -450,67 +475,108 @@ const SocietyDetail = () => {
                       }}
                     />
                   </div>
-                )}
-                <h1 className="text-4xl font-bold">{society.name}</h1>
-              </div>
-              <div className="flex items-center space-x-6 mt-6">
-                <div className="flex items-center space-x-2">
-                  <MapPin className="h-5 w-5" />
-                  <span>{society.location}</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Users className="h-5 w-5" />
-                  <span>Advisor: {society.advisor}</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Calendar className="h-5 w-5" />
-                  <span>Created: {new Date(society.created_at).toLocaleDateString()}</span>
-                </div>
-              </div>
-              {!checkingMembership && !hasMembershipRequest && (
-                <Button variant="university" size="lg" className="w-full md:w-auto mt-6" asChild>
-                  <Link to={`/membership/register/${id}`}>
-                    <Users className="h-5 w-5 mr-2" />
-                    Join Society
-                  </Link>
-                </Button>
-              )}
-              {hasMembershipRequest && (
-                <div className="w-full md:w-auto mt-6 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-sm">
-                  Membership request already submitted
                 </div>
               )}
+              
+              {/* Society Info */}
+              <div className="flex-1 text-white">
+                <div className="flex items-center gap-3 mb-3">
+                  <Badge variant="secondary" className="bg-white/20 text-white border-white/30 backdrop-blur-sm capitalize">
+                    {society.category}
+                  </Badge>
+                </div>
+                
+                <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 drop-shadow-lg">
+                  {society.name}
+                </h1>
+                
+                <div className="flex flex-wrap items-center gap-4 md:gap-6 text-sm md:text-base mb-6">
+                  <div className="flex items-center space-x-2 bg-white/10 backdrop-blur-sm px-3 py-1.5 rounded-full">
+                    <MapPin className="h-4 w-4" />
+                    <span>{society.location}</span>
+                  </div>
+                  <div className="flex items-center space-x-2 bg-white/10 backdrop-blur-sm px-3 py-1.5 rounded-full">
+                    <User className="h-4 w-4" />
+                    <span>{society.advisor}</span>
+                  </div>
+                  <div className="flex items-center space-x-2 bg-white/10 backdrop-blur-sm px-3 py-1.5 rounded-full">
+                    <Calendar className="h-4 w-4" />
+                    <span>{new Date(society.created_at).toLocaleDateString()}</span>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                  {!checkingMembership && !hasMembershipRequest && (
+                    <Button variant="university" size="lg" className="shadow-xl hover:shadow-2xl transition-all" asChild>
+                      <Link to={`/membership/register/${id}`}>
+                        <Users className="h-5 w-5 mr-2" />
+                        Join Society
+                      </Link>
+                    </Button>
+                  )}
+                  {hasMembershipRequest && (
+                    <div className="inline-flex items-center px-4 py-2 bg-blue-500/90 backdrop-blur-sm border border-blue-300 rounded-lg text-white text-sm shadow-lg">
+                      <Clock className="h-4 w-4 mr-2" />
+                      Membership request already submitted
+                    </div>
+                  )}
+                  <Button 
+                    variant="outline" 
+                    size="lg" 
+                    className="bg-white/10 backdrop-blur-sm border-white/30 text-white hover:bg-white/20"
+                    onClick={() => {
+                      if (navigator.share) {
+                        navigator.share({
+                          title: society.name,
+                          text: society.description,
+                          url: window.location.href
+                        });
+                      } else {
+                        navigator.clipboard.writeText(window.location.href);
+                        // You could add a toast notification here
+                      }
+                    }}
+                  >
+                    <Share2 className="h-5 w-5 mr-2" />
+                    Share
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
       {/* Content Section */}
-      <section className="py-12 px-4">
+      <section className="py-12 px-4 bg-gray-50/50">
         <div className="container mx-auto max-w-6xl grid md:grid-cols-3 gap-8">
           {/* Main Content */}
-          <div className="md:col-span-2 space-y-8">
+          <div className="md:col-span-2 space-y-6">
             {/* Description Section */}
-            <Card className="p-6 shadow-card">
-              <h2 className="text-2xl font-semibold mb-4 text-university-navy flex items-center">
-                <FileText className="h-6 w-6 mr-2" />
-                Society Description
-              </h2>
+            <Card className="p-6 md:p-8 shadow-lg border-0 hover:shadow-xl transition-shadow">
+              <div className="flex items-center mb-6 pb-4 border-b border-gray-200">
+                <div className="p-2 bg-university-navy/10 rounded-lg">
+                  <FileText className="h-6 w-6 text-university-navy" />
+                </div>
+                <h2 className="text-2xl font-bold ml-3 text-university-navy">About</h2>
+              </div>
               <div className="prose prose-gray max-w-none">
-                <p className="text-muted-foreground leading-relaxed">
+                <p className="text-gray-700 leading-relaxed text-base">
                   {society.description || "No description has been provided yet."}
                 </p>
               </div>
             </Card>
 
             {/* Purpose Section */}
-            <Card className="p-6 shadow-card">
-              <h2 className="text-2xl font-semibold mb-4 text-university-navy flex items-center">
-                <BookOpen className="h-6 w-6 mr-2" />
-                Society Purpose
-              </h2>
+            <Card className="p-6 md:p-8 shadow-lg border-0 hover:shadow-xl transition-shadow">
+              <div className="flex items-center mb-6 pb-4 border-b border-gray-200">
+                <div className="p-2 bg-university-gold/10 rounded-lg">
+                  <BookOpen className="h-6 w-6 text-university-gold" />
+                </div>
+                <h2 className="text-2xl font-bold ml-3 text-university-navy">Our Purpose</h2>
+              </div>
               <div className="prose prose-gray max-w-none">
-                <p className="text-muted-foreground leading-relaxed">
+                <p className="text-gray-700 leading-relaxed text-base">
                   {society.purpose || "Purpose details coming soon."}
                 </p>
               </div>
@@ -518,16 +584,18 @@ const SocietyDetail = () => {
 
             {/* Achievements */}
             {society.achievements && society.achievements.length > 0 && (
-            <Card className="p-6 shadow-card">
-              <h2 className="text-2xl font-semibold mb-4 text-university-navy flex items-center">
-                <Award className="h-6 w-6 mr-2" />
-                Achievements
-              </h2>
+            <Card className="p-6 md:p-8 shadow-lg border-0 hover:shadow-xl transition-shadow">
+              <div className="flex items-center mb-6 pb-4 border-b border-gray-200">
+                <div className="p-2 bg-green-500/10 rounded-lg">
+                  <Award className="h-6 w-6 text-green-600" />
+                </div>
+                <h2 className="text-2xl font-bold ml-3 text-university-navy">Achievements</h2>
+              </div>
               <div className="grid md:grid-cols-2 gap-4">
                 {society.achievements.map((achievement, index) => (
-                  <div key={index} className="flex items-start space-x-3">
-                    <div className="w-2 h-2 bg-university-gold rounded-full mt-2"></div>
-                    <span className="text-muted-foreground">{achievement}</span>
+                  <div key={index} className="flex items-start space-x-3 p-3 bg-gradient-to-r from-university-gold/5 to-transparent rounded-lg border-l-4 border-university-gold hover:shadow-md transition-shadow">
+                    <Star className="h-5 w-5 text-university-gold mt-0.5 flex-shrink-0" />
+                    <span className="text-gray-700 leading-relaxed">{achievement}</span>
                   </div>
                 ))}
               </div>
@@ -535,11 +603,26 @@ const SocietyDetail = () => {
             )}
 
             {/* Posts Section */}
-            <Card className="p-6 shadow-card">
-              <h2 className="text-2xl font-semibold mb-6 text-university-navy flex items-center">
-                <MessageSquare className="h-6 w-6 mr-2" />
-                Society Posts
-              </h2>
+            <Card className="p-6 md:p-8 shadow-lg border-0">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 pb-4 border-b border-gray-200 gap-4">
+                <div className="flex items-center">
+                  <div className="p-2 bg-blue-500/10 rounded-lg">
+                    <MessageSquare className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <h2 className="text-2xl font-bold ml-3 text-university-navy">Recent Posts</h2>
+                </div>
+                {posts.length > 0 && (
+                  <div className="relative w-full md:w-auto">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search posts..."
+                      value={postSearchQuery}
+                      onChange={(e) => setPostSearchQuery(e.target.value)}
+                      className="pl-10 w-full md:w-64"
+                    />
+                  </div>
+                )}
+              </div>
               
               {loadingPosts ? (
                 <div className="text-center py-8">
@@ -566,29 +649,61 @@ const SocietyDetail = () => {
                     This society hasn't posted anything yet. Check back later!
                   </p>
                 </div>
-              ) : (
-                <div className="space-y-6">
-                  {posts.map((post) => (
-                    <div key={post.post_id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+              ) : (() => {
+                const filteredPosts = posts.filter(post => {
+                  if (!postSearchQuery) return true;
+                  const query = postSearchQuery.toLowerCase();
+                  return (
+                    post.title?.toLowerCase().includes(query) ||
+                    post.content?.toLowerCase().includes(query) ||
+                    post.advisor_name?.toLowerCase().includes(query) ||
+                    post.author_name?.toLowerCase().includes(query)
+                  );
+                });
+
+                if (filteredPosts.length === 0 && postSearchQuery) {
+                  return (
+                    <div className="text-center py-12">
+                      <Search className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <h3 className="font-semibold text-university-navy mb-2">No Posts Found</h3>
+                      <p className="text-muted-foreground">
+                        No posts match your search query "{postSearchQuery}". Try a different search term.
+                      </p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-6">
+                    {filteredPosts.map((post) => (
+                    <div key={post.post_id} className="bg-white border border-gray-200 rounded-xl p-5 md:p-6 hover:shadow-lg transition-all duration-300 hover:border-university-navy/30">
                       {/* Post Header */}
-                      <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-start justify-between mb-4">
                         <div className="flex items-center space-x-3">
-                          <div className="bg-gradient-to-br from-university-navy to-university-navy/80 text-white rounded-full w-10 h-10 flex items-center justify-center font-semibold text-sm">
+                          <div className="bg-gradient-to-br from-university-navy to-university-maroon text-white rounded-full w-12 h-12 flex items-center justify-center font-semibold text-sm shadow-md">
                             {(post.advisor_name || post.author_name) ? (post.advisor_name || post.author_name).charAt(0).toUpperCase() : 'A'}
                           </div>
                           <div>
-                            <h4 className="font-semibold text-university-navy">
-                              {post.advisor_name || post.author_name || 'Anonymous'}
-                            </h4>
-                            <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-                              <Clock className="h-3 w-3" />
-                              <span>{new Date(post.created_at).toLocaleDateString()}</span>
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-semibold text-university-navy">
+                                {post.advisor_name || post.author_name || 'Anonymous'}
+                              </h4>
                               {post.advisor_name && (
-                                <Badge variant="secondary" className="text-xs">
+                                <Badge variant="secondary" className="text-xs bg-university-gold/20 text-university-gold border-university-gold/30">
                                   Advisor
                                 </Badge>
                               )}
-                              <Badge variant="outline" className="text-xs">
+                            </div>
+                            <div className="flex items-center space-x-2 text-xs text-muted-foreground mt-1">
+                              <Clock className="h-3 w-3" />
+                              <span>{new Date(post.created_at).toLocaleDateString('en-US', { 
+                                month: 'short', 
+                                day: 'numeric',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}</span>
+                              <Badge variant="outline" className="text-xs capitalize">
                                 {post.post_type}
                               </Badge>
                             </div>
@@ -597,8 +712,8 @@ const SocietyDetail = () => {
                       </div>
 
                       {/* Post Content */}
-                      <div className="mb-4">
-                        <h3 className="font-semibold text-lg mb-2 text-university-navy">{post.title}</h3>
+                      <div className="mb-5">
+                        <h3 className="font-bold text-xl mb-3 text-university-navy">{post.title}</h3>
                         
                         {/* Post Type Specific Content */}
                         {post.post_type === 'text' && (
@@ -606,10 +721,12 @@ const SocietyDetail = () => {
                         )}
 
                         {post.post_type === 'photo' && (
-                          <div className="space-y-3">
-                            <p className="text-muted-foreground leading-relaxed">{post.content}</p>
+                          <div className="space-y-4">
+                            {post.content && (
+                              <p className="text-gray-700 leading-relaxed">{post.content}</p>
+                            )}
                             {post.media_files && post.media_files.length > 0 && (
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <div className={`grid gap-4 ${post.media_files.length === 1 ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
                                 {post.media_files.map((file, index) => {
                                   // Handle different URL formats
                                   let imageUrl = file.file_url;
@@ -619,11 +736,11 @@ const SocietyDetail = () => {
                                   }
                                   
                                   return (
-                                    <div key={file.media_id} className="relative group">
+                                    <div key={file.media_id} className="relative group overflow-hidden rounded-xl border-2 border-gray-200 hover:border-university-navy/50 transition-all duration-300">
                                       <img 
                                         src={imageUrl}
                                         alt={`Post image ${index + 1}`}
-                                        className="w-full h-48 object-cover rounded-lg border"
+                                        className="w-full h-auto object-cover transition-transform duration-300 group-hover:scale-105"
                                         onError={(e) => {
                                           console.error('Image failed to load:', imageUrl);
                                           e.currentTarget.style.display = 'none';
@@ -632,8 +749,8 @@ const SocietyDetail = () => {
                                           console.log('Image loaded successfully:', imageUrl);
                                         }}
                                       />
-                                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded-lg flex items-center justify-center">
-                                        <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-300 rounded-xl flex items-center justify-center">
+                                        <Eye className="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                                       </div>
                                     </div>
                                   );
@@ -786,14 +903,14 @@ const SocietyDetail = () => {
                       })()}
 
                       {/* Post Actions */}
-                      <div className="flex items-center space-x-6 pt-3 border-t border-gray-100">
+                      <div className="flex items-center space-x-4 pt-4 border-t border-gray-100">
                         <Button 
                           variant="ghost" 
                           size="sm" 
                           className={`${post.is_liked_by_user === true || likedPosts[post.post_id] === true
                             ? 'text-red-500 hover:text-red-600 bg-red-50 hover:bg-red-100' 
                             : 'text-muted-foreground hover:text-university-navy hover:bg-university-navy/5'
-                          }`}
+                          } rounded-full px-4 transition-all`}
                           onClick={() => handleLike(post.post_id)}
                           disabled={likingPost === post.post_id}
                         >
@@ -804,7 +921,7 @@ const SocietyDetail = () => {
                           ) : (
                             <ThumbsUp className="h-4 w-4 mr-2" />
                           )}
-                          Like ({post.like_count || 0})
+                          <span className="font-medium">{post.like_count || 0}</span>
                         </Button>
                         
                         {/*
@@ -919,8 +1036,9 @@ const SocietyDetail = () => {
                       </div>
                     </div>
                   ))}
-                </div>
-              )}
+                  </div>
+                );
+              })()}
             </Card>
 
           </div>
@@ -928,47 +1046,75 @@ const SocietyDetail = () => {
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Society Info */}
-            <Card className="p-6 shadow-card">
-              <h3 className="font-semibold mb-4 text-university-navy">Society Information</h3>
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Category:</span>
-                  <span className="font-medium capitalize">{society.category}</span>
+            <Card className="p-6 shadow-lg border-0 sticky top-6">
+              <div className="flex items-center mb-6 pb-4 border-b border-gray-200">
+                <div className="p-2 bg-university-navy/10 rounded-lg">
+                  <BookOpen className="h-5 w-5 text-university-navy" />
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Advisor:</span>
-                  <span className="font-medium">{society.advisor}</span>
+                <h3 className="font-bold ml-3 text-university-navy">Society Information</h3>
+              </div>
+              <div className="space-y-4">
+                <div className="flex items-start justify-between py-2 border-b border-gray-100 last:border-0">
+                  <div className="flex items-center space-x-2">
+                    <Badge className="bg-university-gold/10 text-university-gold border-university-gold/30 text-xs">Category</Badge>
+                  </div>
+                  <span className="font-semibold text-right capitalize">{society.category}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Location:</span>
-                  <span className="font-medium">{society.location}</span>
+                <div className="flex items-start justify-between py-2 border-b border-gray-100 last:border-0">
+                  <div className="flex items-center space-x-2 text-muted-foreground">
+                    <User className="h-4 w-4" />
+                    <span className="text-sm">Advisor</span>
+                  </div>
+                  <span className="font-semibold text-right">{society.advisor}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Created:</span>
-                  <span className="font-medium">{new Date(society.created_at).toLocaleDateString()}</span>
+                <div className="flex items-start justify-between py-2 border-b border-gray-100 last:border-0">
+                  <div className="flex items-center space-x-2 text-muted-foreground">
+                    <MapPin className="h-4 w-4" />
+                    <span className="text-sm">Location</span>
+                  </div>
+                  <span className="font-semibold text-right">{society.location}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Submitted by:</span>
-                  <span className="font-medium">{society.submitted_by}</span>
+                <div className="flex items-start justify-between py-2 border-b border-gray-100 last:border-0">
+                  <div className="flex items-center space-x-2 text-muted-foreground">
+                    <Calendar className="h-4 w-4" />
+                    <span className="text-sm">Created</span>
+                  </div>
+                  <span className="font-semibold text-right">{new Date(society.created_at).toLocaleDateString()}</span>
                 </div>
+                {society.submitted_by && (
+                  <div className="flex items-start justify-between py-2">
+                    <div className="flex items-center space-x-2 text-muted-foreground">
+                      <User className="h-4 w-4" />
+                      <span className="text-sm">Submitted by</span>
+                    </div>
+                    <span className="font-semibold text-right">{society.submitted_by}</span>
+                  </div>
+                )}
               </div>
             </Card>
 
             {/* Events */}
             {society.events && society.events.length > 0 && (
-            <Card className="p-6 shadow-card">
-              <h3 className="font-semibold mb-4 text-university-navy flex items-center">
-                <Calendar className="h-5 w-5 mr-2" />
-                  Events
-              </h3>
+            <Card className="p-6 shadow-lg border-0">
+              <div className="flex items-center mb-6 pb-4 border-b border-gray-200">
+                <div className="p-2 bg-green-500/10 rounded-lg">
+                  <Calendar className="h-5 w-5 text-green-600" />
+                </div>
+                <h3 className="font-bold ml-3 text-university-navy">Upcoming Events</h3>
+              </div>
               <div className="space-y-4">
                   {society.events.map((event, index) => (
-                  <div key={index} className="border-b border-border last:border-0 pb-3 last:pb-0">
-                    <h4 className="font-medium text-sm">{event.title}</h4>
-                    <p className="text-xs text-muted-foreground mb-1">
-                        📅 {new Date(event.event_date).toLocaleDateString()}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
+                  <div key={index} className="p-4 bg-gradient-to-r from-university-gold/5 to-transparent rounded-lg border-l-4 border-university-gold hover:shadow-md transition-shadow">
+                    <h4 className="font-semibold text-sm mb-2 text-university-navy">{event.title}</h4>
+                    <div className="flex items-center space-x-2 text-xs text-muted-foreground mb-2">
+                        <Calendar className="h-3 w-3" />
+                        <span>{new Date(event.event_date).toLocaleDateString('en-US', { 
+                          month: 'short', 
+                          day: 'numeric',
+                          year: 'numeric'
+                        })}</span>
+                    </div>
+                    <p className="text-xs text-gray-600 leading-relaxed">
                         {event.description}
                     </p>
                   </div>

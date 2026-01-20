@@ -288,7 +288,7 @@ const API_URL = import.meta.env.VITE_API_URL;
       }
     };
 
-    // Fetch advisors for edit form
+    // Fetch all faculty for edit form
     const fetchAdvisors = async () => {
       try {
         setLoadingAdvisors(true);
@@ -296,7 +296,7 @@ const API_URL = import.meta.env.VITE_API_URL;
         if (!token) return;
 
         const response = await axios.get(
-          `${import.meta.env.VITE_API_URL}/admin/faculty/advisors`,
+          `${import.meta.env.VITE_API_URL}/admin/faculty`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -305,16 +305,18 @@ const API_URL = import.meta.env.VITE_API_URL;
         );
 
         if (response.data.success) {
-          // API returns 'advisors' not 'faculty'
-          const advisorsList = response.data.advisors || response.data.faculty || [];
-          console.log("Fetched advisors:", advisorsList);
-          setAdvisors(advisorsList);
+          // Filter only active faculty
+          const facultyList = (response.data.faculty || []).filter(
+            (f: { is_active: number }) => f.is_active === 1
+          );
+          console.log("Fetched faculty:", facultyList);
+          setAdvisors(facultyList);
         }
       } catch (err: any) {
-        console.error("Error fetching advisors:", err);
+        console.error("Error fetching faculty:", err);
         toast({
           title: "Error",
-          description: "Failed to fetch advisors",
+          description: "Failed to fetch faculty",
           variant: "destructive",
         });
       } finally {
@@ -1888,12 +1890,8 @@ const API_URL = import.meta.env.VITE_API_URL;
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Academic">Academic</SelectItem>
-                    <SelectItem value="Cultural">Cultural</SelectItem>
-                    <SelectItem value="Sports">Sports</SelectItem>
-                    <SelectItem value="Social">Social</SelectItem>
-                    <SelectItem value="Technical">Technical</SelectItem>
-                    <SelectItem value="Other">Other</SelectItem>
+                    <SelectItem value="University Level">University Level</SelectItem>
+                    <SelectItem value="Department Level">Department Level</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

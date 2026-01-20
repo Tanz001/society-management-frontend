@@ -4,11 +4,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, ArrowRight, Upload, Plus, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Upload, Plus, X, Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -18,7 +21,7 @@ import { toast } from "@/components/ui/use-toast";
 
 const formSchema = z.object({
   name: z.string().min(3, "Society name must be at least 3 characters").nonempty("Society name is required"),
-  description: z.string().min(1, "Description is required"), // required
+  description: z.string().min(50, "Description must be at least 50 characters").nonempty("Description is required"),
   category: z.string().min(1, "Please select a category"),
   location: z.string().min(1, "Location is required"),
   advisor: z.string().min(1, "Faculty advisor is required"), // Will store faculty_id as string
@@ -80,19 +83,20 @@ const SocietyRegistration = () => {
   const returnPath = (location.state as any)?.returnTo || defaultReturnPath;
   const [societyLogo, setSocietyLogo] = useState<File | null>(null);
   const [coverPhoto, setCoverPhoto] = useState<File | null>(null);
-  const [advisors, setAdvisors] = useState<Array<{ faculty_id: number; name: string; email: string }>>([]);
-  const [loadingAdvisors, setLoadingAdvisors] = useState(false);
+  const [faculty, setFaculty] = useState<Array<{ faculty_id: number; name: string; email: string }>>([]);
+  const [loadingFaculty, setLoadingFaculty] = useState(false);
+  const [facultyComboboxOpen, setFacultyComboboxOpen] = useState(false);
 
-  // ✅ Fetch advisors on component load
+  // ✅ Fetch all faculty on component load
   useEffect(() => {
-    const fetchAdvisors = async () => {
+    const fetchFaculty = async () => {
       try {
-        setLoadingAdvisors(true);
+        setLoadingFaculty(true);
         const token = localStorage.getItem("token");
         if (!token) return;
 
         const response = await axios.get(
-          `${import.meta.env.VITE_API_URL}/admin/faculty/advisors`,
+          `${import.meta.env.VITE_API_URL}/admin/faculty`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -101,21 +105,25 @@ const SocietyRegistration = () => {
         );
 
         if (response.data.success) {
-          setAdvisors(response.data.advisors || []);
+          // Filter only active faculty
+          const activeFaculty = (response.data.faculty || []).filter(
+            (f: { is_active: number }) => f.is_active === 1
+          );
+          setFaculty(activeFaculty);
         }
       } catch (error) {
-        console.error("Error fetching advisors:", error);
+        console.error("Error fetching faculty:", error);
         toast({
           title: "Error",
-          description: "Failed to load advisors. Please refresh the page.",
+          description: "Failed to load faculty. Please refresh the page.",
           variant: "destructive",
         });
       } finally {
-        setLoadingAdvisors(false);
+        setLoadingFaculty(false);
       }
     };
 
-    fetchAdvisors();
+    fetchFaculty();
   }, []);
 
   // ✅ Check authentication state and role on component load
@@ -555,9 +563,12 @@ const SocietyRegistration = () => {
               name="name"
               render={({ field }) => {
                 console.log("Name field value:", field.value);
+                const charCount = field.value?.length || 0;
+                const minChars = 3;
+                const isValid = charCount >= minChars;
                 return (
                   <FormItem>
-                    <FormLabel>Society Name</FormLabel>
+                    <FormLabel>Society Name <span className="text-red-500">*</span></FormLabel>
                     <FormControl>
                       <Input
                         name="name"
@@ -576,6 +587,11 @@ const SocietyRegistration = () => {
                         ref={field.ref}
                       />
                     </FormControl>
+                    <FormDescription>
+                      <span className={isValid ? "text-green-600" : "text-muted-foreground"}>
+                        {charCount > 0 ? `${charCount} / ${minChars} characters` : `Minimum ${minChars} characters required`}
+                      </span>
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 );
@@ -584,19 +600,30 @@ const SocietyRegistration = () => {
             <FormField
               control={form.control}
               name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Short Description</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Brief description of your society..."
-                      className="min-h-24"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+              render={({ field }) => {
+                const charCount = field.value?.length || 0;
+                const minChars = 50;
+                const isValid = charCount >= minChars;
+                return (
+                  <FormItem>
+                    <FormLabel>Short Description <span className="text-red-500">*</span></FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Brief description of your society..."
+                        className="min-h-24"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      <span className={isValid ? "text-green-600" : "text-muted-foreground"}>
+                        {charCount > 0 ? `${charCount} / ${minChars} characters` : `Minimum ${minChars} characters required`}
+                        {charCount > 0 && !isValid && ` (${minChars - charCount} more needed)`}
+                      </span>
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
             />
 
           
@@ -606,7 +633,7 @@ const SocietyRegistration = () => {
                 name="category"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Category</FormLabel>
+                    <FormLabel>Category <span className="text-red-500">*</span></FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
@@ -614,14 +641,13 @@ const SocietyRegistration = () => {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="academic">Academic</SelectItem>
-                        <SelectItem value="arts">Arts</SelectItem>
-                        <SelectItem value="sports">Sports</SelectItem>
-                        <SelectItem value="cultural">Cultural</SelectItem>
-                        <SelectItem value="professional">Professional</SelectItem>
-                        <SelectItem value="social-impact">Social Impact</SelectItem>
+                        <SelectItem value="University Level">University Level</SelectItem>
+                        <SelectItem value="Department Level">Department Level</SelectItem>
                       </SelectContent>
                     </Select>
+                    <FormDescription>
+                      Select whether this is a University Level or Department Level society
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -632,10 +658,13 @@ const SocietyRegistration = () => {
                 name="location"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Primary Location</FormLabel>
+                    <FormLabel>Primary Location <span className="text-red-500">*</span></FormLabel>
                     <FormControl>
                       <Input placeholder="e.g., Engineering Building" {...field} />
                     </FormControl>
+                    <FormDescription>
+                      Enter the primary location or building where your society operates
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -645,32 +674,74 @@ const SocietyRegistration = () => {
             <FormField
               control={form.control}
               name="advisor"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Faculty Advisor</FormLabel>
-                  <FormControl>
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value || undefined}
-                      disabled={loadingAdvisors || advisors.length === 0}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={loadingAdvisors ? "Loading advisors..." : advisors.length === 0 ? "No advisors available" : "Select an advisor"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {advisors.length > 0 ? (
-                          advisors.map((advisor) => (
-                            <SelectItem key={advisor.faculty_id} value={String(advisor.faculty_id)}>
-                              {advisor.name} {advisor.email ? `(${advisor.email})` : ""}
-                            </SelectItem>
-                          ))
-                        ) : null}
-                      </SelectContent>
-                    </Select>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+              render={({ field }) => {
+                const selectedFaculty = faculty.find(
+                  (f) => String(f.faculty_id) === field.value
+                );
+                return (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Faculty Advisor <span className="text-red-500">*</span></FormLabel>
+                    <Popover open={facultyComboboxOpen} onOpenChange={setFacultyComboboxOpen}>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            className={cn(
+                              "w-full justify-between",
+                              !field.value && "text-muted-foreground"
+                            )}
+                            disabled={loadingFaculty || faculty.length === 0}
+                          >
+                            {loadingFaculty
+                              ? "Loading faculty..."
+                              : faculty.length === 0
+                              ? "No faculty available"
+                              : selectedFaculty
+                              ? `${selectedFaculty.name}${selectedFaculty.email ? ` (${selectedFaculty.email})` : ""}`
+                              : "Select a faculty member"}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Search faculty by name or email..." />
+                          <CommandList>
+                            <CommandEmpty>No faculty found.</CommandEmpty>
+                            <CommandGroup>
+                              {faculty.map((f) => (
+                                <CommandItem
+                                  value={`${f.name} ${f.email || ""}`}
+                                  key={f.faculty_id}
+                                  onSelect={() => {
+                                    field.onChange(String(f.faculty_id));
+                                    setFacultyComboboxOpen(false);
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      String(f.faculty_id) === field.value
+                                        ? "opacity-100"
+                                        : "opacity-0"
+                                    )}
+                                  />
+                                  {f.name} {f.email ? `(${f.email})` : ""}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                    <FormDescription>
+                      Search and select a faculty member who will serve as the advisor for this society. The advisor role will be assigned to this faculty member for this society.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
             />
           </div>
         );
@@ -686,19 +757,30 @@ const SocietyRegistration = () => {
             <FormField
               control={form.control}
               name="purpose"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Society Purpose</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Describe the main purpose and goals of your society..."
-                      className="min-h-32"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+              render={({ field }) => {
+                const charCount = field.value?.length || 0;
+                const minChars = 30;
+                const isValid = charCount >= minChars;
+                return (
+                  <FormItem>
+                    <FormLabel>Society Purpose <span className="text-red-500">*</span></FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Describe the main purpose and goals of your society..."
+                        className="min-h-32"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      <span className={isValid ? "text-green-600" : "text-muted-foreground"}>
+                        {charCount > 0 ? `${charCount} / ${minChars} characters` : `Minimum ${minChars} characters required`}
+                        {charCount > 0 && !isValid && ` (${minChars - charCount} more needed)`}
+                      </span>
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
             />
           </div>
         );
@@ -800,19 +882,30 @@ const SocietyRegistration = () => {
                   <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                   <h3 className="font-medium mb-2">Society Logo <span className="text-red-500">*</span></h3>
                   <p className="text-sm text-muted-foreground mb-2">
-                    Upload your society's logo (PNG, JPG)
+                    Upload your society's logo
                   </p>
-                  <p className="text-xs text-muted-foreground mb-4 italic">
-                    Maximum file size: 5MB
-                  </p>
+                  <div className="text-xs text-muted-foreground mb-2 space-y-1">
+                    <p className="font-medium">Requirements:</p>
+                    <p>• Accepted formats: PNG, JPG, JPEG</p>
+                    <p>• Maximum file size: <span className="font-semibold">5MB</span></p>
+                    <p>• Recommended: Square image (1:1 ratio)</p>
+                  </div>
                   {societyLogo && (
-                    <p className="text-sm text-green-600 mb-2">
-                      ✓ Logo selected: {societyLogo.name}
-                    </p>
+                    <div className="mb-2 space-y-1">
+                      <p className="text-sm text-green-600 font-medium">
+                        ✓ Logo selected: {societyLogo.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Size: {(societyLogo.size / 1024 / 1024).toFixed(2)} MB
+                        {societyLogo.size > 5 * 1024 * 1024 && (
+                          <span className="text-red-500 ml-1">(Exceeds limit!)</span>
+                        )}
+                      </p>
+                    </div>
                   )}
                   <Input
                     type="file"
-                    accept="image/png,image/jpeg"
+                    accept="image/png,image/jpeg,image/jpg"
                     onChange={(e) => handleFileChange(e, 'logo')}
                     className="hidden"
                     id="society-logo"
@@ -834,17 +927,28 @@ const SocietyRegistration = () => {
                   <p className="text-sm text-muted-foreground mb-2">
                     Upload a cover photo for your society
                   </p>
-                  <p className="text-xs text-muted-foreground mb-4 italic">
-                    Maximum file size: 5MB
-                  </p>
+                  <div className="text-xs text-muted-foreground mb-2 space-y-1">
+                    <p className="font-medium">Requirements:</p>
+                    <p>• Accepted formats: PNG, JPG, JPEG</p>
+                    <p>• Maximum file size: <span className="font-semibold">5MB</span></p>
+                    <p>• Recommended: Wide image (16:9 ratio)</p>
+                  </div>
                   {coverPhoto && (
-                    <p className="text-sm text-green-600 mb-2">
-                      ✓ Cover photo selected: {coverPhoto.name}
-                    </p>
+                    <div className="mb-2 space-y-1">
+                      <p className="text-sm text-green-600 font-medium">
+                        ✓ Cover photo selected: {coverPhoto.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Size: {(coverPhoto.size / 1024 / 1024).toFixed(2)} MB
+                        {coverPhoto.size > 5 * 1024 * 1024 && (
+                          <span className="text-red-500 ml-1">(Exceeds limit!)</span>
+                        )}
+                      </p>
+                    </div>
                   )}
                   <Input
                     type="file"
-                    accept="image/png,image/jpeg"
+                    accept="image/png,image/jpeg,image/jpg"
                     onChange={(e) => handleFileChange(e, 'cover')}
                     className="hidden"
                     id="cover-photo"

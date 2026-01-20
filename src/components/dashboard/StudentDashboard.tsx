@@ -94,7 +94,7 @@ const StudentDashboard = () => {
     getJoinedSocietiesCount();
   }, []);
 
-  const categories = ["All", "Academic", "Arts", "Social Impact", "Cultural", "Professional", "Sports"];
+  const categories = ["All", "University Level", "Department Level"];
   const [selectedCategory, setSelectedCategory] = useState("All");
 
   const filteredSocieties = societies.filter(society => {
