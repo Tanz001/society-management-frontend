@@ -4,9 +4,12 @@ import { Button } from "@/components/ui/button";
   import { Badge } from "@/components/ui/badge";
   import { Input } from "@/components/ui/input";
   import { Textarea } from "@/components/ui/textarea";
-  import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-  import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 import AdminEventReportsSection from "@/components/admin/AdminEventReportsSection";
   import { 
     Users, 
@@ -21,7 +24,12 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
     FileText,
     Award,
     Edit,
-    MapPin
+    MapPin,
+    UserPlus,
+    Check,
+    ChevronsUpDown,
+    X,
+    Power
   } from "lucide-react";
   import { useNavigate } from "react-router-dom";
   import axios from "axios";
@@ -110,6 +118,19 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
   });
   const [advisors, setAdvisors] = useState<Array<{ faculty_id: number; name: string; email: string }>>([]);
   const [loadingAdvisors, setLoadingAdvisors] = useState(false);
+  const [facultyComboboxOpen, setFacultyComboboxOpen] = useState(false);
+  
+  // Faculty Management states
+  const [allFaculty, setAllFaculty] = useState<Array<{ faculty_id: number; name: string; email: string; cnic?: string; phone?: string; is_active: number; created_at: string }>>([]);
+  const [loadingFaculty, setLoadingFaculty] = useState(false);
+  const [isFacultyEditModalOpen, setIsFacultyEditModalOpen] = useState(false);
+  const [selectedFaculty, setSelectedFaculty] = useState<any>(null);
+  const [facultyEditFormData, setFacultyEditFormData] = useState({
+    name: "",
+    email: "",
+    cnic: "",
+    phone: "",
+  });
   
   // Pagination states
   const [societiesCurrentPage, setSocietiesCurrentPage] = useState(1);
@@ -321,6 +342,119 @@ const API_URL = import.meta.env.VITE_API_URL;
         });
       } finally {
         setLoadingAdvisors(false);
+      }
+    };
+
+    // Fetch all faculty for management tab
+    const fetchAllFaculty = async () => {
+      try {
+        setLoadingFaculty(true);
+        const token = localStorage.getItem("token");
+        if (!token) return;
+
+        const response = await axios.get(
+          `${import.meta.env.VITE_API_URL}/admin/faculty`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (response.data.success) {
+          setAllFaculty(response.data.faculty || []);
+        }
+      } catch (err: any) {
+        console.error("Error fetching all faculty:", err);
+        toast({
+          title: "Error",
+          description: "Failed to fetch faculty",
+          variant: "destructive",
+        });
+      } finally {
+        setLoadingFaculty(false);
+      }
+    };
+
+    // Handle edit faculty click
+    const handleEditFacultyClick = (faculty: any) => {
+      setSelectedFaculty(faculty);
+      setFacultyEditFormData({
+        name: faculty.name || "",
+        email: faculty.email || "",
+        cnic: faculty.cnic || "",
+        phone: faculty.phone || "",
+      });
+      setIsFacultyEditModalOpen(true);
+    };
+
+    // Handle update faculty
+    const handleUpdateFaculty = async () => {
+      if (!selectedFaculty) return;
+
+      try {
+        setActionLoading(true);
+        const token = localStorage.getItem("token");
+        if (!token) return;
+
+        // Note: We'll need to create an update endpoint or use existing one
+        // For now, we'll show a message that update functionality needs backend support
+        toast({
+          title: "Info",
+          description: "Faculty update endpoint needs to be implemented in backend",
+          variant: "default",
+        });
+        
+        setIsFacultyEditModalOpen(false);
+        setSelectedFaculty(null);
+      } catch (err: any) {
+        console.error("Error updating faculty:", err);
+        toast({
+          title: "Error",
+          description: err.response?.data?.message || "Failed to update faculty",
+          variant: "destructive",
+        });
+      } finally {
+        setActionLoading(false);
+      }
+    };
+
+    // Handle toggle faculty status (activate/deactivate)
+    const handleToggleFacultyStatus = async (facultyId: number, currentStatus: number) => {
+      try {
+        setActionLoading(true);
+        const token = localStorage.getItem("token");
+        if (!token) return;
+
+        const newStatus = currentStatus === 1 ? 0 : 1;
+        const response = await axios.put(
+          `${import.meta.env.VITE_API_URL}/admin/faculty/${facultyId}/status`,
+          { is_active: newStatus },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (response.data.success) {
+          toast({
+            title: "Success",
+            description: `Faculty member ${newStatus === 1 ? 'activated' : 'deactivated'} successfully`,
+            variant: "default",
+          });
+          await fetchAllFaculty();
+          await fetchAdvisors(); // Refresh advisors list too
+        }
+      } catch (err: any) {
+        console.error("Error toggling faculty status:", err);
+        toast({
+          title: "Error",
+          description: err.response?.data?.message || "Failed to update faculty status",
+          variant: "destructive",
+        });
+      } finally {
+        setActionLoading(false);
       }
     };
 
@@ -609,6 +743,9 @@ const API_URL = import.meta.env.VITE_API_URL;
         fetchAllEventRequests();
         fetchEventRequestStats();
       }
+      // if (activeTab === "faculty") {
+      //   fetchAllFaculty();
+      // }
     }, [activeTab, eventRequestFilter]);
 
     // Logout function
@@ -639,6 +776,15 @@ const API_URL = import.meta.env.VITE_API_URL;
                   <Building className="h-4 w-4 mr-2" />
                   Create Society
                 </Button>
+                {/* <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="text-white border-white hover:bg-white/20 bg-transparent"
+                  onClick={() => navigate("/dashboard/admin/add-faculty")}
+                >
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Add Faculty
+                </Button> */}
                 <Button 
                   variant="outline" 
                   size="sm" 
@@ -662,6 +808,7 @@ const API_URL = import.meta.env.VITE_API_URL;
                 <TabsTrigger value="overview">Societies</TabsTrigger>
                 <TabsTrigger value="event-requests">Event Requests</TabsTrigger>
                 <TabsTrigger value="event-reports">Event Reports</TabsTrigger>
+                {/* <TabsTrigger value="faculty">Faculty Management</TabsTrigger> */}
               </TabsList>
 
               {/* Societies Tab (kept for reference but not reachable from UI) */}
@@ -1090,6 +1237,87 @@ const API_URL = import.meta.env.VITE_API_URL;
               <TabsContent value="event-reports">
                 <AdminEventReportsSection isActive={activeTab === "event-reports"} />
               </TabsContent>
+
+              {/* <TabsContent value="faculty">
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-2xl font-semibold text-university-navy">Faculty Management</h2>
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        onClick={fetchAllFaculty}
+                        disabled={loadingFaculty}
+                      >
+                        {loadingFaculty ? "Loading..." : "Refresh"}
+                      </Button>
+                      <Button 
+                        variant="university"
+                        onClick={() => navigate("/dashboard/admin/add-faculty")}
+                      >
+                        <UserPlus className="h-4 w-4 mr-2" />
+                        Add Faculty
+                      </Button>
+                    </div>
+                  </div>
+
+                  {loadingFaculty && allFaculty.length === 0 ? (
+                    <div className="text-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-university-navy mx-auto mb-4"></div>
+                      <p className="text-muted-foreground">Loading faculty...</p>
+                    </div>
+                  ) : allFaculty.length === 0 ? (
+                    <Card className="p-8 text-center">
+                      <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                      <p className="text-muted-foreground">No faculty members found</p>
+                    </Card>
+                  ) : (
+                    <div className="grid gap-4">
+                      {allFaculty.map((faculty) => (
+                        <Card key={faculty.faculty_id} className="p-6 shadow-card">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3 mb-2">
+                                <h3 className="text-lg font-semibold text-university-navy">{faculty.name}</h3>
+                                <Badge variant={faculty.is_active === 1 ? "default" : "secondary"}>
+                                  {faculty.is_active === 1 ? "Active" : "Inactive"}
+                                </Badge>
+                              </div>
+                              <div className="space-y-1 text-sm text-muted-foreground">
+                                <p>📧 {faculty.email}</p>
+                                {faculty.phone && <p>📞 {faculty.phone}</p>}
+                                {faculty.cnic && <p>🆔 CNIC: {faculty.cnic}</p>}
+                                <p className="text-xs">
+                                  Created: {new Date(faculty.created_at).toLocaleDateString()}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex gap-2 ml-4">
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => handleEditFacultyClick(faculty)}
+                                disabled={actionLoading}
+                              >
+                                <Edit className="h-3 w-3 mr-1" />
+                                Edit
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant={faculty.is_active === 1 ? "destructive" : "default"}
+                                onClick={() => handleToggleFacultyStatus(faculty.faculty_id, faculty.is_active)}
+                                disabled={actionLoading}
+                              >
+                                <Power className="h-3 w-3 mr-1" />
+                                {faculty.is_active === 1 ? "Deactivate" : "Activate"}
+                              </Button>
+                            </div>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </TabsContent> */}
             </Tabs>
           </div>
         </section>
@@ -1908,37 +2136,57 @@ const API_URL = import.meta.env.VITE_API_URL;
               <div>
                 <label className="text-sm font-medium mb-2 block">Faculty Advisor</label>
                 {loadingAdvisors ? (
-                  <div className="text-sm text-muted-foreground">Loading advisors...</div>
+                  <div className="text-sm text-muted-foreground">Loading faculty...</div>
                 ) : advisors.length === 0 ? (
-                  <div className="text-sm text-muted-foreground">No advisors available</div>
+                  <div className="text-sm text-muted-foreground">No faculty available</div>
                 ) : (
-                  <Select
-                    value={editFormData.advisor || undefined}
-                    onValueChange={(value) => {
-                      console.log("Advisor changed to:", value);
-                      setEditFormData({ ...editFormData, advisor: value });
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={editFormData.advisor ? "Select advisor" : "Select advisor"}>
+                  <Popover open={facultyComboboxOpen} onOpenChange={setFacultyComboboxOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        className={cn(
+                          "w-full justify-between",
+                          !editFormData.advisor && "text-muted-foreground"
+                        )}
+                      >
                         {editFormData.advisor && advisors.find(a => String(a.faculty_id) === editFormData.advisor)
-                          ? `${advisors.find(a => String(a.faculty_id) === editFormData.advisor)?.name} (${advisors.find(a => String(a.faculty_id) === editFormData.advisor)?.email})`
-                          : "Select advisor"}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {advisors.map((advisor) => (
-                        <SelectItem key={advisor.faculty_id} value={String(advisor.faculty_id)}>
-                          {advisor.name} ({advisor.email})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-                {editFormData.advisor && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Current advisor ID: {editFormData.advisor}
-                  </p>
+                          ? `${advisors.find(a => String(a.faculty_id) === editFormData.advisor)?.name}${advisors.find(a => String(a.faculty_id) === editFormData.advisor)?.email ? ` (${advisors.find(a => String(a.faculty_id) === editFormData.advisor)?.email})` : ""}`
+                          : "Select a faculty member"}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Search faculty by name or email..." />
+                        <CommandList>
+                          <CommandEmpty>No faculty found.</CommandEmpty>
+                          <CommandGroup>
+                            {advisors.map((f) => (
+                              <CommandItem
+                                value={`${f.name} ${f.email || ""}`}
+                                key={f.faculty_id}
+                                onSelect={() => {
+                                  setEditFormData({ ...editFormData, advisor: String(f.faculty_id) });
+                                  setFacultyComboboxOpen(false);
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    String(f.faculty_id) === editFormData.advisor
+                                      ? "opacity-100"
+                                      : "opacity-0"
+                                  )}
+                                />
+                                {f.name} {f.email ? `(${f.email})` : ""}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 )}
               </div>
 
@@ -1965,6 +2213,75 @@ const API_URL = import.meta.env.VITE_API_URL;
                 </Button>
               </div>
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Faculty Modal */}
+        <Dialog open={isFacultyEditModalOpen} onOpenChange={setIsFacultyEditModalOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Edit Faculty Member</DialogTitle>
+              <DialogDescription>
+                Update the faculty member information below
+              </DialogDescription>
+            </DialogHeader>
+
+            {selectedFaculty && (
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Full Name *</label>
+                  <Input
+                    value={facultyEditFormData.name}
+                    onChange={(e) => setFacultyEditFormData({ ...facultyEditFormData, name: e.target.value })}
+                    placeholder="Enter full name"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Email *</label>
+                  <Input
+                    type="email"
+                    value={facultyEditFormData.email}
+                    onChange={(e) => setFacultyEditFormData({ ...facultyEditFormData, email: e.target.value })}
+                    placeholder="Enter email"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium mb-2 block">CNIC (Optional)</label>
+                  <Input
+                    value={facultyEditFormData.cnic}
+                    onChange={(e) => setFacultyEditFormData({ ...facultyEditFormData, cnic: e.target.value })}
+                    placeholder="Enter CNIC"
+                    maxLength={20}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Phone (Optional)</label>
+                  <Input
+                    type="tel"
+                    value={facultyEditFormData.phone}
+                    onChange={(e) => setFacultyEditFormData({ ...facultyEditFormData, phone: e.target.value })}
+                    placeholder="Enter phone number"
+                    maxLength={20}
+                  />
+                </div>
+
+                <div className="flex justify-end space-x-3 pt-4">
+                  <Button variant="outline" onClick={() => setIsFacultyEditModalOpen(false)} disabled={actionLoading}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    variant="university" 
+                    onClick={handleUpdateFaculty}
+                    disabled={actionLoading}
+                  >
+                    {actionLoading ? "Updating..." : "Update Faculty"}
+                  </Button>
+                </div>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
       </div>

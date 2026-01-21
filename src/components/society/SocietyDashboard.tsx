@@ -36,7 +36,8 @@ import {
   Video,
   Download,
   BarChart3 as BarChartIcon,
-  MapPin
+  MapPin,
+  ArrowLeft
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -74,6 +75,29 @@ const SocietyDashboard = () => {
   const [selectedEventForReport, setSelectedEventForReport] = useState<{id: number, title: string} | null>(null);
   const [isReportUploadOpen, setIsReportUploadOpen] = useState(false);
   const [completingEvent, setCompletingEvent] = useState<number | null>(null);
+
+  // Check if user is advisor
+  const isAdvisor = () => {
+    try {
+      const user = localStorage.getItem("user");
+      if (!user) return false;
+      
+      const userData = JSON.parse(user);
+      const roles = userData.roles || [];
+      const roleNames = roles.map((r: any) => String(r.role_name || "").toLowerCase());
+      
+      // Check if user has advisor role or has faculty_id (indicating faculty/advisor)
+      return roleNames.includes("advisor") || !!userData.faculty_id;
+    } catch (error) {
+      console.error("Error checking advisor status:", error);
+      return false;
+    }
+  };
+
+  // Navigate back to advisor dashboard
+  const handleBackToAdvisorDashboard = () => {
+    navigate("/dashboard/advisor");
+  };
 
   // Logout function
   const handleLogout = () => {
@@ -615,24 +639,38 @@ const SocietyDashboard = () => {
           variant: "secondary"
         }}
         leftContent={
-          <MobileSidebar trigger={
-            <Button variant="ghost" size="sm" className="md:hidden text-white hover:bg-white/20">
-              <Menu className="h-5 w-5" />
-              <span className="sr-only">Open menu</span>
-            </Button>
-          }>
-            <MobileNav items={navigationItems} />
-            <div className="border-t p-4">
+          <div className="flex items-center gap-2">
+            {isAdvisor() && (
               <Button 
                 variant="ghost" 
-                onClick={handleLogout}
-                className="w-full justify-start text-red-600 hover:bg-red-50"
+                size="sm" 
+                onClick={handleBackToAdvisorDashboard}
+                className="text-white hover:bg-white/20"
+                title="Back to My Societies"
               >
-                <LogOut className="h-4 w-4 mr-3" />
-                Logout
+                <ArrowLeft className="h-5 w-5 mr-1 md:mr-2" />
+                <span className="hidden sm:inline">My Societies</span>
               </Button>
-            </div>
-          </MobileSidebar>
+            )}
+            <MobileSidebar trigger={
+              <Button variant="ghost" size="sm" className="md:hidden text-white hover:bg-white/20">
+                <Menu className="h-5 w-5" />
+                <span className="sr-only">Open menu</span>
+              </Button>
+            }>
+              <MobileNav items={navigationItems} />
+              <div className="border-t p-4">
+                <Button 
+                  variant="ghost" 
+                  onClick={handleLogout}
+                  className="w-full justify-start text-red-600 hover:bg-red-50"
+                >
+                  <LogOut className="h-4 w-4 mr-3" />
+                  Logout
+                </Button>
+              </div>
+            </MobileSidebar>
+          </div>
         }
         rightContent={
           <Button 

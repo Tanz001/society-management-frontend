@@ -77,10 +77,15 @@ const LoginForm = () => {
 
       // 👉 FACULTY / ADMIN FLOW
       const roles = user.roles || [];
+      
+      console.log("User roles from login:", roles);
+      console.log("User object:", user);
 
       const roleNames = roles.map((r: any) =>
         String(r.role_name).toLowerCase()
       );
+      
+      console.log("Role names extracted:", roleNames);
 
       // Admin roles
       if (roleNames.includes("vc")) {
@@ -112,14 +117,26 @@ const LoginForm = () => {
         return;
       }
 
-      // Advisor roles
+      // Advisor roles - check for advisor role
       if (roleNames.includes("advisor")) {
+        console.log("Advisor role detected, navigating to /dashboard/advisor");
         navigate("/dashboard/advisor");
         return;
       }
 
-      // Default faculty
-      navigate("/dashboard/faculty");
+      // If no roles found but user is faculty, default to advisor dashboard
+      // (since faculty without specific roles might be advisors)
+      if (user.faculty_id && roles.length === 0) {
+        console.log("No roles found, but faculty_id exists. Navigating to advisor dashboard as fallback");
+        navigate("/dashboard/advisor");
+        return;
+      }
+
+      // Default fallback - show error instead of navigating to non-existent route
+      console.error("No matching role found for user:", user);
+      setError("Unable to determine user role. Please contact administrator.");
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
 
     } catch (err: any) {
       console.error(err);
