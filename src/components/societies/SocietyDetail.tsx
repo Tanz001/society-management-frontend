@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import axios from "axios";
+import { getDashboardPath } from "@/lib/utils";
 
 const SocietyDetail = () => {
   const { id } = useParams();
@@ -399,7 +400,7 @@ const SocietyDetail = () => {
           <h2 className="text-2xl font-bold text-university-navy mb-4">Error</h2>
           <p className="text-muted-foreground mb-4">{error}</p>
           <Button asChild className="bg-university-navy hover:bg-university-navy/90">
-            <Link to="/dashboard/student">Back to Dashboard</Link>
+            <Link to={getDashboardPath()}>Back to Dashboard</Link>
           </Button>
         </div>
       </div>
@@ -414,7 +415,7 @@ const SocietyDetail = () => {
           <h2 className="text-2xl font-bold text-university-navy mb-4">Society Not Found</h2>
           <p className="text-muted-foreground mb-4">The society you're looking for doesn't exist.</p>
           <Button asChild className="bg-university-navy hover:bg-university-navy/90">
-            <Link to="/dashboard/student">Back to Dashboard</Link>
+            <Link to={getDashboardPath()}>Back to Dashboard</Link>
           </Button>
         </div>
       </div>
@@ -454,7 +455,7 @@ const SocietyDetail = () => {
           <div className="container mx-auto max-w-6xl px-4 pb-8">
             <div className="flex items-center mb-6">
               <Button variant="ghost" size="sm" asChild className="text-white hover:bg-white/20 border border-white/30 bg-black/20 backdrop-blur-sm">
-                <Link to="/dashboard/student">
+                <Link to={getDashboardPath()}>
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Back to Dashboard
                 </Link>

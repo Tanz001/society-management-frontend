@@ -1,4 +1,5 @@
 import { Navigate, useLocation } from "react-router-dom";
+import { getDashboardPath } from "@/lib/utils";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -27,8 +28,9 @@ const ProtectedRoute = ({ children, requireAuth = false, guestOnly = false }: Pr
 
   // If route is guest-only and user is logged in
   if (guestOnly && isAuthenticated) {
-    console.log("ProtectedRoute - Redirecting to dashboard (already authenticated)");
-    return <Navigate to="/dashboard/student" replace />;
+    const dashboardPath = getDashboardPath();
+    console.log("ProtectedRoute - Redirecting to dashboard (already authenticated):", dashboardPath);
+    return <Navigate to={dashboardPath} replace />;
   }
 
   console.log("ProtectedRoute - Access granted");

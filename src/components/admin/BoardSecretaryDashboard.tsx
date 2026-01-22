@@ -34,7 +34,7 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
   import { useNavigate } from "react-router-dom";
   import axios from "axios";
   import { useToast } from "@/components/ui/use-toast";
-  import { formatTimeToAMPM } from "@/lib/utils";
+  import { formatTimeToAMPM, getDashboardPath } from "@/lib/utils";
   import {
     Pagination,
     PaginationContent,
@@ -731,8 +731,37 @@ const API_URL = import.meta.env.VITE_API_URL;
       }
     };
 
-    // Load societies on component mount
+    // Verify user role on component mount
     useEffect(() => {
+      const userStr = localStorage.getItem("user");
+      if (!userStr) {
+        navigate("/");
+        return;
+      }
+
+      try {
+        const user = JSON.parse(userStr);
+        const roles = user.roles || [];
+        const roleNames = roles.map((r: any) => String(r.role_name || "").toLowerCase());
+        
+        // Check if user has board_secretary role
+        if (!roleNames.includes("board_secretary")) {
+          toast({
+            title: "Access Denied",
+            description: "You don't have permission to access this dashboard.",
+            variant: "destructive",
+          });
+          // Redirect to appropriate dashboard based on user role
+          navigate(getDashboardPath());
+          return;
+        }
+      } catch (error) {
+        console.error("Error verifying user role:", error);
+        navigate("/");
+        return;
+      }
+
+      // Load data if role is correct
       fetchAllSocieties();
       fetchStatuses();
     }, []);

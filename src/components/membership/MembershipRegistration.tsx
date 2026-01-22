@@ -9,6 +9,7 @@ import { Upload, User, Mail, Phone, MapPin, GraduationCap, BookOpen, Calendar, C
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { toast } from "sonner";
+import { getDashboardPath } from "@/lib/utils";
 
 interface MembershipRegistrationProps {
   societyName?: string;
@@ -286,7 +287,7 @@ const fetchMembershipSettings = async (societyId: string) => {
           duration: 2000,
         });
   
-        setTimeout(() => navigate("/dashboard/student"), 2000);
+        setTimeout(() => navigate(getDashboardPath()), 2000);
       } else {
         throw new Error(message || "Submission failed");
       }
