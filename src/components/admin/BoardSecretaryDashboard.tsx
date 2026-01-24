@@ -8,6 +8,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger,
+  DropdownMenuSeparator
+} from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import AdminEventReportsSection from "@/components/admin/AdminEventReportsSection";
@@ -29,12 +36,19 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
     Check,
     ChevronsUpDown,
     X,
-    Power
+    Power,
+    Trash2,
+    Upload,
+    Image as ImageIcon,
+    MoreVertical,
+    Search
   } from "lucide-react";
   import { useNavigate } from "react-router-dom";
   import axios from "axios";
-  import { useToast } from "@/components/ui/use-toast";
-  import { formatTimeToAMPM, getDashboardPath } from "@/lib/utils";
+import { useToast } from "@/components/ui/use-toast";
+import { formatTimeToAMPM, getDashboardPath } from "@/lib/utils";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { Label } from "@/components/ui/label";
   import {
     Pagination,
     PaginationContent,
@@ -61,11 +75,23 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
     note: string;
     created_at: string;
     updated_at: string;
-    student_info: {
+    logo_path?: string;
+    cover_image_path?: string;
+    advisor_info?: {
+      faculty_id: number;
+      name: string;
+      email?: string;
+      phone?: string;
+      cnic?: string;
+      dept?: string;
+    };
+    student_info?: {
       firstName: string;
       lastName: string;
       email: string;
       rollNo: string;
+      university?: string;
+      major?: string;
     };
     achievements?: any[];
     events?: any[];
@@ -116,7 +142,17 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
     advisor: "",
     purpose: "",
   });
-  const [advisors, setAdvisors] = useState<Array<{ faculty_id: number; name: string; email: string }>>([]);
+  const [editLogoFile, setEditLogoFile] = useState<File | null>(null);
+  const [editCoverFile, setEditCoverFile] = useState<File | null>(null);
+  const [previewLogo, setPreviewLogo] = useState<string | null>(null);
+  const [previewCover, setPreviewCover] = useState<string | null>(null);
+  const [societyToDelete, setSocietyToDelete] = useState<number | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [selectedSocietyDetail, setSelectedSocietyDetail] = useState<Society | null>(null);
+  const [advisorInfo, setAdvisorInfo] = useState<any>(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [advisors, setAdvisors] = useState<Array<{ faculty_id: number; name: string; email: string; dept?: string }>>([]);
   const [loadingAdvisors, setLoadingAdvisors] = useState(false);
   const [facultyComboboxOpen, setFacultyComboboxOpen] = useState(false);
   
@@ -136,6 +172,7 @@ import AdminEventReportsSection from "@/components/admin/AdminEventReportsSectio
   const [societiesCurrentPage, setSocietiesCurrentPage] = useState(1);
   const [eventRequestsCurrentPage, setEventRequestsCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+  const [searchTerm, setSearchTerm] = useState("");
 
 
     // Helper functions for event requester details
@@ -458,6 +495,148 @@ const API_URL = import.meta.env.VITE_API_URL;
       }
     };
 
+    // Handle delete society
+    const handleDeleteSociety = async (societyId: number) => {
+      try {
+        setActionLoading(true);
+        const token = localStorage.getItem("token");
+        if (!token) {
+          toast({
+            title: "Error",
+            description: "No authentication token found",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        const response = await axios.delete(
+          `${import.meta.env.VITE_API_URL}/admin/societies/${societyId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (response.data.success) {
+          toast({
+            title: "Success",
+            description: "Society deleted successfully!",
+          });
+          setIsDeleteDialogOpen(false);
+          setSocietyToDelete(null);
+          await fetchAllSocieties();
+        }
+      } catch (err: any) {
+        console.error("Error deleting society:", err);
+        toast({
+          title: "Error",
+          description: err.response?.data?.message || "Failed to delete society",
+          variant: "destructive",
+        });
+      } finally {
+        setActionLoading(false);
+      }
+    };
+
+    // Handle file change for edit modal
+    const handleEditFileChange = (event: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'cover') => {
+      if (event.target.files && event.target.files[0]) {
+        const file = event.target.files[0];
+        const maxSize = 5 * 1024 * 1024; // 5MB
+        
+        if (file.size > maxSize) {
+          toast({
+            title: "File too large",
+            description: `${type === 'logo' ? 'Logo' : 'Cover photo'} size exceeds 5MB. Please choose a smaller file.`,
+            variant: "destructive",
+          });
+          event.target.value = '';
+          return;
+        }
+        
+        if (!file.type.match(/^image\/(png|jpeg|jpg)$/i)) {
+          toast({
+            title: "Invalid file type",
+            description: `Invalid file type for ${type === 'logo' ? 'logo' : 'cover photo'}. Please upload PNG or JPG images only.`,
+            variant: "destructive",
+          });
+          event.target.value = '';
+          return;
+        }
+        
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          if (type === 'logo') {
+            setEditLogoFile(file);
+            setPreviewLogo(reader.result as string);
+          } else {
+            setEditCoverFile(file);
+            setPreviewCover(reader.result as string);
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+    };
+
+    // Handle view details
+    const handleViewDetails = async (society: Society) => {
+      try {
+        setLoadingDetails(true);
+        const token = localStorage.getItem("token");
+        if (!token) return;
+
+        // Fetch detailed society information with advisor details
+        const response = await axios.get(
+          `${import.meta.env.VITE_API_URL}/admin/societies/${society.society_id}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+
+        const societyData = response.data.data;
+        setSelectedSocietyDetail(societyData);
+
+        // Fetch advisor details from faculty table if faculty_id exists
+        if (societyData.faculty_id) {
+          try {
+            const advisorResponse = await axios.get(
+              `${import.meta.env.VITE_API_URL}/admin/faculty`,
+              {
+                headers: { Authorization: `Bearer ${token}` },
+              }
+            );
+            
+            const advisor = advisorResponse.data.faculty?.find(
+              (f: any) => f.faculty_id === societyData.faculty_id
+            );
+            
+            if (advisor) {
+              setAdvisorInfo(advisor);
+            } else {
+              setAdvisorInfo(null);
+            }
+          } catch (err) {
+            console.error("Error fetching advisor details:", err);
+            setAdvisorInfo(null);
+          }
+        } else {
+          setAdvisorInfo(null);
+        }
+
+        setIsDetailModalOpen(true);
+      } catch (err: any) {
+        console.error("Error fetching society details:", err);
+        toast({
+          title: "Error",
+          description: "Failed to load society details",
+          variant: "destructive",
+        });
+      } finally {
+        setLoadingDetails(false);
+      }
+    };
+
     // Handle edit button click
     const handleEditClick = async (society: Society) => {
       try {
@@ -491,6 +670,10 @@ const API_URL = import.meta.env.VITE_API_URL;
         });
 
         setSocietyToEdit(society);
+        setEditLogoFile(null);
+        setEditCoverFile(null);
+        setPreviewLogo(societyData.society_logo ? `${import.meta.env.VITE_API_URL}/${societyData.society_logo}` : null);
+        setPreviewCover(societyData.cover_photo ? `${import.meta.env.VITE_API_URL}/${societyData.cover_photo}` : null);
         
         // Always fetch advisors to ensure we have the latest list before opening modal
         await fetchAdvisors();
@@ -525,28 +708,57 @@ const API_URL = import.meta.env.VITE_API_URL;
           return;
         }
 
-        // Send as JSON instead of FormData since we're not uploading files
-        const payload = {
-          name: editFormData.name,
-          description: editFormData.description,
-          category: editFormData.category,
-          location: editFormData.location,
-          advisor: editFormData.advisor,
-          purpose: editFormData.purpose,
-        };
-
-        console.log("Updating society with payload:", payload);
-
-        const response = await axios.put(
-          `${import.meta.env.VITE_API_URL}/admin/societies/${societyToEdit.society_id}`,
-          payload,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
+        // Use FormData if images are being uploaded, otherwise use JSON
+        const hasImages = editLogoFile || editCoverFile;
+        
+        let response;
+        if (hasImages) {
+          const formData = new FormData();
+          formData.append("name", editFormData.name);
+          formData.append("description", editFormData.description);
+          formData.append("category", editFormData.category);
+          formData.append("location", editFormData.location);
+          formData.append("advisor", editFormData.advisor);
+          formData.append("purpose", editFormData.purpose);
+          
+          if (editLogoFile) {
+            formData.append("societyLogo", editLogoFile);
           }
-        );
+          if (editCoverFile) {
+            formData.append("coverPhoto", editCoverFile);
+          }
+
+          response = await axios.put(
+            `${import.meta.env.VITE_API_URL}/admin/societies/${societyToEdit.society_id}`,
+            formData,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "multipart/form-data",
+              },
+            }
+          );
+        } else {
+          const payload = {
+            name: editFormData.name,
+            description: editFormData.description,
+            category: editFormData.category,
+            location: editFormData.location,
+            advisor: editFormData.advisor,
+            purpose: editFormData.purpose,
+          };
+
+          response = await axios.put(
+            `${import.meta.env.VITE_API_URL}/admin/societies/${societyToEdit.society_id}`,
+            payload,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+              },
+            }
+          );
+        }
 
         if (response.data.success) {
           toast({
@@ -556,6 +768,10 @@ const API_URL = import.meta.env.VITE_API_URL;
           });
           setIsEditModalOpen(false);
           setSocietyToEdit(null);
+          setEditLogoFile(null);
+          setEditCoverFile(null);
+          setPreviewLogo(null);
+          setPreviewCover(null);
           await fetchAllSocieties();
         }
       } catch (err: any) {
@@ -861,16 +1077,39 @@ const API_URL = import.meta.env.VITE_API_URL;
                   </Card>
                 )}
 
+                {/* Search Input */}
+                <div className="mb-6">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder="Search societies by name..."
+                      value={searchTerm}
+                      onChange={(e) => {
+                        setSearchTerm(e.target.value);
+                        setSocietiesCurrentPage(1); // Reset to first page when searching
+                      }}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+
                 {/* Societies List */}
             {loading && societies.length === 0 ? (
               <div className="text-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-university-navy mx-auto mb-4"></div>
                 <p className="text-muted-foreground">Loading societies...</p>
               </div>
-            ) : societies.length > 0 ? (
+            ) : (() => {
+              // Filter societies based on search term
+              const filteredSocieties = societies.filter((society) =>
+                society.name.toLowerCase().includes(searchTerm.toLowerCase())
+              );
+              
+              return filteredSocieties.length > 0 ? (
               <>
               <div className="grid gap-6">
-                {societies.slice((societiesCurrentPage - 1) * itemsPerPage, societiesCurrentPage * itemsPerPage).map((society) => (
+                {filteredSocieties.slice((societiesCurrentPage - 1) * itemsPerPage, societiesCurrentPage * itemsPerPage).map((society) => (
                   <Card key={society.society_id} className="p-6 shadow-card">
                     <div className="flex items-start justify-between">
                       <div className="flex items-start space-x-4 flex-1">
@@ -910,32 +1149,40 @@ const API_URL = import.meta.env.VITE_API_URL;
                           </div>
                         </div>
                       </div>
-                      <div className="flex space-x-2 ml-4">
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => handleEditClick(society)}
-                          disabled={loading}
-                        >
-                          <Edit className="h-3 w-3 mr-1" />
-                          Edit
-                        </Button>
-                        {/* Only show Review button for Pending (status 1) - Board Secretary's pending items */}
-                        {/* {society.status_id === 1 ? (
-                          <Button 
-                            size="sm" 
-                            variant="university"
-                            onClick={() => handleReviewClick(society)}
-                            disabled={loading}
-                          >
-                            <Eye className="h-3 w-3 mr-1" />
-                            Review
-                          </Button>
-                        ) : (
-                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                            Tracked: {society.status_name}
-                          </Badge>
-                        )} */}
+                      <div className="flex items-center ml-4">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              disabled={loading}
+                            >
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleViewDetails(society)}>
+                              <Eye className="h-4 w-4 mr-2" />
+                              View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEditClick(society)}>
+                              <Edit className="h-4 w-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem 
+                              onClick={() => {
+                                setSocietyToDelete(society.society_id);
+                                setIsDeleteDialogOpen(true);
+                              }}
+                              className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
                   </Card>
@@ -943,10 +1190,10 @@ const API_URL = import.meta.env.VITE_API_URL;
               </div>
               
               {/* Pagination for Societies */}
-              {societies.length > itemsPerPage && (
+              {filteredSocieties.length > itemsPerPage && (
                 <div className="flex items-center justify-between mt-6">
                   <div className="text-sm text-muted-foreground">
-                    Showing {(societiesCurrentPage - 1) * itemsPerPage + 1} to {Math.min(societiesCurrentPage * itemsPerPage, societies.length)} of {societies.length} societies
+                    Showing {(societiesCurrentPage - 1) * itemsPerPage + 1} to {Math.min(societiesCurrentPage * itemsPerPage, filteredSocieties.length)} of {filteredSocieties.length} societies
                   </div>
                   <Pagination>
                     <PaginationContent>
@@ -956,10 +1203,10 @@ const API_URL = import.meta.env.VITE_API_URL;
                           className={societiesCurrentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
                         />
                       </PaginationItem>
-                      {Array.from({ length: Math.ceil(societies.length / itemsPerPage) }, (_, i) => i + 1)
+                      {Array.from({ length: Math.ceil(filteredSocieties.length / itemsPerPage) }, (_, i) => i + 1)
                         .filter(page => {
                           return page === 1 || 
-                                 page === Math.ceil(societies.length / itemsPerPage) ||
+                                 page === Math.ceil(filteredSocieties.length / itemsPerPage) ||
                                  (page >= societiesCurrentPage - 1 && page <= societiesCurrentPage + 1);
                         })
                         .map((page, idx, array) => {
@@ -986,10 +1233,10 @@ const API_URL = import.meta.env.VITE_API_URL;
                           );
                         })}
                       <PaginationItem>
-                        <PaginationNext 
-                          onClick={() => setSocietiesCurrentPage(prev => Math.min(Math.ceil(societies.length / itemsPerPage), prev + 1))}
-                          className={societiesCurrentPage >= Math.ceil(societies.length / itemsPerPage) ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                        />
+                            <PaginationNext 
+                              onClick={() => setSocietiesCurrentPage(prev => Math.min(Math.ceil(filteredSocieties.length / itemsPerPage), prev + 1))}
+                              className={societiesCurrentPage >= Math.ceil(filteredSocieties.length / itemsPerPage) ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                            />
                       </PaginationItem>
                     </PaginationContent>
                   </Pagination>
@@ -998,11 +1245,27 @@ const API_URL = import.meta.env.VITE_API_URL;
               </>
             ) : (
               <div className="text-center py-12">
-                <Building className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                <h3 className="text-lg font-medium mb-2">No Pending Applications</h3>
-                <p className="text-muted-foreground">There are no society applications waiting for board review.</p>
+                <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-lg font-medium mb-2">
+                  {searchTerm ? "No Societies Found" : "No Societies Found"}
+                </h3>
+                <p className="text-muted-foreground">
+                  {searchTerm 
+                    ? `No societies found matching "${searchTerm}". Try a different search term.`
+                    : "No societies have been registered yet."}
+                </p>
+                {searchTerm && (
+                  <Button
+                    variant="outline"
+                    className="mt-4"
+                    onClick={() => setSearchTerm("")}
+                  >
+                    Clear Search
+                  </Button>
+                )}
               </div>
-            )}
+            );
+            })()}
               </TabsContent>
 
               {/* Event Requests Tab */}
@@ -2149,6 +2412,7 @@ const API_URL = import.meta.env.VITE_API_URL;
                   <SelectContent>
                     <SelectItem value="University Level">University Level</SelectItem>
                     <SelectItem value="Department Level">Department Level</SelectItem>
+                    <SelectItem value="Intermediate Level">Intermediate Level</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -2180,7 +2444,10 @@ const API_URL = import.meta.env.VITE_API_URL;
                         )}
                       >
                         {editFormData.advisor && advisors.find(a => String(a.faculty_id) === editFormData.advisor)
-                          ? `${advisors.find(a => String(a.faculty_id) === editFormData.advisor)?.name}${advisors.find(a => String(a.faculty_id) === editFormData.advisor)?.email ? ` (${advisors.find(a => String(a.faculty_id) === editFormData.advisor)?.email})` : ""}`
+                          ? (() => {
+                              const selected = advisors.find(a => String(a.faculty_id) === editFormData.advisor);
+                              return selected ? `${selected.name}${selected.email ? ` (${selected.email})` : ""}` : "Select a faculty member";
+                            })()
                           : "Select a faculty member"}
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
@@ -2193,7 +2460,7 @@ const API_URL = import.meta.env.VITE_API_URL;
                           <CommandGroup>
                             {advisors.map((f) => (
                               <CommandItem
-                                value={`${f.name} ${f.email || ""}`}
+                                value={`${f.name} ${f.email || ""} ${f.dept || ""}`}
                                 key={f.faculty_id}
                                 onSelect={() => {
                                   setEditFormData({ ...editFormData, advisor: String(f.faculty_id) });
@@ -2208,7 +2475,10 @@ const API_URL = import.meta.env.VITE_API_URL;
                                       : "opacity-0"
                                   )}
                                 />
-                                {f.name} {f.email ? `(${f.email})` : ""}
+                                <div className="flex flex-col">
+                                  <span>{f.name} {f.email ? `(${f.email})` : ""}</span>
+                                  {f.dept && <span className="text-xs text-muted-foreground">{f.dept}</span>}
+                                </div>
                               </CommandItem>
                             ))}
                           </CommandGroup>
@@ -2227,6 +2497,71 @@ const API_URL = import.meta.env.VITE_API_URL;
                   placeholder="Enter purpose (minimum 30 characters)"
                   rows={4}
                 />
+              </div>
+
+              {/* Image Upload Section */}
+              <div className="space-y-4 pt-4 border-t">
+                <h3 className="text-sm font-medium">Update Images</h3>
+                
+                {/* Logo Upload */}
+                <div>
+                  <Label htmlFor="edit-logo" className="text-sm font-medium mb-2 block">
+                    Society Logo
+                  </Label>
+                  <div className="flex items-center gap-4">
+                    {previewLogo && (
+                      <div className="w-20 h-20 rounded-lg overflow-hidden border-2 border-gray-200">
+                        <img
+                          src={previewLogo}
+                          alt="Logo preview"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <Input
+                        id="edit-logo"
+                        type="file"
+                        accept="image/png,image/jpeg,image/jpg"
+                        onChange={(e) => handleEditFileChange(e, 'logo')}
+                        className="cursor-pointer"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        PNG or JPG, max 5MB
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Cover Photo Upload */}
+                <div>
+                  <Label htmlFor="edit-cover" className="text-sm font-medium mb-2 block">
+                    Cover Photo
+                  </Label>
+                  <div className="flex items-center gap-4">
+                    {previewCover && (
+                      <div className="w-32 h-20 rounded-lg overflow-hidden border-2 border-gray-200">
+                        <img
+                          src={previewCover}
+                          alt="Cover preview"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <Input
+                        id="edit-cover"
+                        type="file"
+                        accept="image/png,image/jpeg,image/jpg"
+                        onChange={(e) => handleEditFileChange(e, 'cover')}
+                        className="cursor-pointer"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        PNG or JPG, max 5MB
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="flex justify-end space-x-3 pt-4">
@@ -2309,6 +2644,249 @@ const API_URL = import.meta.env.VITE_API_URL;
                     {actionLoading ? "Updating..." : "Update Faculty"}
                   </Button>
                 </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <ConfirmDialog
+          open={isDeleteDialogOpen}
+          onOpenChange={setIsDeleteDialogOpen}
+          title="Delete Society"
+          description="Are you sure you want to delete this society? This action cannot be undone and will delete all associated data including events, achievements, and status history."
+          confirmText="Delete"
+          cancelText="Cancel"
+          variant="destructive"
+          onConfirm={() => {
+            if (societyToDelete) {
+              handleDeleteSociety(societyToDelete);
+            }
+          }}
+        />
+
+        {/* Society Detail Modal */}
+        <Dialog open={isDetailModalOpen} onOpenChange={setIsDetailModalOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Society Details</DialogTitle>
+              <DialogDescription>
+                Complete information about the society
+              </DialogDescription>
+            </DialogHeader>
+
+            {loadingDetails ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-university-navy"></div>
+              </div>
+            ) : selectedSocietyDetail ? (
+              <div className="space-y-6">
+                {/* Header Section with Cover Photo */}
+                {selectedSocietyDetail.cover_image_path && (
+                  <div className="relative h-48 rounded-lg overflow-hidden">
+                    <img
+                      src={`${import.meta.env.VITE_API_URL}/${selectedSocietyDetail.cover_image_path}`}
+                      alt={selectedSocietyDetail.name}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  </div>
+                )}
+
+                {/* Society Basic Info */}
+                <Card className="p-6">
+                  <div className="flex items-start gap-4 mb-4">
+                    {selectedSocietyDetail.logo_path && (
+                      <img
+                        src={`${import.meta.env.VITE_API_URL}/${selectedSocietyDetail.logo_path}`}
+                        alt={selectedSocietyDetail.name}
+                        className="w-20 h-20 rounded-lg object-cover border-2 border-university-gold"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    )}
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h2 className="text-2xl font-bold text-university-navy">{selectedSocietyDetail.name}</h2>
+                        <Badge variant="secondary">{selectedSocietyDetail.status_name}</Badge>
+                        <Badge variant="outline">{selectedSocietyDetail.category}</Badge>
+                      </div>
+                      <p className="text-muted-foreground mb-2">
+                        <MapPin className="h-4 w-4 inline mr-1" />
+                        {selectedSocietyDetail.location}
+                      </p>
+                      <div className="flex items-center text-sm text-muted-foreground">
+                        <Clock className="h-4 w-4 mr-1" />
+                        Created: {new Date(selectedSocietyDetail.created_at || '').toLocaleDateString()}
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Description */}
+                <Card className="p-6">
+                  <h3 className="font-semibold mb-3 text-university-navy flex items-center">
+                    <FileText className="h-5 w-5 mr-2" />
+                    Description
+                  </h3>
+                  <p className="text-muted-foreground leading-relaxed">{selectedSocietyDetail.description}</p>
+                </Card>
+
+                {/* Purpose */}
+                <Card className="p-6">
+                  <h3 className="font-semibold mb-3 text-university-navy flex items-center">
+                    <FileText className="h-5 w-5 mr-2" />
+                    Purpose
+                  </h3>
+                  <p className="text-muted-foreground leading-relaxed">{selectedSocietyDetail.purpose}</p>
+                </Card>
+
+                {/* Advisor Information */}
+                {(selectedSocietyDetail.advisor_info || advisorInfo) && (
+                  <Card className="p-6 border-l-4 border-l-blue-500">
+                    <h3 className="font-semibold mb-3 text-university-navy flex items-center">
+                      <Users className="h-5 w-5 mr-2" />
+                      Advisor Information
+                    </h3>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Name:</span>
+                          <span className="font-medium">
+                            {selectedSocietyDetail.advisor_info?.name || advisorInfo?.name || selectedSocietyDetail.advisor || "N/A"}
+                          </span>
+                        </div>
+                        {(selectedSocietyDetail.advisor_info?.email || advisorInfo?.email) && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Email:</span>
+                            <span className="font-medium">
+                              {selectedSocietyDetail.advisor_info?.email || advisorInfo?.email}
+                            </span>
+                          </div>
+                        )}
+                        {(selectedSocietyDetail.advisor_info?.phone || advisorInfo?.phone) && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Phone:</span>
+                            <span className="font-medium">
+                              {selectedSocietyDetail.advisor_info?.phone || advisorInfo?.phone}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="space-y-2 text-sm">
+                        {(selectedSocietyDetail.advisor_info?.faculty_id || advisorInfo?.faculty_id) && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Faculty ID:</span>
+                            <span className="font-medium">
+                              {selectedSocietyDetail.advisor_info?.faculty_id || advisorInfo?.faculty_id}
+                            </span>
+                          </div>
+                        )}
+                        {(selectedSocietyDetail.advisor_info?.dept || advisorInfo?.dept) && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Department:</span>
+                            <span className="font-medium">
+                              {selectedSocietyDetail.advisor_info?.dept || advisorInfo?.dept}
+                            </span>
+                          </div>
+                        )}
+                        {(selectedSocietyDetail.advisor_info?.cnic || advisorInfo?.cnic) && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">CNIC:</span>
+                            <span className="font-medium">
+                              {selectedSocietyDetail.advisor_info?.cnic || advisorInfo?.cnic}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </Card>
+                )}
+
+                {/* Student Information */}
+                {selectedSocietyDetail.student_info && (
+                  <Card className="p-6">
+                    <h3 className="font-semibold mb-3 text-university-navy">Submitted By (Student)</h3>
+                    <div className="grid md:grid-cols-2 gap-4 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Name:</span>
+                        <span className="font-medium">
+                          {selectedSocietyDetail.student_info.firstName} {selectedSocietyDetail.student_info.lastName}
+                        </span>
+                      </div>
+                      {selectedSocietyDetail.student_info.email && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Email:</span>
+                          <span className="font-medium">{selectedSocietyDetail.student_info.email}</span>
+                        </div>
+                      )}
+                      {selectedSocietyDetail.student_info.rollNo && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Roll Number:</span>
+                          <span className="font-medium">{selectedSocietyDetail.student_info.rollNo}</span>
+                        </div>
+                      )}
+                      {selectedSocietyDetail.student_info.university && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">University:</span>
+                          <span className="font-medium">{selectedSocietyDetail.student_info.university}</span>
+                        </div>
+                      )}
+                      {selectedSocietyDetail.student_info.major && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Major:</span>
+                          <span className="font-medium">{selectedSocietyDetail.student_info.major}</span>
+                        </div>
+                      )}
+                    </div>
+                  </Card>
+                )}
+
+                {/* Achievements */}
+                {selectedSocietyDetail.achievements && Array.isArray(selectedSocietyDetail.achievements) && selectedSocietyDetail.achievements.length > 0 && (
+                  <Card className="p-6">
+                    <h3 className="font-semibold mb-3 text-university-navy flex items-center">
+                      <Award className="h-5 w-5 mr-2" />
+                      Achievements
+                    </h3>
+                    <div className="space-y-2">
+                      {selectedSocietyDetail.achievements.map((achievement: any, index: number) => (
+                        <div key={index} className="flex items-start space-x-2">
+                          <div className="w-2 h-2 bg-university-gold rounded-full mt-2"></div>
+                          <span className="text-muted-foreground">
+                            {achievement.achievement || "Untitled Achievement"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex justify-end space-x-3 pt-4 border-t">
+                  <Button variant="outline" onClick={() => setIsDetailModalOpen(false)}>
+                    Close
+                  </Button>
+                  <Button 
+                    variant="university" 
+                    onClick={() => {
+                      setIsDetailModalOpen(false);
+                      if (selectedSocietyDetail) {
+                        handleEditClick(selectedSocietyDetail as any);
+                      }
+                    }}
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit Society
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground">No details available</p>
               </div>
             )}
           </DialogContent>

@@ -83,7 +83,7 @@ const SocietyRegistration = () => {
   const returnPath = (location.state as any)?.returnTo || defaultReturnPath;
   const [societyLogo, setSocietyLogo] = useState<File | null>(null);
   const [coverPhoto, setCoverPhoto] = useState<File | null>(null);
-  const [faculty, setFaculty] = useState<Array<{ faculty_id: number; name: string; email: string }>>([]);
+  const [faculty, setFaculty] = useState<Array<{ faculty_id: number; name: string; email: string; dept?: string }>>([]);
   const [loadingFaculty, setLoadingFaculty] = useState(false);
   const [facultyComboboxOpen, setFacultyComboboxOpen] = useState(false);
 
@@ -643,10 +643,11 @@ const SocietyRegistration = () => {
                       <SelectContent>
                         <SelectItem value="University Level">University Level</SelectItem>
                         <SelectItem value="Department Level">Department Level</SelectItem>
+                        <SelectItem value="Intermediate Level">Intermediate Level</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormDescription>
-                      Select whether this is a University Level or Department Level society
+                      Select whether this is a University Level, Department Level, or Intermediate Level society
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -712,7 +713,7 @@ const SocietyRegistration = () => {
                             <CommandGroup>
                               {faculty.map((f) => (
                                 <CommandItem
-                                  value={`${f.name} ${f.email || ""}`}
+                                  value={`${f.name} ${f.dept || ""} ${f.email || ""}`}
                                   key={f.faculty_id}
                                   onSelect={() => {
                                     field.onChange(String(f.faculty_id));
@@ -727,7 +728,12 @@ const SocietyRegistration = () => {
                                         : "opacity-0"
                                     )}
                                   />
-                                  {f.name} {f.email ? `(${f.email})` : ""}
+                                  <div className="flex flex-col">
+                                    <span>{f.name} {f.email ? `(${f.email})` : ""}</span>
+                                    {f.dept && (
+                                      <span className="text-xs text-muted-foreground">{f.dept}</span>
+                                    )}
+                                  </div>
                                 </CommandItem>
                               ))}
                             </CommandGroup>
