@@ -1021,7 +1021,7 @@ const API_URL = import.meta.env.VITE_API_URL;
                   <Building className="h-4 w-4 mr-2" />
                   Create Society
                 </Button>
-                {/* <Button 
+                <Button 
                   variant="outline" 
                   size="sm" 
                   className="text-white border-white hover:bg-white/20 bg-transparent"
@@ -1029,7 +1029,7 @@ const API_URL = import.meta.env.VITE_API_URL;
                 >
                   <UserPlus className="h-4 w-4 mr-2" />
                   Add Faculty
-                </Button> */}
+                </Button>
                 <Button 
                   variant="outline" 
                   size="sm" 

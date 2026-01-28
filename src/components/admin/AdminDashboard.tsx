@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -29,7 +29,10 @@ import {
   Trash2,
   UserPlus,
   ShieldCheck,
-  FileText
+  FileText,
+  Search,
+  MoreVertical,
+  Clock
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -37,6 +40,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger,
+  DropdownMenuSeparator
+} from "@/components/ui/dropdown-menu";
 
 const AdminDashboard = () => {
   const { toast } = useToast();
@@ -86,6 +105,11 @@ const AdminDashboard = () => {
   const [societyToDelete, setSocietyToDelete] = useState<number | null>(null);
   const [studentToDelete, setStudentToDelete] = useState<number | null>(null);
   const navigate = useNavigate();
+  const [societiesCurrentPage, setSocietiesCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [advisorInfo, setAdvisorInfo] = useState<any>(null);
 
   // Calculate stats from actual data
   const stats = {
@@ -123,13 +147,19 @@ const AdminDashboard = () => {
     society.status === 'under_review'
   );
 
-  // Filter societies based on selected filter
+  // Filter societies based on selected filter and search term
   const filteredSocieties = allSocieties.filter(society => {
-    if (societyFilter === "all") return true;
-    if (societyFilter === "active") return society.status_name === 'Approved by VC' || society.status === 'active';
-    if (societyFilter === "pending") return society.status_id === 1 || society.status === 'pending' || society.status === 'under_review';
-    if (societyFilter === "rejected") return society.status_name?.includes('Rejected') || society.status === 'rejected';
-    return true;
+    // Apply status filter
+    let matchesFilter = true;
+    if (societyFilter === "all") matchesFilter = true;
+    else if (societyFilter === "active") matchesFilter = society.status_name === 'Approved by VC' || society.status === 'active';
+    else if (societyFilter === "pending") matchesFilter = society.status_id === 1 || society.status === 'pending' || society.status === 'under_review';
+    else if (societyFilter === "rejected") matchesFilter = society.status_name?.includes('Rejected') || society.status === 'rejected';
+    
+    // Apply search filter
+    const matchesSearch = !searchTerm || society.name.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    return matchesFilter && matchesSearch;
   });
 
   // These would be fetched from separate API endpoints
@@ -145,6 +175,63 @@ const AdminDashboard = () => {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedSociety(null);
+  };
+
+  const handleViewDetails = async (society: any) => {
+    try {
+      setLoadingDetails(true);
+      const token = localStorage.getItem("token");
+      if (!token) return;
+
+      // Fetch detailed society information
+      const response = await axios.get(
+        `${import.meta.env.VITE_API_URL}/admin/societies/${society.society_id}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      const societyData = response.data.data;
+      setSelectedSocietyForDetail(societyData);
+
+      // Fetch advisor details from faculty table if faculty_id exists
+      if (societyData.faculty_id) {
+        try {
+          const advisorResponse = await axios.get(
+            `${import.meta.env.VITE_API_URL}/admin/faculty`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            }
+          );
+          
+          const advisor = advisorResponse.data.faculty?.find(
+            (f: any) => f.faculty_id === societyData.faculty_id
+          );
+          
+          if (advisor) {
+            setAdvisorInfo(advisor);
+          } else {
+            setAdvisorInfo(null);
+          }
+        } catch (err) {
+          console.error("Error fetching advisor details:", err);
+          setAdvisorInfo(null);
+        }
+      } else {
+        setAdvisorInfo(null);
+      }
+
+      setIsSocietyDetailModalOpen(true);
+    } catch (err: any) {
+      console.error("Error fetching society details:", err);
+      toast({
+        title: "Error",
+        description: err.response?.data?.message || "Failed to fetch society details",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingDetails(false);
+    }
   };
 
   const handleApprove = async (societyId) => {
@@ -953,7 +1040,7 @@ const AdminDashboard = () => {
                      "Rejected Societies"} ({filteredSocieties.length})
                   </h3>
                   <div className="grid gap-6">
-                    {filteredSocieties.map((society) => (
+                    {paginatedSocieties.map((society) => (
                       <Card key={society.society_id} className="p-6 shadow-card">
                         <div className="space-y-4">
                           {/* Header */}
@@ -996,26 +1083,33 @@ const AdminDashboard = () => {
                                 </p>
                               </div>
                             </div>
-                            <div className="flex space-x-2">
-                            <Button 
-                              size="sm" 
-                              variant="outline"
-                              onClick={() => {
-                                setSelectedSocietyForDetail(society);
-                                setIsSocietyDetailModalOpen(true);
-                              }}
-                            >
-                              <Eye className="h-3 w-3 mr-1" />
-                              View Details
-                            </Button>
-                              <Button 
-                                size="sm" 
-                                variant="destructive"
-                                onClick={() => handleDeleteSociety(society.society_id)}
-                              >
-                                <Trash2 className="h-3 w-3 mr-1" />
-                                Delete
-                            </Button>
+                            <div className="flex items-center ml-4">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    className="h-8 w-8 p-0"
+                                    disabled={loading}
+                                  >
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => handleViewDetails(society)}>
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    View Details
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem 
+                                    onClick={() => handleDeleteSociety(society.society_id)}
+                                    className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </div>
                           </div>
 
@@ -1651,152 +1745,168 @@ const AdminDashboard = () => {
 
       {/* Society Detail Modal */}
       <Dialog open={isSocietyDetailModalOpen} onOpenChange={setIsSocietyDetailModalOpen}>
-        <DialogContent className="max-w-4xl h-[95vh] overflow-hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Society Details</DialogTitle>
             <DialogDescription>
-              View complete information about the society
+              Complete information about the society
             </DialogDescription>
           </DialogHeader>
 
-          {selectedSocietyForDetail && (
-            <div className="space-y-6 overflow-y-auto h-full [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-              {/* Hero Section */}
-              <div className="gradient-primary text-white p-6 rounded-lg">
-                <div className="flex items-start space-x-4">
-                  <div className="w-20 h-20 bg-white/20 rounded-lg flex items-center justify-center">
-                    {selectedSocietyForDetail.society_logo ? (
-                      <img 
-                        src={`${import.meta.env.VITE_API_URL}/${selectedSocietyForDetail.society_logo}`} 
-                        alt={selectedSocietyForDetail.name}
-                        className="w-16 h-16 rounded-lg object-cover"
-                      />
-                    ) : (
-                      <Building className="h-10 w-10 text-white" />
-                    )}
+          {loadingDetails ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-university-navy"></div>
+            </div>
+          ) : selectedSocietyForDetail ? (
+            <div className="space-y-6">
+              {/* Header Section with Cover Photo */}
+              {selectedSocietyForDetail.cover_image_path && (
+                <div className="relative h-48 rounded-lg overflow-hidden">
+                  <img
+                    src={`${import.meta.env.VITE_API_URL}/${selectedSocietyForDetail.cover_image_path}`}
+                    alt={selectedSocietyForDetail.name}
+                    className="w-full h-full object-cover"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  />
+                </div>
+              )}
+              {/* Society Info */}
+              <div className="flex items-start gap-4">
+                {selectedSocietyForDetail.logo_path && (
+                  <img
+                    src={`${import.meta.env.VITE_API_URL}/${selectedSocietyForDetail.logo_path}`}
+                    alt={selectedSocietyForDetail.name}
+                    className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg -mt-12 bg-white flex-shrink-0"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  />
+                )}
+                <div className="flex-1">
+                  <div className="flex items-center mb-2 gap-2">
+                    <h2 className="text-2xl font-bold text-university-navy">{selectedSocietyForDetail.name}</h2>
+                    <Badge variant="secondary">{selectedSocietyForDetail.status_name}</Badge>
+                    <Badge variant="outline">{selectedSocietyForDetail.category}</Badge>
                   </div>
-                  <div className="flex-1">
-                    <div className="flex items-center mb-2">
-                      <Badge variant="secondary" className="bg-white/20 text-white mr-2 capitalize">
-                        {selectedSocietyForDetail.category}
-                      </Badge>
-                      <Badge 
-                        variant="outline" 
-                        className={`text-white border-white ${
-                          selectedSocietyForDetail.status_name === 'Approved by VC' ? 'bg-green-500/20' :
-                          selectedSocietyForDetail.status_id === 1 ? 'bg-yellow-500/20' :
-                          selectedSocietyForDetail.status_name?.includes('Rejected') ? 'bg-red-500/20' : ''
-                        }`}
-                      >
-                        {selectedSocietyForDetail.status_name || 'Unknown'}
-                      </Badge>
-                    </div>
-                    <h2 className="text-2xl font-bold mb-2">{selectedSocietyForDetail.name}</h2>
-                    <p className="text-white/90 mb-4">{selectedSocietyForDetail.description}</p>
-                    <div className="flex items-center space-x-4 text-sm">
-                      <div className="flex items-center space-x-1">
-                        <MapPin className="h-4 w-4" />
-                        <span>{selectedSocietyForDetail.location}</span>
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        <Users className="h-4 w-4" />
-                        <span>Advisor: {selectedSocietyForDetail.advisor}</span>
-                      </div>
-                    </div>
-                  </div>
+                  <p className="text-sm text-muted-foreground flex items-center gap-1">
+                    <MapPin className="h-4 w-4" /> {selectedSocietyForDetail.location}
+                  </p>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                    <Clock className="h-3 w-3" /> Created: {new Date(selectedSocietyForDetail.created_at || '').toLocaleDateString()}
+                  </p>
                 </div>
               </div>
 
-              {/* Society Information */}
-              <Card className="p-4">
-                <h3 className="font-semibold mb-3 text-university-navy">Society Information</h3>
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Society ID:</span>
-                      <span className="font-medium">{selectedSocietyForDetail.society_id}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Category:</span>
-                      <span className="font-medium capitalize">{selectedSocietyForDetail.category}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Location:</span>
-                      <span className="font-medium">{selectedSocietyForDetail.location}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Advisor:</span>
-                      <span className="font-medium">{selectedSocietyForDetail.advisor}</span>
-                    </div>
-                  </div>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Status:</span>
-                      <Badge 
-                        variant={
-                          selectedSocietyForDetail.status_name === 'Approved by VC' ? 'default' :
-                          selectedSocietyForDetail.status_id === 1 ? 'secondary' :
-                          selectedSocietyForDetail.status_name?.includes('Rejected') ? 'destructive' : 'outline'
-                        }
-                      >
-                        {selectedSocietyForDetail.status_name || 'Unknown'}
-                      </Badge>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Created:</span>
-                      <span className="font-medium">
-                        {selectedSocietyForDetail.created_at ? new Date(selectedSocietyForDetail.created_at).toLocaleDateString() : 'N/A'}
-                      </span>
-                    </div>
-                    {selectedSocietyForDetail.student_info && (
-                      <>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Owner:</span>
-                          <span className="font-medium">
-                            {selectedSocietyForDetail.student_info.firstName} {selectedSocietyForDetail.student_info.lastName}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Owner Email:</span>
-                          <span className="font-medium">{selectedSocietyForDetail.student_info.email}</span>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </Card>
-
               {/* Description */}
-              <Card className="p-4">
+              <Card className="p-6">
                 <h3 className="font-semibold mb-3 text-university-navy">Description</h3>
-                <p className="text-muted-foreground leading-relaxed">
-                  {selectedSocietyForDetail.description}
-                </p>
+                <p className="text-muted-foreground leading-relaxed">{selectedSocietyForDetail.description}</p>
               </Card>
 
               {/* Purpose */}
-              <Card className="p-4">
-                <h3 className="font-semibold mb-3 text-university-navy flex items-center">
-                  <BookOpen className="h-5 w-5 mr-2" />
-                  Society Purpose
-                </h3>
-                <p className="text-muted-foreground leading-relaxed">
-                  {selectedSocietyForDetail.purpose}
-                </p>
+              <Card className="p-6">
+                <h3 className="font-semibold mb-3 text-university-navy">Purpose</h3>
+                <p className="text-muted-foreground leading-relaxed">{selectedSocietyForDetail.purpose}</p>
               </Card>
 
+              {/* Advisor Information */}
+              {(selectedSocietyForDetail.advisor_info || advisorInfo) && (
+                <Card className="p-6 border-l-4 border-l-blue-500">
+                  <h3 className="font-semibold mb-3 text-university-navy flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    Advisor Information
+                  </h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Name:</span>
+                      <span className="font-medium">{selectedSocietyForDetail.advisor_info?.name || advisorInfo?.name || selectedSocietyForDetail.advisor || "N/A"}</span>
+                    </div>
+                    {(selectedSocietyForDetail.advisor_info?.email || advisorInfo?.email) && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Email:</span>
+                        <span className="font-medium">{selectedSocietyForDetail.advisor_info?.email || advisorInfo?.email}</span>
+                      </div>
+                    )}
+                    {(selectedSocietyForDetail.advisor_info?.phone || advisorInfo?.phone) && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Phone:</span>
+                        <span className="font-medium">{selectedSocietyForDetail.advisor_info?.phone || advisorInfo?.phone}</span>
+                      </div>
+                    )}
+                    {(selectedSocietyForDetail.advisor_info?.faculty_id || advisorInfo?.faculty_id) && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Faculty ID:</span>
+                        <span className="font-medium">{selectedSocietyForDetail.advisor_info?.faculty_id || advisorInfo?.faculty_id}</span>
+                      </div>
+                    )}
+                    {(selectedSocietyForDetail.advisor_info?.dept || advisorInfo?.dept) && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Department:</span>
+                        <span className="font-medium">{selectedSocietyForDetail.advisor_info?.dept || advisorInfo?.dept}</span>
+                      </div>
+                    )}
+                    {(selectedSocietyForDetail.advisor_info?.cnic || advisorInfo?.cnic) && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">CNIC:</span>
+                        <span className="font-medium">{selectedSocietyForDetail.advisor_info?.cnic || advisorInfo?.cnic}</span>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              )}
+
+              {/* Submitted By (Student) */}
+              {selectedSocietyForDetail.student_info && (
+                <Card className="p-6 border-l-4 border-l-university-gold">
+                  <h3 className="font-semibold mb-3 text-university-navy flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    Submitted By (Student)
+                  </h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Name:</span>
+                      <span className="font-medium">{selectedSocietyForDetail.student_info.firstName} {selectedSocietyForDetail.student_info.lastName}</span>
+                    </div>
+                    {selectedSocietyForDetail.student_info.email && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Email:</span>
+                        <span className="font-medium">{selectedSocietyForDetail.student_info.email}</span>
+                      </div>
+                    )}
+                    {selectedSocietyForDetail.student_info.rollNo && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Roll No:</span>
+                        <span className="font-medium">{selectedSocietyForDetail.student_info.rollNo}</span>
+                      </div>
+                    )}
+                    {selectedSocietyForDetail.student_info.university && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">University:</span>
+                        <span className="font-medium">{selectedSocietyForDetail.student_info.university}</span>
+                      </div>
+                    )}
+                    {selectedSocietyForDetail.student_info.major && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Major:</span>
+                        <span className="font-medium">{selectedSocietyForDetail.student_info.major}</span>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              )}
+
               {/* Achievements */}
-              {selectedSocietyForDetail.achievements && selectedSocietyForDetail.achievements.length > 0 && (
-                <Card className="p-4">
+              {selectedSocietyForDetail.achievements && Array.isArray(selectedSocietyForDetail.achievements) && selectedSocietyForDetail.achievements.length > 0 && (
+                <Card className="p-6">
                   <h3 className="font-semibold mb-3 text-university-navy flex items-center">
                     <Award className="h-5 w-5 mr-2" />
                     Achievements
                   </h3>
                   <div className="space-y-2">
-                    {selectedSocietyForDetail.achievements.map((achievement: string, index: number) => (
+                    {selectedSocietyForDetail.achievements.map((achievement: any, index: number) => (
                       <div key={index} className="flex items-start space-x-2">
                         <div className="w-2 h-2 bg-university-gold rounded-full mt-2"></div>
-                        <span className="text-muted-foreground">{achievement}</span>
+                        <span className="text-muted-foreground">
+                          {achievement.achievement || achievement || "Untitled Achievement"}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -1849,25 +1959,11 @@ const AdminDashboard = () => {
                 <Button variant="outline" onClick={() => setIsSocietyDetailModalOpen(false)}>
                   Close
                 </Button>
-                <Button 
-                  variant="destructive"
-                  onClick={() => {
-                    setConfirmDialog({
-                      open: true,
-                      title: "Delete Society",
-                      description: "Are you sure you want to delete this society? This action cannot be undone.",
-                      onConfirm: () => {
-                        handleDeleteSociety(selectedSocietyForDetail.society_id);
-                        setIsSocietyDetailModalOpen(false);
-                      },
-                      variant: "destructive"
-                    });
-                  }}
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete Society
-                </Button>
               </div>
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">No details available</p>
             </div>
           )}
         </DialogContent>
