@@ -92,6 +92,7 @@ const AdminDashboard = () => {
     rejected: 0
   });
   const [eventRequestsCurrentPage, setEventRequestsCurrentPage] = useState(1);
+  const [societiesCurrentPage, setSocietiesCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [isAdvisorDialogOpen, setIsAdvisorDialogOpen] = useState(false);
   const [advisorData, setAdvisorData] = useState({
@@ -1017,28 +1018,40 @@ const AdminDashboard = () => {
                   <Button
                     variant={societyFilter === "all" ? "university" : "outline"}
                     size="sm"
-                    onClick={() => setSocietyFilter("all")}
+                    onClick={() => {
+                      setSocietyFilter("all");
+                      setSocietiesCurrentPage(1);
+                    }}
                   >
                     All ({allSocieties.length})
                   </Button>
                   <Button
                     variant={societyFilter === "active" ? "university" : "outline"}
                     size="sm"
-                    onClick={() => setSocietyFilter("active")}
+                    onClick={() => {
+                      setSocietyFilter("active");
+                      setSocietiesCurrentPage(1);
+                    }}
                   >
                     Active ({allSocieties.filter(s => s.status_name === 'Approved by VC' || s.status === 'active').length})
                   </Button>
                   <Button
                     variant={societyFilter === "pending" ? "university" : "outline"}
                     size="sm"
-                    onClick={() => setSocietyFilter("pending")}
+                    onClick={() => {
+                      setSocietyFilter("pending");
+                      setSocietiesCurrentPage(1);
+                    }}
                   >
                     Pending ({allSocieties.filter(s => s.status_id === 1 || s.status === 'pending' || s.status === 'under_review').length})
                   </Button>
                   <Button
                     variant={societyFilter === "rejected" ? "university" : "outline"}
                     size="sm"
-                    onClick={() => setSocietyFilter("rejected")}
+                    onClick={() => {
+                      setSocietyFilter("rejected");
+                      setSocietiesCurrentPage(1);
+                    }}
                   >
                     Rejected ({allSocieties.filter(s => s.status_name?.includes('Rejected') || s.status === 'rejected').length})
                   </Button>
@@ -1062,7 +1075,9 @@ const AdminDashboard = () => {
                      "Rejected Societies"} ({filteredSocieties.length})
                   </h3>
                   <div className="grid gap-6">
-                    {filteredSocieties.map((society) => (
+                    {filteredSocieties
+                      .slice((societiesCurrentPage - 1) * itemsPerPage, societiesCurrentPage * itemsPerPage)
+                      .map((society) => (
                       <Card key={society.society_id} className="p-6 shadow-card">
                         <div className="flex items-start justify-between">
                           <div className="flex items-start space-x-4 flex-1">
@@ -1130,6 +1145,66 @@ const AdminDashboard = () => {
                       </Card>
                     ))}
                   </div>
+                  
+                  {/* Pagination for Societies */}
+                  {filteredSocieties.length > itemsPerPage && (
+                    <div className="mt-6">
+                      <Pagination>
+                        <PaginationContent>
+                          <PaginationItem>
+                            <PaginationPrevious 
+                              onClick={() => setSocietiesCurrentPage(prev => Math.max(1, prev - 1))}
+                              className={societiesCurrentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                            />
+                          </PaginationItem>
+                          
+                          {Array.from({ length: Math.ceil(filteredSocieties.length / itemsPerPage) }, (_, i) => i + 1)
+                            .filter(page => {
+                              const totalPages = Math.ceil(filteredSocieties.length / itemsPerPage);
+                              return page === 1 || 
+                                     page === totalPages || 
+                                     (page >= societiesCurrentPage - 1 && page <= societiesCurrentPage + 1);
+                            })
+                            .map((page, index, array) => {
+                              const totalPages = Math.ceil(filteredSocieties.length / itemsPerPage);
+                              const showEllipsisBefore = index > 0 && page - array[index - 1] > 1;
+                              const showEllipsisAfter = index < array.length - 1 && array[index + 1] - page > 1;
+                              
+                              return (
+                                <React.Fragment key={page}>
+                                  {showEllipsisBefore && (
+                                    <PaginationItem>
+                                      <PaginationEllipsis />
+                                    </PaginationItem>
+                                  )}
+                                  <PaginationItem>
+                                    <PaginationLink
+                                      onClick={() => setSocietiesCurrentPage(page)}
+                                      isActive={societiesCurrentPage === page}
+                                      className="cursor-pointer"
+                                    >
+                                      {page}
+                                    </PaginationLink>
+                                  </PaginationItem>
+                                  {showEllipsisAfter && (
+                                    <PaginationItem>
+                                      <PaginationEllipsis />
+                                    </PaginationItem>
+                                  )}
+                                </React.Fragment>
+                              );
+                            })}
+                          
+                          <PaginationItem>
+                            <PaginationNext 
+                              onClick={() => setSocietiesCurrentPage(prev => Math.min(Math.ceil(filteredSocieties.length / itemsPerPage), prev + 1))}
+                              className={societiesCurrentPage >= Math.ceil(filteredSocieties.length / itemsPerPage) ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                            />
+                          </PaginationItem>
+                        </PaginationContent>
+                      </Pagination>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1188,7 +1263,9 @@ const AdminDashboard = () => {
                     All Societies ({filteredSocieties.length})
                   </h3>
                   <div className="grid gap-6">
-                    {filteredSocieties.map((society: any) => (
+                    {filteredSocieties
+                      .slice((societiesCurrentPage - 1) * itemsPerPage, societiesCurrentPage * itemsPerPage)
+                      .map((society: any) => (
                       <Card key={society.society_id} className="p-6 shadow-card">
                         <div className="flex items-start justify-between">
                           <div className="flex items-start space-x-4 flex-1">
@@ -1256,6 +1333,66 @@ const AdminDashboard = () => {
                       </Card>
                     ))}
                   </div>
+                  
+                  {/* Pagination for Societies */}
+                  {filteredSocieties.length > itemsPerPage && (
+                    <div className="mt-6">
+                      <Pagination>
+                        <PaginationContent>
+                          <PaginationItem>
+                            <PaginationPrevious 
+                              onClick={() => setSocietiesCurrentPage(prev => Math.max(1, prev - 1))}
+                              className={societiesCurrentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                            />
+                          </PaginationItem>
+                          
+                          {Array.from({ length: Math.ceil(filteredSocieties.length / itemsPerPage) }, (_, i) => i + 1)
+                            .filter(page => {
+                              const totalPages = Math.ceil(filteredSocieties.length / itemsPerPage);
+                              return page === 1 || 
+                                     page === totalPages || 
+                                     (page >= societiesCurrentPage - 1 && page <= societiesCurrentPage + 1);
+                            })
+                            .map((page, index, array) => {
+                              const totalPages = Math.ceil(filteredSocieties.length / itemsPerPage);
+                              const showEllipsisBefore = index > 0 && page - array[index - 1] > 1;
+                              const showEllipsisAfter = index < array.length - 1 && array[index + 1] - page > 1;
+                              
+                              return (
+                                <React.Fragment key={page}>
+                                  {showEllipsisBefore && (
+                                    <PaginationItem>
+                                      <PaginationEllipsis />
+                                    </PaginationItem>
+                                  )}
+                                  <PaginationItem>
+                                    <PaginationLink
+                                      onClick={() => setSocietiesCurrentPage(page)}
+                                      isActive={societiesCurrentPage === page}
+                                      className="cursor-pointer"
+                                    >
+                                      {page}
+                                    </PaginationLink>
+                                  </PaginationItem>
+                                  {showEllipsisAfter && (
+                                    <PaginationItem>
+                                      <PaginationEllipsis />
+                                    </PaginationItem>
+                                  )}
+                                </React.Fragment>
+                              );
+                            })}
+                          
+                          <PaginationItem>
+                            <PaginationNext 
+                              onClick={() => setSocietiesCurrentPage(prev => Math.min(Math.ceil(filteredSocieties.length / itemsPerPage), prev + 1))}
+                              className={societiesCurrentPage >= Math.ceil(filteredSocieties.length / itemsPerPage) ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                            />
+                          </PaginationItem>
+                        </PaginationContent>
+                      </Pagination>
+                    </div>
+                  )}
                 </div>
               )}
 
