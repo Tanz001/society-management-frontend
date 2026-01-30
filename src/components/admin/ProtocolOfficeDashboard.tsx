@@ -7,15 +7,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { 
-  Calendar, 
+import {
+  Calendar,
   Eye,
   AlertTriangle,
   LogOut,
@@ -29,7 +29,8 @@ import {
   Filter,
   MoreVertical,
   Pencil,
-  User
+  User,
+  Users
 } from "lucide-react";
 import {
   Pagination,
@@ -55,27 +56,27 @@ const ProtocolOfficeDashboard = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState("");
   const navigate = useNavigate();
-  
+
   // Filters
   const [selectedVenueId, setSelectedVenueId] = useState<string>("all");
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [selectedSlotStatus, setSelectedSlotStatus] = useState<string>("all"); // Default: All statuses
-  
+
   // Venues list
   const [venues, setVenues] = useState<Array<{ venue_id: number; venue_name: string }>>([]);
   const [availableSlots, setAvailableSlots] = useState([]);
-  
+
   // Slot status update
   const [slotStatusNote, setSlotStatusNote] = useState("");
   const [selectedSlotStatusId, setSelectedSlotStatusId] = useState<string>("2"); // Default: GRANTED
-  
+
   // Suggest slot - manual entry
   const [suggestSlotNote, setSuggestSlotNote] = useState("");
   const [suggestSlotDate, setSuggestSlotDate] = useState<string>("");
   const [suggestSlotTimeFrom, setSuggestSlotTimeFrom] = useState<string>("");
   const [suggestSlotTimeTo, setSuggestSlotTimeTo] = useState<string>("");
   const [suggestSlotVenueId, setSuggestSlotVenueId] = useState<string>("");
-  
+
   // Stats
   const [eventRequestStats, setEventRequestStats] = useState({
     total: 0,
@@ -84,12 +85,12 @@ const ProtocolOfficeDashboard = () => {
     rejected: 0
   });
   const [statsLoading, setStatsLoading] = useState(false);
-  
+
   // Suggested slots tab
   const [suggestedSlots, setSuggestedSlots] = useState([]);
   const [suggestedSlotsLoading, setSuggestedSlotsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("requests");
-  
+
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
@@ -112,13 +113,13 @@ const ProtocolOfficeDashboard = () => {
   // Check if advisor can edit the request
   const canAdvisorEdit = (request: any) => {
     if (!request) return false;
-    
+
     // Check if slot is REJECTED (3) or SUGGESTED (4)
     const slotRejectedOrSuggested = request.slot_status_id === 3 || request.slot_status_id === 4;
-    
+
     // Check if event is rejected by any admin (3, 5, 7, 9, 12, 14)
     const eventRejected = [3, 5, 7, 9, 12, 14].includes(request.event_status_id);
-    
+
     return slotRejectedOrSuggested || eventRejected;
   };
 
@@ -183,14 +184,14 @@ const ProtocolOfficeDashboard = () => {
         throw new Error("No authentication token found");
       }
 
-    const params: any = {};
-    if (selectedVenueId && selectedVenueId !== "all") params.venue_id = selectedVenueId;
-    if (selectedDate) params.date = selectedDate;
-    // Only send status_id if not "all" - don't send status_id at all to get all statuses
-    if (selectedSlotStatus && selectedSlotStatus !== "all") {
-      params.status_id = selectedSlotStatus;
-    }
-    // If "all" is selected, don't send status_id parameter at all
+      const params: any = {};
+      if (selectedVenueId && selectedVenueId !== "all") params.venue_id = selectedVenueId;
+      if (selectedDate) params.date = selectedDate;
+      // Only send status_id if not "all" - don't send status_id at all to get all statuses
+      if (selectedSlotStatus && selectedSlotStatus !== "all") {
+        params.status_id = selectedSlotStatus;
+      }
+      // If "all" is selected, don't send status_id parameter at all
 
       const response = await axios.get(
         `${API_URL}/admin/protocol/event-requests`,
@@ -242,10 +243,10 @@ const ProtocolOfficeDashboard = () => {
   // Handle view event request details
   const handleViewEventRequest = async (reqId) => {
     try {
-       const API_URL = import.meta.env.VITE_API_URL;
+      const API_URL = import.meta.env.VITE_API_URL;
       setLoading(true);
       const token = localStorage.getItem("token");
-      
+
       const response = await axios.get(`${API_URL}/admin/event-requests/${reqId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -479,9 +480,9 @@ const ProtocolOfficeDashboard = () => {
               <p className="text-white/80">View All Event Protocol Requests</p>
             </div>
             <div className="flex items-center space-x-3">
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 className="text-white border-white hover:bg-white/20 bg-transparent"
                 onClick={handleLogout}
               >
@@ -631,8 +632,8 @@ const ProtocolOfficeDashboard = () => {
                 <TabsTrigger value="requests">Slot Requests</TabsTrigger>
                 <TabsTrigger value="suggested">Suggested Slots</TabsTrigger>
               </TabsList>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => {
                   if (activeTab === "requests") {
                     fetchProtocolEventRequests();
@@ -656,197 +657,197 @@ const ProtocolOfficeDashboard = () => {
             {/* Event Requests Tab */}
             <TabsContent value="requests" className="space-y-4">
               {/* Event Requests List */}
-          {loading && eventRequests.length === 0 ? (
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-university-navy mx-auto mb-4"></div>
-              <p className="text-muted-foreground">Loading event requests...</p>
-            </div>
-          ) : eventRequests.length > 0 ? (
-            <>
-            <div className="grid gap-4">
-              {eventRequests.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((request) => (
-                <Card key={request.req_id} className="p-4 shadow-card">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center mb-2 flex-wrap gap-2">
-                        <h3 className="text-lg font-semibold text-university-navy">
-                          {request.event_name || request.title || "Event Request"}
-                        </h3>
-                        {request.slot_status_name && (
-                          <Badge variant={getStatusVariant(request.slot_status_id)}>
-                            Slot: {request.slot_status_name}
-                          </Badge>
-                        )}
-                        {request.event_status_id && (
-                          <Badge variant={getStatusVariant(request.event_status_id)}>
-                            Event: {request.status_name || "Pending"}
-                          </Badge>
-                        )}
-                        {request.society_name && (
-                          <Badge variant="outline">{request.society_name}</Badge>
-                        )}
-                      </div>
-                      {request.event_type && (
-                        <p className="text-sm text-muted-foreground mb-2">
-                          Type: {request.event_type}
-                        </p>
-                      )}
-                      <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mb-2">
-                        {request.date_from && (
-                          <span className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            {new Date(request.date_from).toLocaleDateString()}
-                            {request.date_to && request.date_to !== request.date_from && (
-                              <> - {new Date(request.date_to).toLocaleDateString()}</>
-                            )}
-                          </span>
-                        )}
-                        {request.time_from && (
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {formatTimeToAMPM(request.time_from)}
-                            {request.time_to && <> - {formatTimeToAMPM(request.time_to)}</>}
-                          </span>
-                        )}
-                        {request.venue_name && (
-                          <span className="flex items-center gap-1">
-                            <MapPin className="h-3 w-3" />
-                            {request.venue_name}
-                          </span>
-                        )}
-                        {request.advisor_name && (
-                          <span className="flex items-center gap-1">
-                            👤 Advisor: {request.advisor_name}
-                            {request.advisor_email && <> ({request.advisor_email})</>}
-                          </span>
-                        )}
-                      </div>
-                      {request.note && (
-                        <div className="bg-blue-50 border-l-4 border-blue-200 p-2 mt-2 rounded">
-                          <p className="text-xs font-medium text-blue-900 mb-1">Note:</p>
-                          <p className="text-xs text-blue-800">{request.note}</p>
-                        </div>
-                      )}
-                      <div className="flex items-center text-xs text-muted-foreground mt-2">
-                        <Clock className="h-3 w-3 mr-1" />
-                        Created: {new Date(request.created_at).toLocaleString()}
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2 ml-4">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            className="h-8 w-8 p-0"
-                          >
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem 
-                            onClick={() => handleViewEventRequest(request.req_id)}
-                            disabled={loading}
-                          >
-                            <Eye className="h-4 w-4 mr-2" />
-                            View Details
-                          </DropdownMenuItem>
-                          {canAdvisorEdit(request) && (
-                            <DropdownMenuItem 
-                              onClick={() => handleEditRequest(request.req_id)}
-                              disabled={loading}
-                            >
-                              <Pencil className="h-4 w-4 mr-2" />
-                              Edit Request
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem 
-                            onClick={() => handleOpenSlotStatusModal(request)}
-                            disabled={loading}
-                          >
-                            <CheckCircle className="h-4 w-4 mr-2" />
-                            Update Status
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            onClick={() => handleOpenSuggestSlotModal(request)}
-                            disabled={loading}
-                          >
-                            <Lightbulb className="h-4 w-4 mr-2" />
-                            Suggest Slot
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-            
-            {/* Pagination */}
-            {eventRequests.length > itemsPerPage && (
-              <div className="flex items-center justify-between mt-6">
-                <div className="text-sm text-muted-foreground">
-                  Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, eventRequests.length)} of {eventRequests.length} event requests
+              {loading && eventRequests.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-university-navy mx-auto mb-4"></div>
+                  <p className="text-muted-foreground">Loading event requests...</p>
                 </div>
-                <Pagination>
-                  <PaginationContent>
-                    <PaginationItem>
-                      <PaginationPrevious 
-                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                        className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                      />
-                    </PaginationItem>
-                    {Array.from({ length: Math.ceil(eventRequests.length / itemsPerPage) }, (_, i) => i + 1)
-                      .filter(page => {
-                        // Show first page, last page, current page, and pages around current
-                        return page === 1 || 
-                               page === Math.ceil(eventRequests.length / itemsPerPage) ||
-                               (page >= currentPage - 1 && page <= currentPage + 1);
-                      })
-                      .map((page, idx, array) => {
-                        // Add ellipsis if there's a gap
-                        const prevPage = array[idx - 1];
-                        const showEllipsisBefore = prevPage && page - prevPage > 1;
-                        
-                        return (
-                          <React.Fragment key={page}>
-                            {showEllipsisBefore && (
-                              <PaginationItem>
-                                <PaginationEllipsis />
-                              </PaginationItem>
+              ) : eventRequests.length > 0 ? (
+                <>
+                  <div className="grid gap-4">
+                    {eventRequests.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((request) => (
+                      <Card key={request.req_id} className="p-4 shadow-card">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center mb-2 flex-wrap gap-2">
+                              <h3 className="text-lg font-semibold text-university-navy">
+                                {request.event_name || request.title || "Event Request"}
+                              </h3>
+                              {request.slot_status_name && (
+                                <Badge variant={getStatusVariant(request.slot_status_id)}>
+                                  Slot: {request.slot_status_name}
+                                </Badge>
+                              )}
+                              {request.event_status_id && (
+                                <Badge variant={getStatusVariant(request.event_status_id)}>
+                                  Event: {request.status_name || "Pending"}
+                                </Badge>
+                              )}
+                              {request.society_name && (
+                                <Badge variant="outline">{request.society_name}</Badge>
+                              )}
+                            </div>
+                            {request.event_type && (
+                              <p className="text-sm text-muted-foreground mb-2">
+                                Type: {request.event_type}
+                              </p>
                             )}
-                            <PaginationItem>
-                              <PaginationLink
-                                onClick={() => setCurrentPage(page)}
-                                isActive={currentPage === page}
-                                className="cursor-pointer"
-                              >
-                                {page}
-                              </PaginationLink>
-                            </PaginationItem>
-                          </React.Fragment>
-                        );
-                      })}
-                    <PaginationItem>
-                      <PaginationNext 
-                        onClick={() => setCurrentPage(prev => Math.min(Math.ceil(eventRequests.length / itemsPerPage), prev + 1))}
-                        className={currentPage >= Math.ceil(eventRequests.length / itemsPerPage) ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                      />
-                    </PaginationItem>
-                  </PaginationContent>
-                </Pagination>
-              </div>
-            )}
-            </>
-          ) : (
-            <div className="text-center py-12">
-              <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-              <h3 className="text-lg font-medium mb-2">No Event Requests Found</h3>
-              <p className="text-muted-foreground">
-                No event requests have been submitted yet.
-              </p>
-            </div>
-          )}
+                            <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mb-2">
+                              {request.date_from && (
+                                <span className="flex items-center gap-1">
+                                  <Calendar className="h-3 w-3" />
+                                  {new Date(request.date_from).toLocaleDateString()}
+                                  {request.date_to && request.date_to !== request.date_from && (
+                                    <> - {new Date(request.date_to).toLocaleDateString()}</>
+                                  )}
+                                </span>
+                              )}
+                              {request.time_from && (
+                                <span className="flex items-center gap-1">
+                                  <Clock className="h-3 w-3" />
+                                  {formatTimeToAMPM(request.time_from)}
+                                  {request.time_to && <> - {formatTimeToAMPM(request.time_to)}</>}
+                                </span>
+                              )}
+                              {request.venue_name && (
+                                <span className="flex items-center gap-1">
+                                  <MapPin className="h-3 w-3" />
+                                  {request.venue_name}
+                                </span>
+                              )}
+                              {request.advisor_name && (
+                                <span className="flex items-center gap-1">
+                                  👤 Advisor: {request.advisor_name}
+                                  {request.advisor_email && <> ({request.advisor_email})</>}
+                                </span>
+                              )}
+                            </div>
+                            {request.note && (
+                              <div className="bg-blue-50 border-l-4 border-blue-200 p-2 mt-2 rounded">
+                                <p className="text-xs font-medium text-blue-900 mb-1">Note:</p>
+                                <p className="text-xs text-blue-800">{request.note}</p>
+                              </div>
+                            )}
+                            <div className="flex items-center text-xs text-muted-foreground mt-2">
+                              <Clock className="h-3 w-3 mr-1" />
+                              Created: {new Date(request.created_at).toLocaleString()}
+                            </div>
+                          </div>
+                          <div className="flex items-start gap-2 ml-4">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onClick={() => handleViewEventRequest(request.req_id)}
+                                  disabled={loading}
+                                >
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View Details
+                                </DropdownMenuItem>
+                                {canAdvisorEdit(request) && (
+                                  <DropdownMenuItem
+                                    onClick={() => handleEditRequest(request.req_id)}
+                                    disabled={loading}
+                                  >
+                                    <Pencil className="h-4 w-4 mr-2" />
+                                    Edit Request
+                                  </DropdownMenuItem>
+                                )}
+                                <DropdownMenuItem
+                                  onClick={() => handleOpenSlotStatusModal(request)}
+                                  disabled={loading}
+                                >
+                                  <CheckCircle className="h-4 w-4 mr-2" />
+                                  Update Status
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => handleOpenSuggestSlotModal(request)}
+                                  disabled={loading}
+                                >
+                                  <Lightbulb className="h-4 w-4 mr-2" />
+                                  Suggest Slot
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+
+                  {/* Pagination */}
+                  {eventRequests.length > itemsPerPage && (
+                    <div className="flex items-center justify-between mt-6">
+                      <div className="text-sm text-muted-foreground">
+                        Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, eventRequests.length)} of {eventRequests.length} event requests
+                      </div>
+                      <Pagination>
+                        <PaginationContent>
+                          <PaginationItem>
+                            <PaginationPrevious
+                              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                              className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                            />
+                          </PaginationItem>
+                          {Array.from({ length: Math.ceil(eventRequests.length / itemsPerPage) }, (_, i) => i + 1)
+                            .filter(page => {
+                              // Show first page, last page, current page, and pages around current
+                              return page === 1 ||
+                                page === Math.ceil(eventRequests.length / itemsPerPage) ||
+                                (page >= currentPage - 1 && page <= currentPage + 1);
+                            })
+                            .map((page, idx, array) => {
+                              // Add ellipsis if there's a gap
+                              const prevPage = array[idx - 1];
+                              const showEllipsisBefore = prevPage && page - prevPage > 1;
+
+                              return (
+                                <React.Fragment key={page}>
+                                  {showEllipsisBefore && (
+                                    <PaginationItem>
+                                      <PaginationEllipsis />
+                                    </PaginationItem>
+                                  )}
+                                  <PaginationItem>
+                                    <PaginationLink
+                                      onClick={() => setCurrentPage(page)}
+                                      isActive={currentPage === page}
+                                      className="cursor-pointer"
+                                    >
+                                      {page}
+                                    </PaginationLink>
+                                  </PaginationItem>
+                                </React.Fragment>
+                              );
+                            })}
+                          <PaginationItem>
+                            <PaginationNext
+                              onClick={() => setCurrentPage(prev => Math.min(Math.ceil(eventRequests.length / itemsPerPage), prev + 1))}
+                              className={currentPage >= Math.ceil(eventRequests.length / itemsPerPage) ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                            />
+                          </PaginationItem>
+                        </PaginationContent>
+                      </Pagination>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-center py-12">
+                  <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <h3 className="text-lg font-medium mb-2">No Event Requests Found</h3>
+                  <p className="text-muted-foreground">
+                    No event requests have been submitted yet.
+                  </p>
+                </div>
+              )}
             </TabsContent>
 
             {/* Suggested Slots Tab */}
@@ -858,110 +859,110 @@ const ProtocolOfficeDashboard = () => {
                 </div>
               ) : suggestedSlots.length > 0 ? (
                 <>
-                <div className="grid gap-4">
-                  {suggestedSlots.slice((currentSuggestedPage - 1) * itemsPerPage, currentSuggestedPage * itemsPerPage).map((slot: any) => (
-                    <Card key={slot.suggested_slot_id || slot.id} className="p-4 shadow-card">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center mb-2 flex-wrap gap-2">
-                            <h3 className="text-lg font-semibold text-university-navy">
-                              {slot.event_name || "Event"}
-                            </h3>
-                            {slot.society_name && (
-                              <Badge variant="outline">{slot.society_name}</Badge>
-                            )}
-                            {slot.slot_status_name && (
-                              <Badge variant={getStatusVariant(slot.slot_status_id)}>
-                                {slot.slot_status_name}
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mb-2">
-                            {slot.venue_name && (
-                              <span className="flex items-center gap-1">
-                                <MapPin className="h-3 w-3" />
-                                {slot.venue_name}
-                              </span>
-                            )}
-                            {slot.slot_date && (
-                              <span className="flex items-center gap-1">
-                                <Calendar className="h-3 w-3" />
-                                {new Date(slot.slot_date).toLocaleDateString()}
-                              </span>
-                            )}
-                            {slot.slot_time_from && (
-                              <span className="flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                {formatTimeToAMPM(slot.slot_time_from)}
-                                {slot.slot_time_to && <> - {formatTimeToAMPM(slot.slot_time_to)}</>}
-                              </span>
-                            )}
-                          </div>
-                          {slot.note && (
-                            <div className="bg-blue-50 border-l-4 border-blue-200 p-2 mt-2 rounded">
-                              <p className="text-xs font-medium text-blue-900 mb-1">Note:</p>
-                              <p className="text-xs text-blue-800">{slot.note}</p>
+                  <div className="grid gap-4">
+                    {suggestedSlots.slice((currentSuggestedPage - 1) * itemsPerPage, currentSuggestedPage * itemsPerPage).map((slot: any) => (
+                      <Card key={slot.suggested_slot_id || slot.id} className="p-4 shadow-card">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center mb-2 flex-wrap gap-2">
+                              <h3 className="text-lg font-semibold text-university-navy">
+                                {slot.event_name || "Event"}
+                              </h3>
+                              {slot.society_name && (
+                                <Badge variant="outline">{slot.society_name}</Badge>
+                              )}
+                              {slot.slot_status_name && (
+                                <Badge variant={getStatusVariant(slot.slot_status_id)}>
+                                  {slot.slot_status_name}
+                                </Badge>
+                              )}
                             </div>
-                          )}
+                            <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mb-2">
+                              {slot.venue_name && (
+                                <span className="flex items-center gap-1">
+                                  <MapPin className="h-3 w-3" />
+                                  {slot.venue_name}
+                                </span>
+                              )}
+                              {slot.slot_date && (
+                                <span className="flex items-center gap-1">
+                                  <Calendar className="h-3 w-3" />
+                                  {new Date(slot.slot_date).toLocaleDateString()}
+                                </span>
+                              )}
+                              {slot.slot_time_from && (
+                                <span className="flex items-center gap-1">
+                                  <Clock className="h-3 w-3" />
+                                  {formatTimeToAMPM(slot.slot_time_from)}
+                                  {slot.slot_time_to && <> - {formatTimeToAMPM(slot.slot_time_to)}</>}
+                                </span>
+                              )}
+                            </div>
+                            {slot.note && (
+                              <div className="bg-blue-50 border-l-4 border-blue-200 p-2 mt-2 rounded">
+                                <p className="text-xs font-medium text-blue-900 mb-1">Note:</p>
+                                <p className="text-xs text-blue-800">{slot.note}</p>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-                
-                {/* Pagination for Suggested Slots */}
-                {suggestedSlots.length > itemsPerPage && (
-                  <div className="flex items-center justify-between mt-6">
-                    <div className="text-sm text-muted-foreground">
-                      Showing {(currentSuggestedPage - 1) * itemsPerPage + 1} to {Math.min(currentSuggestedPage * itemsPerPage, suggestedSlots.length)} of {suggestedSlots.length} suggested slots
-                    </div>
-                    <Pagination>
-                      <PaginationContent>
-                        <PaginationItem>
-                          <PaginationPrevious 
-                            onClick={() => setCurrentSuggestedPage(prev => Math.max(1, prev - 1))}
-                            className={currentSuggestedPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                          />
-                        </PaginationItem>
-                        {Array.from({ length: Math.ceil(suggestedSlots.length / itemsPerPage) }, (_, i) => i + 1)
-                          .filter(page => {
-                            return page === 1 || 
-                                   page === Math.ceil(suggestedSlots.length / itemsPerPage) ||
-                                   (page >= currentSuggestedPage - 1 && page <= currentSuggestedPage + 1);
-                          })
-                          .map((page, idx, array) => {
-                            const prevPage = array[idx - 1];
-                            const showEllipsisBefore = prevPage && page - prevPage > 1;
-                            
-                            return (
-                              <React.Fragment key={page}>
-                                {showEllipsisBefore && (
-                                  <PaginationItem>
-                                    <PaginationEllipsis />
-                                  </PaginationItem>
-                                )}
-                                <PaginationItem>
-                                  <PaginationLink
-                                    onClick={() => setCurrentSuggestedPage(page)}
-                                    isActive={currentSuggestedPage === page}
-                                    className="cursor-pointer"
-                                  >
-                                    {page}
-                                  </PaginationLink>
-                                </PaginationItem>
-                              </React.Fragment>
-                            );
-                          })}
-                        <PaginationItem>
-                          <PaginationNext 
-                            onClick={() => setCurrentSuggestedPage(prev => Math.min(Math.ceil(suggestedSlots.length / itemsPerPage), prev + 1))}
-                            className={currentSuggestedPage >= Math.ceil(suggestedSlots.length / itemsPerPage) ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                          />
-                        </PaginationItem>
-                      </PaginationContent>
-                    </Pagination>
+                      </Card>
+                    ))}
                   </div>
-                )}
+
+                  {/* Pagination for Suggested Slots */}
+                  {suggestedSlots.length > itemsPerPage && (
+                    <div className="flex items-center justify-between mt-6">
+                      <div className="text-sm text-muted-foreground">
+                        Showing {(currentSuggestedPage - 1) * itemsPerPage + 1} to {Math.min(currentSuggestedPage * itemsPerPage, suggestedSlots.length)} of {suggestedSlots.length} suggested slots
+                      </div>
+                      <Pagination>
+                        <PaginationContent>
+                          <PaginationItem>
+                            <PaginationPrevious
+                              onClick={() => setCurrentSuggestedPage(prev => Math.max(1, prev - 1))}
+                              className={currentSuggestedPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                            />
+                          </PaginationItem>
+                          {Array.from({ length: Math.ceil(suggestedSlots.length / itemsPerPage) }, (_, i) => i + 1)
+                            .filter(page => {
+                              return page === 1 ||
+                                page === Math.ceil(suggestedSlots.length / itemsPerPage) ||
+                                (page >= currentSuggestedPage - 1 && page <= currentSuggestedPage + 1);
+                            })
+                            .map((page, idx, array) => {
+                              const prevPage = array[idx - 1];
+                              const showEllipsisBefore = prevPage && page - prevPage > 1;
+
+                              return (
+                                <React.Fragment key={page}>
+                                  {showEllipsisBefore && (
+                                    <PaginationItem>
+                                      <PaginationEllipsis />
+                                    </PaginationItem>
+                                  )}
+                                  <PaginationItem>
+                                    <PaginationLink
+                                      onClick={() => setCurrentSuggestedPage(page)}
+                                      isActive={currentSuggestedPage === page}
+                                      className="cursor-pointer"
+                                    >
+                                      {page}
+                                    </PaginationLink>
+                                  </PaginationItem>
+                                </React.Fragment>
+                              );
+                            })}
+                          <PaginationItem>
+                            <PaginationNext
+                              onClick={() => setCurrentSuggestedPage(prev => Math.min(Math.ceil(suggestedSlots.length / itemsPerPage), prev + 1))}
+                              className={currentSuggestedPage >= Math.ceil(suggestedSlots.length / itemsPerPage) ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                            />
+                          </PaginationItem>
+                        </PaginationContent>
+                      </Pagination>
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="text-center py-12">
@@ -1063,11 +1064,11 @@ const ProtocolOfficeDashboard = () => {
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Date From:</span>
                       <span className="font-medium">
-                        {selectedEventRequest.date_from 
+                        {selectedEventRequest.date_from
                           ? new Date(selectedEventRequest.date_from).toLocaleDateString()
-                          : selectedEventRequest.event_date 
-                          ? new Date(selectedEventRequest.event_date).toLocaleDateString()
-                          : "Not specified"}
+                          : selectedEventRequest.event_date
+                            ? new Date(selectedEventRequest.event_date).toLocaleDateString()
+                            : "Not specified"}
                       </span>
                     </div>
                     {selectedEventRequest.date_to && (
@@ -1079,11 +1080,11 @@ const ProtocolOfficeDashboard = () => {
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Time From:</span>
                       <span className="font-medium">
-                        {selectedEventRequest.time_from 
+                        {selectedEventRequest.time_from
                           ? formatTimeToAMPM(selectedEventRequest.time_from)
-                          : selectedEventRequest.event_time 
-                          ? formatTimeToAMPM(selectedEventRequest.event_time)
-                          : "Not specified"}
+                          : selectedEventRequest.event_time
+                            ? formatTimeToAMPM(selectedEventRequest.event_time)
+                            : "Not specified"}
                       </span>
                     </div>
                     {selectedEventRequest.time_to && (
@@ -1197,10 +1198,10 @@ const ProtocolOfficeDashboard = () => {
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Sponsor Amount:</span>
                           <span className="font-medium text-green-600">
-                            {typeof selectedEventRequest.sponsor_amount === 'string' 
+                            {typeof selectedEventRequest.sponsor_amount === 'string'
                               ? (selectedEventRequest.sponsor_amount.startsWith('PKR') || selectedEventRequest.sponsor_amount.startsWith('$')
-                                  ? selectedEventRequest.sponsor_amount.replace(/^\$/, 'PKR ')
-                                  : `PKR ${selectedEventRequest.sponsor_amount}`)
+                                ? selectedEventRequest.sponsor_amount.replace(/^\$/, 'PKR ')
+                                : `PKR ${selectedEventRequest.sponsor_amount}`)
                               : `PKR ${selectedEventRequest.sponsor_amount}`}
                           </span>
                         </div>
@@ -1223,7 +1224,7 @@ const ProtocolOfficeDashboard = () => {
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Slot Date:</span>
                         <span className="font-medium">
-                          {selectedEventRequest.slot_date 
+                          {selectedEventRequest.slot_date
                             ? new Date(selectedEventRequest.slot_date).toLocaleDateString()
                             : "Not specified"}
                         </span>
@@ -1231,11 +1232,11 @@ const ProtocolOfficeDashboard = () => {
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Slot Time:</span>
                         <span className="font-medium">
-                          {selectedEventRequest.slot_time_from 
+                          {selectedEventRequest.slot_time_from
                             ? formatTimeToAMPM(selectedEventRequest.slot_time_from)
-                            : ""} - {selectedEventRequest.slot_time_to 
-                            ? formatTimeToAMPM(selectedEventRequest.slot_time_to)
-                            : ""}
+                            : ""} - {selectedEventRequest.slot_time_to
+                              ? formatTimeToAMPM(selectedEventRequest.slot_time_to)
+                              : ""}
                         </span>
                       </div>
                     </div>
@@ -1262,54 +1263,54 @@ const ProtocolOfficeDashboard = () => {
               {/* Participants: Students */}
               {Array.isArray(selectedEventRequest.student_participants) &&
                 selectedEventRequest.student_participants.length > 0 && (
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-3 text-university-navy">Student Participants</h3>
-                  <div className="space-y-2 text-sm">
-                    {selectedEventRequest.student_participants.map((s: any, idx: number) => (
-                      <div
-                        key={idx}
-                        className="flex flex-wrap justify-between border-b last:border-0 pb-2 last:pb-0"
-                      >
-                        <span className="font-medium">
-                          {s.academic_program || "Program not specified"}
-                        </span>
-                        <span className="text-muted-foreground">
-                          {s.semester && `Semester: ${s.semester} • `}
-                          {typeof s.no_of_students === "number" && s.no_of_students > 0
-                            ? `${s.no_of_students} students`
-                            : "Count not specified"}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              )}
+                  <Card className="p-4">
+                    <h3 className="font-semibold mb-3 text-university-navy">Student Participants</h3>
+                    <div className="space-y-2 text-sm">
+                      {selectedEventRequest.student_participants.map((s: any, idx: number) => (
+                        <div
+                          key={idx}
+                          className="flex flex-wrap justify-between border-b last:border-0 pb-2 last:pb-0"
+                        >
+                          <span className="font-medium">
+                            {s.academic_program || "Program not specified"}
+                          </span>
+                          <span className="text-muted-foreground">
+                            {s.semester && `Semester: ${s.semester} • `}
+                            {typeof s.no_of_students === "number" && s.no_of_students > 0
+                              ? `${s.no_of_students} students`
+                              : "Count not specified"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
 
               {/* Participants: Staff */}
               {Array.isArray(selectedEventRequest.staff_participants) &&
                 selectedEventRequest.staff_participants.length > 0 && (
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-3 text-university-navy">Staff Participants</h3>
-                  <div className="space-y-2 text-sm">
-                    {selectedEventRequest.staff_participants.map((s: any, idx: number) => (
-                      <div
-                        key={idx}
-                        className="flex flex-wrap justify-between border-b last:border-0 pb-2 last:pb-0"
-                      >
-                        <span className="font-medium">
-                          {s.department || "Department not specified"}
-                        </span>
-                        <span className="text-muted-foreground">
-                          {s.gazetted || "Category not specified"} •{" "}
-                          {typeof s.no_of_staff === "number" && s.no_of_staff > 0
-                            ? `${s.no_of_staff} staff`
-                            : "Count not specified"}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              )}
+                  <Card className="p-4">
+                    <h3 className="font-semibold mb-3 text-university-navy">Staff Participants</h3>
+                    <div className="space-y-2 text-sm">
+                      {selectedEventRequest.staff_participants.map((s: any, idx: number) => (
+                        <div
+                          key={idx}
+                          className="flex flex-wrap justify-between border-b last:border-0 pb-2 last:pb-0"
+                        >
+                          <span className="font-medium">
+                            {s.department || "Department not specified"}
+                          </span>
+                          <span className="text-muted-foreground">
+                            {s.gazetted || "Category not specified"} •{" "}
+                            {typeof s.no_of_staff === "number" && s.no_of_staff > 0
+                              ? `${s.no_of_staff} staff`
+                              : "Count not specified"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
 
               {/* Management Requirements */}
               {selectedEventRequest.management_requirements && (
@@ -1388,30 +1389,89 @@ const ProtocolOfficeDashboard = () => {
               {/* Transport Requests */}
               {Array.isArray(selectedEventRequest.transport_requests) &&
                 selectedEventRequest.transport_requests.length > 0 && (
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-3 text-university-navy">Transport Requests</h3>
-                  <div className="space-y-2 text-sm">
-                    {selectedEventRequest.transport_requests.map((t: any, idx: number) => (
-                      <div
-                        key={idx}
-                        className="border rounded p-2 flex flex-wrap justify-between gap-2"
-                      >
-                        <div>
-                          <p className="font-medium">{t.vehicle_type || "Vehicle not specified"}</p>
-                          <p className="text-muted-foreground">
-                            {t.purpose || "Purpose not specified"}
-                          </p>
+                  <Card className="p-4">
+                    <h3 className="font-semibold mb-3 text-university-navy">Transport Requests</h3>
+                    <div className="space-y-2 text-sm">
+                      {selectedEventRequest.transport_requests.map((t: any, idx: number) => (
+                        <div
+                          key={idx}
+                          className="border rounded p-2 flex flex-wrap justify-between gap-2"
+                        >
+                          <div>
+                            <p className="font-medium">{t.vehicle_type || "Vehicle not specified"}</p>
+                            <p className="text-muted-foreground">
+                              {t.purpose || "Purpose not specified"}
+                            </p>
+                          </div>
+                          <div className="text-right text-xs text-muted-foreground">
+                            {t.date && <div>📅 {new Date(t.date).toLocaleDateString()}</div>}
+                            {t.time && <div>🕐 {t.time}</div>}
+                            {t.destination && <div>📍 {t.destination}</div>}
+                            {typeof t.no_of_persons === "number" && t.no_of_persons > 0 && (
+                              <div>👥 {t.no_of_persons} persons</div>
+                            )}
+                          </div>
                         </div>
-                        <div className="text-right text-xs text-muted-foreground">
-                          {t.date && <div>📅 {new Date(t.date).toLocaleDateString()}</div>}
-                          {t.time && <div>🕐 {t.time}</div>}
-                          {t.destination && <div>📍 {t.destination}</div>}
-                          {typeof t.no_of_persons === "number" && t.no_of_persons > 0 && (
-                            <div>👥 {t.no_of_persons} persons</div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
+
+              {/* Guests & Speakers */}
+              {Array.isArray(selectedEventRequest.event_guests) &&
+                selectedEventRequest.event_guests.length > 0 && (
+                  <Card className="p-4">
+                    <h3 className="font-semibold mb-3 text-university-navy">Guests & Speakers</h3>
+                    <div className="space-y-3 text-sm">
+                      {selectedEventRequest.event_guests.map((g: any, idx: number) => (
+                        <div
+                          key={g.guest_id || idx}
+                          className="border rounded p-3"
+                        >
+                          <div className="flex justify-between items-start mb-1">
+                            <span className="font-medium text-base">{g.guest_name}</span>
+                            {g.profile_document_path && (
+                              <a
+                                href={`${import.meta.env.VITE_API_URL}${g.profile_document_path}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                              >
+                                <FileText className="h-3 w-3" />
+                                View Profile
+                              </a>
+                            )}
+                          </div>
+                          {g.description && (
+                            <p className="text-muted-foreground text-xs leading-relaxed">
+                              {g.description}
+                            </p>
                           )}
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
+                  </Card>
+                )}
+
+              {/* Event Guest List File */}
+              {selectedEventRequest.guest_list && (
+                <Card className="p-4 border-l-4 border-l-purple-500">
+                  <h3 className="font-semibold mb-3 text-university-navy flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    Event Guest List
+                  </h3>
+                  <div className="flex items-center justify-between text-sm bg-gray-50 p-2 rounded border">
+                    <span className="truncate max-w-[200px] md:max-w-md">
+                      {selectedEventRequest.guest_list.file_path.split('/').pop()}
+                    </span>
+                    <a
+                      href={`${import.meta.env.VITE_API_URL}${selectedEventRequest.guest_list.file_path}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline font-medium"
+                    >
+                      View / Download
+                    </a>
                   </div>
                 </Card>
               )}
@@ -1419,98 +1479,98 @@ const ProtocolOfficeDashboard = () => {
               {/* Documents */}
               {Array.isArray(selectedEventRequest.documents) &&
                 selectedEventRequest.documents.length > 0 && (
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-3 text-university-navy">Attached Documents</h3>
-                  <div className="space-y-2 text-sm">
-                    {selectedEventRequest.documents.map((doc: any) => (
-                      <div
-                        key={doc.doc_id}
-                        className="flex items-center justify-between border-b last:border-0 pb-2 last:pb-0"
-                      >
-                        <span>
-                          <span className="font-medium capitalize">{doc.doc_type}</span>
-                          {" – "}
-                          {doc.file_path.split("/").pop()}
-                        </span>
-                        <a
-                          href={`${import.meta.env.VITE_API_URL}${doc.file_path}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-blue-600 hover:underline"
+                  <Card className="p-4">
+                    <h3 className="font-semibold mb-3 text-university-navy">Attached Documents</h3>
+                    <div className="space-y-2 text-sm">
+                      {selectedEventRequest.documents.map((doc: any) => (
+                        <div
+                          key={doc.doc_id}
+                          className="flex items-center justify-between border-b last:border-0 pb-2 last:pb-0"
                         >
-                          View
-                        </a>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              )}
+                          <span>
+                            <span className="font-medium capitalize">{doc.doc_type}</span>
+                            {" – "}
+                            {doc.file_path.split("/").pop()}
+                          </span>
+                          <a
+                            href={`${import.meta.env.VITE_API_URL}${doc.file_path}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-blue-600 hover:underline"
+                          >
+                            View
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
 
               {/* Admin Notes from History - Grouped by Role */}
               {Array.isArray(selectedEventRequest.status_history) &&
                 selectedEventRequest.status_history.length > 0 && (
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-4 text-university-navy">Admin Notes & Status History</h3>
-                  <div className="space-y-6">
-                    {/* Group notes by role */}
-                    {(() => {
-                      const notesByRole: { [key: string]: any[] } = {};
-                      selectedEventRequest.status_history
-                        .filter((h: any) => h.note && h.note.trim() !== "")
-                        .forEach((history: any) => {
-                          const role = history.role || history.role_display_name || history.role_name || "Admin";
-                          if (!notesByRole[role]) {
-                            notesByRole[role] = [];
-                          }
-                          notesByRole[role].push(history);
+                  <Card className="p-4">
+                    <h3 className="font-semibold mb-4 text-university-navy">Admin Notes & Status History</h3>
+                    <div className="space-y-6">
+                      {/* Group notes by role */}
+                      {(() => {
+                        const notesByRole: { [key: string]: any[] } = {};
+                        selectedEventRequest.status_history
+                          .filter((h: any) => h.note && h.note.trim() !== "")
+                          .forEach((history: any) => {
+                            const role = history.role || history.role_display_name || history.role_name || "Admin";
+                            if (!notesByRole[role]) {
+                              notesByRole[role] = [];
+                            }
+                            notesByRole[role].push(history);
+                          });
+
+                        const roleOrder = ["Board Secretary", "Board President", "Registrar", "VC", "Transport Office", "Protocol Office"];
+                        const sortedRoles = Object.keys(notesByRole).sort((a, b) => {
+                          const aIndex = roleOrder.indexOf(a);
+                          const bIndex = roleOrder.indexOf(b);
+                          if (aIndex === -1 && bIndex === -1) return a.localeCompare(b);
+                          if (aIndex === -1) return 1;
+                          if (bIndex === -1) return -1;
+                          return aIndex - bIndex;
                         });
 
-                      const roleOrder = ["Board Secretary", "Board President", "Registrar", "VC", "Transport Office", "Protocol Office"];
-                      const sortedRoles = Object.keys(notesByRole).sort((a, b) => {
-                        const aIndex = roleOrder.indexOf(a);
-                        const bIndex = roleOrder.indexOf(b);
-                        if (aIndex === -1 && bIndex === -1) return a.localeCompare(b);
-                        if (aIndex === -1) return 1;
-                        if (bIndex === -1) return -1;
-                        return aIndex - bIndex;
-                      });
+                        if (sortedRoles.length === 0) {
+                          return <p className="text-sm text-muted-foreground italic">No admin notes yet.</p>;
+                        }
 
-                      if (sortedRoles.length === 0) {
-                        return <p className="text-sm text-muted-foreground italic">No admin notes yet.</p>;
-                      }
-
-                      return sortedRoles.map((role) => (
-                        <div key={role} className="space-y-3">
-                          <h4 className="font-semibold text-sm text-university-navy border-b pb-2">
-                            {role} Notes
-                          </h4>
-                          {notesByRole[role].map((history: any, idx: number) => (
-                            <div
-                              key={history.history_id || idx}
-                              className="border-l-4 border-blue-500 pl-4 py-2 bg-blue-50 rounded-r"
-                            >
-                              <div className="flex items-start justify-between mb-2">
-                                <div>
-                                  <p className="text-xs text-muted-foreground">
-                                    {history.firstName && history.lastName
-                                      ? `${history.firstName} ${history.lastName}`
-                                      : "Unknown"}
-                                    {history.status_name && ` • ${history.status_name}`}
-                                  </p>
+                        return sortedRoles.map((role) => (
+                          <div key={role} className="space-y-3">
+                            <h4 className="font-semibold text-sm text-university-navy border-b pb-2">
+                              {role} Notes
+                            </h4>
+                            {notesByRole[role].map((history: any, idx: number) => (
+                              <div
+                                key={history.history_id || idx}
+                                className="border-l-4 border-blue-500 pl-4 py-2 bg-blue-50 rounded-r"
+                              >
+                                <div className="flex items-start justify-between mb-2">
+                                  <div>
+                                    <p className="text-xs text-muted-foreground">
+                                      {history.firstName && history.lastName
+                                        ? `${history.firstName} ${history.lastName}`
+                                        : "Unknown"}
+                                      {history.status_name && ` • ${history.status_name}`}
+                                    </p>
+                                  </div>
+                                  <span className="text-xs text-muted-foreground">
+                                    {new Date(history.changed_at).toLocaleString()}
+                                  </span>
                                 </div>
-                                <span className="text-xs text-muted-foreground">
-                                  {new Date(history.changed_at).toLocaleString()}
-                                </span>
+                                <p className="text-sm text-gray-700 mt-1">{history.note}</p>
                               </div>
-                              <p className="text-sm text-gray-700 mt-1">{history.note}</p>
-                            </div>
-                          ))}
-                        </div>
-                      ));
-                    })()}
-                  </div>
-                </Card>
-              )}
+                            ))}
+                          </div>
+                        ));
+                      })()}
+                    </div>
+                  </Card>
+                )}
 
               {/* Action Buttons */}
               <div className="flex justify-end space-x-3 pt-4 border-t">
@@ -1537,13 +1597,13 @@ const ProtocolOfficeDashboard = () => {
               <div>
                 <Label>Current Slot</Label>
                 <p className="text-sm text-muted-foreground">
-                  {selectedEventRequest.slot_time_from 
+                  {selectedEventRequest.slot_time_from
                     ? formatTimeToAMPM(selectedEventRequest.slot_time_from)
-                    : ""} - {selectedEventRequest.slot_time_to 
-                    ? formatTimeToAMPM(selectedEventRequest.slot_time_to)
-                    : ""} on {selectedEventRequest.slot_date 
-                    ? new Date(selectedEventRequest.slot_date).toLocaleDateString()
-                    : ""}
+                    : ""} - {selectedEventRequest.slot_time_to
+                      ? formatTimeToAMPM(selectedEventRequest.slot_time_to)
+                      : ""} on {selectedEventRequest.slot_date
+                        ? new Date(selectedEventRequest.slot_date).toLocaleDateString()
+                        : ""}
                 </p>
                 <p className="text-sm text-muted-foreground">
                   Status: <Badge>{selectedEventRequest.slot_status_name}</Badge>
@@ -1603,13 +1663,13 @@ const ProtocolOfficeDashboard = () => {
               <div>
                 <Label>Original Slot</Label>
                 <p className="text-sm text-muted-foreground">
-                  {selectedEventRequest.slot_time_from 
+                  {selectedEventRequest.slot_time_from
                     ? formatTimeToAMPM(selectedEventRequest.slot_time_from)
-                    : ""} - {selectedEventRequest.slot_time_to 
-                    ? formatTimeToAMPM(selectedEventRequest.slot_time_to)
-                    : ""} on {selectedEventRequest.slot_date 
-                    ? new Date(selectedEventRequest.slot_date).toLocaleDateString()
-                    : ""}
+                    : ""} - {selectedEventRequest.slot_time_to
+                      ? formatTimeToAMPM(selectedEventRequest.slot_time_to)
+                      : ""} on {selectedEventRequest.slot_date
+                        ? new Date(selectedEventRequest.slot_date).toLocaleDateString()
+                        : ""}
                 </p>
               </div>
               <div>
@@ -1669,8 +1729,8 @@ const ProtocolOfficeDashboard = () => {
                 <Button variant="outline" onClick={() => setIsSuggestSlotModalOpen(false)} disabled={actionLoading}>
                   Cancel
                 </Button>
-                <Button 
-                  onClick={handleSuggestSlot} 
+                <Button
+                  onClick={handleSuggestSlot}
                   disabled={actionLoading || !suggestSlotDate || !suggestSlotTimeFrom || !suggestSlotTimeTo || !suggestSlotVenueId}
                 >
                   {actionLoading ? "Suggesting..." : "Suggest Slot"}

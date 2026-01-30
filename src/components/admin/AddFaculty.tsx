@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
@@ -13,8 +13,6 @@ const AddFaculty = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [isBoardSecretary, setIsBoardSecretary] = useState(false);
-  const [dashboardPath, setDashboardPath] = useState("/dashboard/admin/role-access");
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -23,29 +21,6 @@ const AddFaculty = () => {
     password: "",
     confirmPassword: "",
   });
-
-  // Check user role on component mount
-  useEffect(() => {
-    try {
-      const userStr = localStorage.getItem("user");
-      if (userStr) {
-        const user = JSON.parse(userStr);
-        const roles = user.roles || [];
-        const roleNames = roles.map((r: any) => String(r.role_name || "").toLowerCase());
-        const isSecretary = roleNames.includes("board_secretary");
-        setIsBoardSecretary(isSecretary);
-        
-        // Set appropriate dashboard path
-        if (isSecretary) {
-          setDashboardPath("/dashboard/admin/board-secretary");
-        } else {
-          setDashboardPath("/dashboard/admin/role-access");
-        }
-      }
-    } catch (error) {
-      console.error("Error checking user role:", error);
-    }
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -118,9 +93,9 @@ const AddFaculty = () => {
         confirmPassword: "",
       });
 
-      // Navigate back to appropriate dashboard based on user role
+      // Optionally navigate back or to role access
       setTimeout(() => {
-        navigate(dashboardPath);
+        navigate("/dashboard/admin/role-access");
       }, 1500);
     } catch (error: any) {
       console.error("Error creating faculty:", error);
@@ -140,9 +115,7 @@ const AddFaculty = () => {
         <div className="container mx-auto max-w-6xl flex flex-col gap-4">
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div>
-              <p className="text-sm uppercase tracking-widest text-white/70">
-                {isBoardSecretary ? "Board Secretary" : "Super Admin"}
-              </p>
+              <p className="text-sm uppercase tracking-widest text-white/70">Super Admin</p>
               <h1 className="text-3xl font-bold">Register Faculty / Advisor</h1>
               <p className="text-white/80">
                 Create a new faculty member or advisor account. All fields marked with * are required.
@@ -150,9 +123,9 @@ const AddFaculty = () => {
             </div>
             <div className="flex gap-2">
               <Button variant="outline" className="text-white border-white bg-white/20" asChild>
-                <Link to={dashboardPath}>
+                <Link to="/dashboard/admin/role-access">
                   <ArrowLeft className="h-4 w-4 mr-2" />
-                  {isBoardSecretary ? "Back to Dashboard" : "Back to Role Access"}
+                  Back to Role Access
                 </Link>
               </Button>
             </div>
@@ -245,7 +218,7 @@ const AddFaculty = () => {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => navigate(dashboardPath)}
+                  onClick={() => navigate("/dashboard/admin/role-access")}
                   disabled={loading}
                 >
                   Cancel

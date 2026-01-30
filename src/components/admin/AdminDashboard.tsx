@@ -30,16 +30,24 @@ import {
   UserPlus,
   ShieldCheck,
   FileText,
-  Search,
-  MoreVertical,
-  Clock
+  Edit,
+  Clock,
+  MoreVertical
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator
+} from "@/components/ui/dropdown-menu";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { formatTimeToAMPM } from "@/lib/utils";
 import {
   Pagination,
   PaginationContent,
@@ -49,13 +57,6 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger,
-  DropdownMenuSeparator
-} from "@/components/ui/dropdown-menu";
 
 const AdminDashboard = () => {
   const { toast } = useToast();
@@ -64,6 +65,8 @@ const AdminDashboard = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSocietyDetailModalOpen, setIsSocietyDetailModalOpen] = useState(false);
   const [selectedSocietyForDetail, setSelectedSocietyForDetail] = useState<any>(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [advisorInfo, setAdvisorInfo] = useState<any>(null);
   const [allSocieties, setAllSocieties] = useState([]);
   const [allEvents, setAllEvents] = useState([]);
   const [allStudents, setAllStudents] = useState([]);
@@ -81,6 +84,15 @@ const AdminDashboard = () => {
   const [isEventRequestDetailModalOpen, setIsEventRequestDetailModalOpen] = useState(false);
   const [loadingEventRequestDetails, setLoadingEventRequestDetails] = useState(false);
   const [societyFilter, setSocietyFilter] = useState("all"); // all, active, pending, rejected
+  const [eventRequestFilter, setEventRequestFilter] = useState<string>("all"); // all, pending, approved, rejected
+  const [eventRequestStats, setEventRequestStats] = useState({
+    total: 0,
+    pending: 0,
+    approved: 0,
+    rejected: 0
+  });
+  const [eventRequestsCurrentPage, setEventRequestsCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
   const [isAdvisorDialogOpen, setIsAdvisorDialogOpen] = useState(false);
   const [advisorData, setAdvisorData] = useState({
     firstName: "",
@@ -105,11 +117,6 @@ const AdminDashboard = () => {
   const [societyToDelete, setSocietyToDelete] = useState<number | null>(null);
   const [studentToDelete, setStudentToDelete] = useState<number | null>(null);
   const navigate = useNavigate();
-  const [societiesCurrentPage, setSocietiesCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [loadingDetails, setLoadingDetails] = useState(false);
-  const [advisorInfo, setAdvisorInfo] = useState<any>(null);
 
   // Calculate stats from actual data
   const stats = {
@@ -147,20 +154,18 @@ const AdminDashboard = () => {
     society.status === 'under_review'
   );
 
-  // Filter societies based on selected filter and search term
+  // Filter societies based on selected filter
   const filteredSocieties = allSocieties.filter(society => {
-    // Apply status filter
-    let matchesFilter = true;
-    if (societyFilter === "all") matchesFilter = true;
-    else if (societyFilter === "active") matchesFilter = society.status_name === 'Approved by VC' || society.status === 'active';
-    else if (societyFilter === "pending") matchesFilter = society.status_id === 1 || society.status === 'pending' || society.status === 'under_review';
-    else if (societyFilter === "rejected") matchesFilter = society.status_name?.includes('Rejected') || society.status === 'rejected';
-    
-    // Apply search filter
-    const matchesSearch = !searchTerm || society.name.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    return matchesFilter && matchesSearch;
+    if (societyFilter === "all") return true;
+    if (societyFilter === "active") return society.status_name === 'Approved by VC' || society.status === 'active';
+    if (societyFilter === "pending") return society.status_id === 1 || society.status === 'pending' || society.status === 'under_review';
+    if (societyFilter === "rejected") return society.status_name?.includes('Rejected') || society.status === 'rejected';
+    return true;
   });
+
+  // Paginated societies (fallback to filteredSocieties if pagination not needed)
+  // This prevents "paginatedSocieties is not defined" errors
+  const paginatedSocieties = filteredSocieties;
 
   // These would be fetched from separate API endpoints
   const flaggedContent = [];
@@ -175,63 +180,6 @@ const AdminDashboard = () => {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedSociety(null);
-  };
-
-  const handleViewDetails = async (society: any) => {
-    try {
-      setLoadingDetails(true);
-      const token = localStorage.getItem("token");
-      if (!token) return;
-
-      // Fetch detailed society information
-      const response = await axios.get(
-        `${import.meta.env.VITE_API_URL}/admin/societies/${society.society_id}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-
-      const societyData = response.data.data;
-      setSelectedSocietyForDetail(societyData);
-
-      // Fetch advisor details from faculty table if faculty_id exists
-      if (societyData.faculty_id) {
-        try {
-          const advisorResponse = await axios.get(
-            `${import.meta.env.VITE_API_URL}/admin/faculty`,
-            {
-              headers: { Authorization: `Bearer ${token}` },
-            }
-          );
-          
-          const advisor = advisorResponse.data.faculty?.find(
-            (f: any) => f.faculty_id === societyData.faculty_id
-          );
-          
-          if (advisor) {
-            setAdvisorInfo(advisor);
-          } else {
-            setAdvisorInfo(null);
-          }
-        } catch (err) {
-          console.error("Error fetching advisor details:", err);
-          setAdvisorInfo(null);
-        }
-      } else {
-        setAdvisorInfo(null);
-      }
-
-      setIsSocietyDetailModalOpen(true);
-    } catch (err: any) {
-      console.error("Error fetching society details:", err);
-      toast({
-        title: "Error",
-        description: err.response?.data?.message || "Failed to fetch society details",
-        variant: "destructive",
-      });
-    } finally {
-      setLoadingDetails(false);
-    }
   };
 
   const handleApprove = async (societyId) => {
@@ -319,6 +267,70 @@ const AdminDashboard = () => {
         description: err.response?.data?.message || err.message || "Failed to reject society",
         variant: "destructive",
       });
+    }
+  };
+
+  // Handle view details - same as BoardSecretaryDashboard
+  const handleViewDetails = async (society: any) => {
+    try {
+      console.log("handleViewDetails called for society:", society);
+      setLoadingDetails(true);
+      const token = localStorage.getItem("token");
+      if (!token) {
+        console.error("No token found");
+        return;
+      }
+
+      // Fetch detailed society information with advisor details
+      const response = await axios.get(
+        `${import.meta.env.VITE_API_URL}/admin/societies/${society.society_id}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      console.log("Society details fetched:", response.data);
+      const societyData = response.data.data;
+      setSelectedSocietyForDetail(societyData);
+
+      // Fetch advisor details from faculty table if faculty_id exists
+      if (societyData.faculty_id) {
+        try {
+          const advisorResponse = await axios.get(
+            `${import.meta.env.VITE_API_URL}/admin/faculty`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            }
+          );
+          
+          const advisor = advisorResponse.data.faculty?.find(
+            (f: any) => f.faculty_id === societyData.faculty_id
+          );
+          
+          if (advisor) {
+            setAdvisorInfo(advisor);
+          } else {
+            setAdvisorInfo(null);
+          }
+        } catch (err) {
+          console.error("Error fetching advisor details:", err);
+          setAdvisorInfo(null);
+        }
+      } else {
+        setAdvisorInfo(null);
+      }
+
+      console.log("Opening modal with society data:", societyData);
+      setIsSocietyDetailModalOpen(true);
+    } catch (err: any) {
+      console.error("Error fetching society details:", err);
+      toast({
+        title: "Error",
+        description: err.response?.data?.message || "Failed to fetch society details",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingDetails(false);
     }
   };
 
@@ -493,7 +505,17 @@ const AdminDashboard = () => {
       );
 
       console.log("All event requests fetched:", response.data);
-      setAllEventRequests(response.data.data || []);
+      const requests = response.data.data || [];
+      setAllEventRequests(requests);
+      
+      // Calculate stats
+      const stats = {
+        total: requests.length,
+        pending: requests.filter((r: any) => r.status_id === 1).length,
+        approved: requests.filter((r: any) => [2, 4, 6, 8, 11, 13, 15].includes(r.status_id)).length,
+        rejected: requests.filter((r: any) => r.status_id === 3 || r.status_name?.includes('Rejected')).length
+      };
+      setEventRequestStats(stats);
     } catch (err: any) {
       console.error("Error fetching event requests:", err);
       setError(err.response?.data?.message || err.message || "Failed to fetch event requests");
@@ -1040,145 +1062,70 @@ const AdminDashboard = () => {
                      "Rejected Societies"} ({filteredSocieties.length})
                   </h3>
                   <div className="grid gap-6">
-                    {paginatedSocieties.map((society) => (
+                    {filteredSocieties.map((society) => (
                       <Card key={society.society_id} className="p-6 shadow-card">
-                        <div className="space-y-4">
-                          {/* Header */}
-                          <div className="flex items-start justify-between">
-                            <div className="flex items-start space-x-4">
-                              <div className="w-16 h-16 bg-university-navy/10 rounded-lg flex items-center justify-center">
-                                {society.society_logo ? (
-                                  <img 
-                                    src={`${import.meta.env.VITE_API_URL}/${society.society_logo}`}
-
-                                    alt={society.name}
-                                    className="w-12 h-12 rounded-lg object-cover"
-                                  />
-                                ) : (
-                                  <Building className="h-8 w-8 text-university-navy" />
-                                )}
-                              </div>
-                              <div className="flex-1">
-                                <div className="flex items-center justify-between mb-1">
-                                  <h4 className="text-xl font-semibold text-university-navy">{society.name}</h4>
-                                  <Badge 
-                                    variant={
-                                      society.status_name === 'Approved by VC' ? 'default' :
-                                      society.status_id === 1 ? 'secondary' :
-                                      society.status_name?.includes('Rejected') ? 'destructive' : 'outline'
-                                    }
-                                    className="ml-2"
-                                  >
-                                    {society.status_name || 'Unknown'}
-                                  </Badge>
-                                </div>
-                                <Badge variant="outline" className="mb-2 capitalize">
-                                  {society.category}
-                                </Badge>
-                                <p className="text-sm text-muted-foreground mb-2">
-                                  📍 {society.location} • 👨‍🏫 {society.advisor}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  Created: {new Date(society.created_at).toLocaleDateString()}
-                                </p>
-                              </div>
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-start space-x-4 flex-1">
+                            <div className="w-16 h-16 bg-university-navy/10 rounded-lg flex items-center justify-center">
+                              {society.society_logo ? (
+                                <img 
+                                  src={`${import.meta.env.VITE_API_URL}/${society.society_logo}`}
+                                  alt={society.name}
+                                  className="w-12 h-12 rounded-lg object-cover"
+                                />
+                              ) : (
+                                <Building className="h-8 w-8 text-university-navy" />
+                              )}
                             </div>
-                            <div className="flex items-center ml-4">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button 
-                                    variant="ghost" 
-                                    size="sm"
-                                    className="h-8 w-8 p-0"
-                                    disabled={loading}
-                                  >
-                                    <MoreVertical className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => handleViewDetails(society)}>
-                                    <Eye className="h-4 w-4 mr-2" />
-                                    View Details
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem 
-                                    onClick={() => handleDeleteSociety(society.society_id)}
-                                    className="text-red-600 focus:text-red-600 focus:bg-red-50"
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Delete
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
+                            <div className="flex-1">
+                              <div className="flex items-center mb-2">
+                                <h3 className="text-xl font-semibold text-university-navy mr-3">{society.name}</h3>
+                                <Badge variant="secondary" className="mr-2">{society.status_name}</Badge>
+                                <Badge variant="outline">{society.category}</Badge>
+                              </div>
+                              <p className="text-sm text-muted-foreground mb-2">
+                                📍 {society.location} • 👨‍🏫 {society.advisor}
+                              </p>
+                              <p className="text-sm text-muted-foreground mb-3">
+                                {society.description.length > 150 
+                                  ? `${society.description.substring(0, 150)}...` 
+                                  : society.description
+                                }
+                              </p>
+                              <div className="flex items-center text-xs text-muted-foreground">
+                                <Clock className="h-3 w-3 mr-1" />
+                                Submitted: {new Date(society.created_at).toLocaleDateString()}
+                              </div>
                             </div>
                           </div>
-
-                          {/* Description */}
-                          <div>
-                            <h5 className="font-medium text-university-navy mb-2">Description</h5>
-                            <p className="text-sm text-muted-foreground leading-relaxed">
-                              {society.description.length > 200 
-                                ? `${society.description.substring(0, 200)}...` 
-                                : society.description
-                              }
-                            </p>
+                          <div className="flex items-center ml-4">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  className="h-8 w-8 p-0"
+                                  disabled={loading}
+                                >
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleViewDetails(society)}>
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View Details
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem 
+                                  onClick={() => handleDeleteSociety(society.society_id)}
+                                  className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
-
-                          {/* Purpose */}
-                          <div>
-                            <h5 className="font-medium text-university-navy mb-2">Purpose</h5>
-                            <p className="text-sm text-muted-foreground leading-relaxed">
-                              {society.purpose}
-                            </p>
-                          </div>
-
-                          {/* Achievements */}
-                          {society.achievements && society.achievements.length > 0 && (
-                            <div>
-                              <h5 className="font-medium text-university-navy mb-2">Achievements</h5>
-                              <div className="flex flex-wrap gap-2">
-                                {society.achievements.map((achievement, index) => (
-                                  <Badge key={index} variant="secondary" className="text-xs">
-                                    <Award className="h-3 w-3 mr-1" />
-                                    {achievement}
-                                  </Badge>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Events */}
-                          {society.events && society.events.length > 0 && (
-                            <div>
-                              <h5 className="font-medium text-university-navy mb-2">Upcoming Events</h5>
-                              <div className="space-y-2">
-                                {society.events.slice(0, 2).map((event) => (
-                                  <div key={event.id} className="bg-muted/50 p-3 rounded-lg">
-                                    <div className="flex items-center justify-between">
-                                      <div>
-                                        <h6 className="font-medium text-sm">{event.title}</h6>
-                                        <p className="text-xs text-muted-foreground">
-                                          📅 {new Date(event.event_date).toLocaleDateString()}
-                                        </p>
-                                      </div>
-                                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                                    </div>
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                      {event.description.length > 100 
-                                        ? `${event.description.substring(0, 100)}...` 
-                                        : event.description
-                                      }
-                                    </p>
-                                  </div>
-                                ))}
-                                {society.events.length > 2 && (
-                                  <p className="text-xs text-muted-foreground">
-                                    +{society.events.length - 2} more events
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          )}
                         </div>
                       </Card>
                     ))}
@@ -1213,35 +1160,6 @@ const AdminDashboard = () => {
                   )}
                 </div>
               )}
-
-              <div className="grid md:grid-cols-3 gap-6">
-                <Card className="p-6 shadow-card text-center">
-                  <Building className="h-12 w-12 mx-auto mb-4 text-university-navy" />
-                  <h3 className="text-lg font-semibold mb-2">Active Societies</h3>
-                  <p className="text-2xl font-bold text-university-navy mb-2">{stats.activeSocieties}</p>
-                  <Button variant="outline" size="sm" asChild>
-                    <Link to="/admin/societies/active">Manage</Link>
-                  </Button>
-                </Card>
-
-                <Card className="p-6 shadow-card text-center">
-                  <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-university-gold" />
-                  <h3 className="text-lg font-semibold mb-2">Pending Approval</h3>
-                  <p className="text-2xl font-bold text-university-navy mb-2">{stats.pendingSocieties}</p>
-                  <Button variant="outline" size="sm" asChild>
-                    <Link to="/admin/societies/pending">Review</Link>
-                  </Button>
-                </Card>
-
-                <Card className="p-6 shadow-card text-center">
-                  <XCircle className="h-12 w-12 mx-auto mb-4 text-university-maroon" />
-                  <h3 className="text-lg font-semibold mb-2">Suspended</h3>
-                  <p className="text-2xl font-bold text-university-navy mb-2">{stats.suspendedSocieties}</p>
-                  <Button variant="outline" size="sm" asChild>
-                    <Link to="/admin/societies/suspended">Manage</Link>
-                  </Button>
-                </Card>
-              </div>
             </TabsContent>
 
             <TabsContent value="events" className="space-y-6">
@@ -1269,43 +1187,71 @@ const AdminDashboard = () => {
                   <h3 className="text-lg font-semibold text-university-navy">
                     All Societies ({filteredSocieties.length})
                   </h3>
-                  <div className="grid gap-4">
+                  <div className="grid gap-6">
                     {filteredSocieties.map((society: any) => (
-                      <Card key={society.society_id} className="p-4 shadow-card hover:shadow-lg transition-shadow">
+                      <Card key={society.society_id} className="p-6 shadow-card">
                         <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-2 mb-2">
-                              <h4 className="text-lg font-semibold text-university-navy">{society.name}</h4>
-                              <Badge variant={society.status_name === 'Approved by VC' ? "default" : society.status_id === 1 ? "secondary" : "destructive"}>
-                                {society.status_name || 'Pending'}
-                              </Badge>
-                              <Badge variant="outline">{society.category}</Badge>
-                            </div>
-                            <p className="text-sm text-muted-foreground mb-2">{society.description}</p>
-                            <div className="flex items-center space-x-4 text-xs text-muted-foreground">
-                              <div className="flex items-center space-x-1">
-                                <MapPin className="h-3 w-3" />
-                                <span>{society.location || 'N/A'}</span>
-                              </div>
-                              {society.advisor && (
-                                <div className="flex items-center space-x-1">
-                                  <Users className="h-3 w-3" />
-                                  <span>Advisor: {society.advisor}</span>
-                                </div>
+                          <div className="flex items-start space-x-4 flex-1">
+                            <div className="w-16 h-16 bg-university-navy/10 rounded-lg flex items-center justify-center">
+                              {society.society_logo ? (
+                                <img 
+                                  src={`${import.meta.env.VITE_API_URL}/${society.society_logo}`}
+                                  alt={society.name}
+                                  className="w-12 h-12 rounded-lg object-cover"
+                                />
+                              ) : (
+                                <Building className="h-8 w-8 text-university-navy" />
                               )}
                             </div>
+                            <div className="flex-1">
+                              <div className="flex items-center mb-2">
+                                <h3 className="text-xl font-semibold text-university-navy mr-3">{society.name}</h3>
+                                <Badge variant="secondary" className="mr-2">{society.status_name}</Badge>
+                                <Badge variant="outline">{society.category}</Badge>
+                              </div>
+                              <p className="text-sm text-muted-foreground mb-2">
+                                📍 {society.location} • 👨‍🏫 {society.advisor}
+                              </p>
+                              <p className="text-sm text-muted-foreground mb-3">
+                                {society.description.length > 150 
+                                  ? `${society.description.substring(0, 150)}...` 
+                                  : society.description
+                                }
+                              </p>
+                              <div className="flex items-center text-xs text-muted-foreground">
+                                <Clock className="h-3 w-3 mr-1" />
+                                Submitted: {new Date(society.created_at).toLocaleDateString()}
+                              </div>
+                            </div>
                           </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedSocietyForDetail(society);
-                              setIsSocietyDetailModalOpen(true);
-                            }}
-                          >
-                            <Eye className="h-4 w-4 mr-2" />
-                            View Details
-                          </Button>
+                          <div className="flex items-center ml-4">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  className="h-8 w-8 p-0"
+                                  disabled={loading}
+                                >
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleViewDetails(society)}>
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View Details
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem 
+                                  onClick={() => handleDeleteSociety(society.society_id)}
+                                  className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         </div>
                       </Card>
                     ))}
@@ -1332,59 +1278,254 @@ const AdminDashboard = () => {
             </TabsContent>
 
             <TabsContent value="event-requests" className="space-y-6">
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-semibold text-university-navy">All Event Requests</h2>
-                <Button variant="outline" size="sm" onClick={getAllEventRequests} disabled={eventRequestsLoading}>
-                  {eventRequestsLoading ? "Refreshing..." : "Refresh"}
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-semibold text-university-navy">Event Requests</h2>
+                <Button 
+                  variant="outline" 
+                  onClick={getAllEventRequests}
+                  disabled={eventRequestsLoading}
+                >
+                  {eventRequestsLoading ? "Loading..." : "Refresh"}
                 </Button>
               </div>
 
-              {eventRequestsLoading ? (
+              {/* Stats Overview - Event Requests */}
+              <div className="grid md:grid-cols-4 gap-6 mb-8">
+                <Card className="p-6 shadow-card">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total Requests</p>
+                      <p className="text-2xl font-bold text-university-navy">
+                        {eventRequestStats.total}
+                      </p>
+                    </div>
+                    <FileText className="h-8 w-8 text-university-navy" />
+                  </div>
+                </Card>
+
+                <Card className="p-6 shadow-card">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Pending</p>
+                      <p className="text-2xl font-bold text-university-navy">
+                        {eventRequestStats.pending}
+                      </p>
+                    </div>
+                    <Clock className="h-8 w-8 text-university-maroon" />
+                  </div>
+                </Card>
+
+                <Card className="p-6 shadow-card">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Approved</p>
+                      <p className="text-2xl font-bold text-university-navy">
+                        {eventRequestStats.approved}
+                      </p>
+                    </div>
+                    <CheckCircle className="h-8 w-8 text-green-600" />
+                  </div>
+                </Card>
+
+                <Card className="p-6 shadow-card">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Rejected</p>
+                      <p className="text-2xl font-bold text-university-navy">
+                        {eventRequestStats.rejected}
+                      </p>
+                    </div>
+                    <XCircle className="h-8 w-8 text-red-600" />
+                  </div>
+                </Card> 
+              </div>
+
+              {/* Filter Buttons */}
+              <div className="flex gap-2 mb-6">
+                <Button
+                  variant={eventRequestFilter === "all" ? "university" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setEventRequestFilter("all");
+                    getAllEventRequests();
+                  }}
+                >
+                  All
+                </Button>
+                <Button
+                  variant={eventRequestFilter === "pending" ? "university" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setEventRequestFilter("pending");
+                    getAllEventRequests();
+                  }}
+                >
+                  Pending
+                </Button>
+                <Button
+                  variant={eventRequestFilter === "approved" ? "university" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setEventRequestFilter("approved");
+                    getAllEventRequests();
+                  }}
+                >
+                  Approved
+                </Button>
+                <Button
+                  variant={eventRequestFilter === "rejected" ? "university" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setEventRequestFilter("rejected");
+                    getAllEventRequests();
+                  }}
+                >
+                  Rejected
+                </Button>
+              </div>
+
+              {eventRequestsLoading && allEventRequests.length === 0 ? (
                 <div className="text-center py-8">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-university-navy mx-auto mb-4"></div>
                   <p className="text-muted-foreground">Loading event requests...</p>
                 </div>
-              ) : allEventRequests.length === 0 ? (
+              ) : allEventRequests.length > 0 ? (
+                <>
+                  {/* Filter event requests based on filter */}
+                  {(() => {
+                    const filteredRequests = allEventRequests.filter((request: any) => {
+                      if (eventRequestFilter === "all") return true;
+                      if (eventRequestFilter === "pending") return request.status_id === 1;
+                      if (eventRequestFilter === "approved") return [2, 4, 6, 8, 11, 13, 15].includes(request.status_id);
+                      if (eventRequestFilter === "rejected") return request.status_id === 3 || request.status_name?.includes('Rejected');
+                      return true;
+                    });
+
+                    return filteredRequests.length > 0 ? (
+                      <>
+                        <div className="grid gap-4">
+                          {filteredRequests.slice((eventRequestsCurrentPage - 1) * itemsPerPage, eventRequestsCurrentPage * itemsPerPage).map((request: any) => (
+                            <Card key={request.req_id} className="p-4 shadow-card">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center mb-2 flex-wrap gap-2">
+                                    <h3 className="text-lg font-semibold text-university-navy">{request.title || request.event_name}</h3>
+                                    {request.status_name && (
+                                      <Badge variant={request.status_id === 2 ? "default" : request.status_id === 3 ? "destructive" : "secondary"}>
+                                        {request.status_name}
+                                      </Badge>
+                                    )}
+                                    {request.society_name && (
+                                      <Badge variant="outline">{request.society_name}</Badge>
+                                    )}
+                                  </div>
+                                  <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                                    {request.description || request.media_coverage}
+                                  </p>
+                                  <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mb-2">
+                                    <span>📅 {request.event_date ? new Date(request.event_date).toLocaleDateString() : "Date TBD"}</span>
+                                    <span>🕐 {request.event_time ? formatTimeToAMPM(request.event_time) : request.time_from ? formatTimeToAMPM(request.time_from) : "N/A"}</span>
+                                    <span>📍 {request.venue || "Not specified"}</span>
+                                    {request.firstName && request.lastName && (
+                                      <span>👤 {request.firstName} {request.lastName}</span>
+                                    )}
+                                  </div>
+                                  {request.note && (
+                                    <div className="bg-blue-50 border-l-4 border-blue-200 p-2 mt-2 rounded">
+                                      <p className="text-xs font-medium text-blue-900 mb-1">Note:</p>
+                                      <p className="text-xs text-blue-800">{request.note}</p>
+                                    </div>
+                                  )}
+                                  <div className="flex items-center text-xs text-muted-foreground mt-2">
+                                    <Clock className="h-3 w-3 mr-1" />
+                                    Created: {new Date(request.created_at).toLocaleString()}
+                                  </div>
+                                </div>
+                                <div className="flex flex-col space-y-2 ml-4">
+                                  <Button 
+                                    size="sm" 
+                                    variant="university"
+                                    onClick={() => handleViewEventRequestDetails(request.req_id)}
+                                    disabled={loadingEventRequestDetails}
+                                  >
+                                    <Eye className="h-3 w-3 mr-1" />
+                                    View Details
+                                  </Button>
+                                </div>
+                              </div>
+                            </Card>
+                          ))}
+                        </div>
+                        
+                        {/* Pagination for Event Requests */}
+                        {filteredRequests.length > itemsPerPage && (
+                          <div className="flex items-center justify-between mt-6">
+                            <div className="text-sm text-muted-foreground">
+                              Showing {(eventRequestsCurrentPage - 1) * itemsPerPage + 1} to {Math.min(eventRequestsCurrentPage * itemsPerPage, filteredRequests.length)} of {filteredRequests.length} event requests
+                            </div>
+                            <Pagination>
+                              <PaginationContent>
+                                <PaginationItem>
+                                  <PaginationPrevious 
+                                    onClick={() => setEventRequestsCurrentPage(prev => Math.max(1, prev - 1))}
+                                    className={eventRequestsCurrentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                                  />
+                                </PaginationItem>
+                                {Array.from({ length: Math.ceil(filteredRequests.length / itemsPerPage) }, (_, i) => i + 1)
+                                  .filter(page => {
+                                    return page === 1 || 
+                                           page === Math.ceil(filteredRequests.length / itemsPerPage) ||
+                                           (page >= eventRequestsCurrentPage - 1 && page <= eventRequestsCurrentPage + 1);
+                                  })
+                                  .map((page, idx, array) => {
+                                    const prevPage = array[idx - 1];
+                                    const showEllipsisBefore = prevPage && page - prevPage > 1;
+                                    
+                                    return (
+                                      <React.Fragment key={page}>
+                                        {showEllipsisBefore && (
+                                          <PaginationItem>
+                                            <PaginationEllipsis />
+                                          </PaginationItem>
+                                        )}
+                                        <PaginationItem>
+                                          <PaginationLink
+                                            onClick={() => setEventRequestsCurrentPage(page)}
+                                            isActive={eventRequestsCurrentPage === page}
+                                            className="cursor-pointer"
+                                          >
+                                            {page}
+                                          </PaginationLink>
+                                        </PaginationItem>
+                                      </React.Fragment>
+                                    );
+                                  })}
+                                <PaginationItem>
+                                  <PaginationNext 
+                                    onClick={() => setEventRequestsCurrentPage(prev => Math.min(Math.ceil(filteredRequests.length / itemsPerPage), prev + 1))}
+                                    className={eventRequestsCurrentPage >= Math.ceil(filteredRequests.length / itemsPerPage) ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                                  />
+                                </PaginationItem>
+                              </PaginationContent>
+                            </Pagination>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <Card className="p-6 text-center">
+                        <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                        <h3 className="text-lg font-medium mb-2">No Event Requests Found</h3>
+                        <p className="text-muted-foreground">No {eventRequestFilter} event requests found.</p>
+                      </Card>
+                    );
+                  })()}
+                </>
+              ) : (
                 <Card className="p-6 text-center">
                   <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                   <h3 className="text-lg font-medium mb-2">No Event Requests Found</h3>
                   <p className="text-muted-foreground">No event requests have been submitted yet.</p>
                 </Card>
-              ) : (
-                <div className="grid gap-4">
-                  {allEventRequests.map((request: any) => (
-                    <Card key={request.req_id} className="p-4 hover:shadow-lg transition-shadow">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <h3 className="text-lg font-semibold text-university-navy">{request.title || request.event_name}</h3>
-                            <Badge variant={request.status_id === 1 ? "secondary" : [2, 4, 6, 8, 11, 13, 15].includes(request.status_id) ? "default" : "destructive"}>
-                              {request.status_name || "Pending"}
-                            </Badge>
-                          </div>
-                          <p className="text-sm text-muted-foreground mb-2">{request.description || request.media_coverage}</p>
-                          <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
-                            <span>📅 {request.event_date ? new Date(request.event_date).toLocaleDateString() : "Date TBD"}</span>
-                            {request.event_time && <span>🕐 {request.event_time}</span>}
-                            {request.venue && <span>📍 {request.venue}</span>}
-                            {request.society_name && <span>🏛️ {request.society_name}</span>}
-                          </div>
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={async () => {
-                            await handleViewEventRequestDetails(request.req_id);
-                          }}
-                          disabled={loadingEventRequestDetails}
-                        >
-                          <Eye className="h-4 w-4 mr-2" />
-                          {loadingEventRequestDetails ? "Loading..." : "View Details"}
-                        </Button>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
               )}
             </TabsContent>
 
@@ -1573,10 +1714,7 @@ const AdminDashboard = () => {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => {
-                              setSelectedSocietyForDetail(society);
-                              setIsSocietyDetailModalOpen(true);
-                            }}
+                            onClick={() => handleViewDetails(society)}
                           >
                             <Eye className="h-4 w-4 mr-2" />
                             View Details
@@ -1743,7 +1881,7 @@ const AdminDashboard = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Society Detail Modal */}
+      {/* Society Detail Modal - Same as BoardSecretaryDashboard */}
       <Dialog open={isSocietyDetailModalOpen} onOpenChange={setIsSocietyDetailModalOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -1766,104 +1904,134 @@ const AdminDashboard = () => {
                     src={`${import.meta.env.VITE_API_URL}/${selectedSocietyForDetail.cover_image_path}`}
                     alt={selectedSocietyForDetail.name}
                     className="w-full h-full object-cover"
-                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                    }}
                   />
                 </div>
               )}
-              {/* Society Info */}
-              <div className="flex items-start gap-4">
-                {selectedSocietyForDetail.logo_path && (
-                  <img
-                    src={`${import.meta.env.VITE_API_URL}/${selectedSocietyForDetail.logo_path}`}
-                    alt={selectedSocietyForDetail.name}
-                    className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg -mt-12 bg-white flex-shrink-0"
-                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                  />
-                )}
-                <div className="flex-1">
-                  <div className="flex items-center mb-2 gap-2">
-                    <h2 className="text-2xl font-bold text-university-navy">{selectedSocietyForDetail.name}</h2>
-                    <Badge variant="secondary">{selectedSocietyForDetail.status_name}</Badge>
-                    <Badge variant="outline">{selectedSocietyForDetail.category}</Badge>
+
+              {/* Society Basic Info */}
+              <Card className="p-6">
+                <div className="flex items-start gap-4 mb-4">
+                  {selectedSocietyForDetail.logo_path && (
+                    <img
+                      src={`${import.meta.env.VITE_API_URL}/${selectedSocietyForDetail.logo_path}`}
+                      alt={selectedSocietyForDetail.name}
+                      className="w-20 h-20 rounded-lg object-cover border-2 border-university-gold"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  )}
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <h2 className="text-2xl font-bold text-university-navy">{selectedSocietyForDetail.name}</h2>
+                      <Badge variant="secondary">{selectedSocietyForDetail.status_name}</Badge>
+                      <Badge variant="outline">{selectedSocietyForDetail.category}</Badge>
+                    </div>
+                    <p className="text-muted-foreground mb-2">
+                      <MapPin className="h-4 w-4 inline mr-1" />
+                      {selectedSocietyForDetail.location}
+                    </p>
+                    <div className="flex items-center text-sm text-muted-foreground">
+                      <Clock className="h-4 w-4 mr-1" />
+                      Created: {new Date(selectedSocietyForDetail.created_at || '').toLocaleDateString()}
+                    </div>
                   </div>
-                  <p className="text-sm text-muted-foreground flex items-center gap-1">
-                    <MapPin className="h-4 w-4" /> {selectedSocietyForDetail.location}
-                  </p>
-                  <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                    <Clock className="h-3 w-3" /> Created: {new Date(selectedSocietyForDetail.created_at || '').toLocaleDateString()}
-                  </p>
                 </div>
-              </div>
+              </Card>
 
               {/* Description */}
               <Card className="p-6">
-                <h3 className="font-semibold mb-3 text-university-navy">Description</h3>
+                <h3 className="font-semibold mb-3 text-university-navy flex items-center">
+                  <FileText className="h-5 w-5 mr-2" />
+                  Description
+                </h3>
                 <p className="text-muted-foreground leading-relaxed">{selectedSocietyForDetail.description}</p>
               </Card>
 
               {/* Purpose */}
               <Card className="p-6">
-                <h3 className="font-semibold mb-3 text-university-navy">Purpose</h3>
+                <h3 className="font-semibold mb-3 text-university-navy flex items-center">
+                  <FileText className="h-5 w-5 mr-2" />
+                  Purpose
+                </h3>
                 <p className="text-muted-foreground leading-relaxed">{selectedSocietyForDetail.purpose}</p>
               </Card>
 
               {/* Advisor Information */}
               {(selectedSocietyForDetail.advisor_info || advisorInfo) && (
                 <Card className="p-6 border-l-4 border-l-blue-500">
-                  <h3 className="font-semibold mb-3 text-university-navy flex items-center gap-2">
-                    <Users className="h-5 w-5" />
+                  <h3 className="font-semibold mb-3 text-university-navy flex items-center">
+                    <Users className="h-5 w-5 mr-2" />
                     Advisor Information
                   </h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Name:</span>
-                      <span className="font-medium">{selectedSocietyForDetail.advisor_info?.name || advisorInfo?.name || selectedSocietyForDetail.advisor || "N/A"}</span>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Name:</span>
+                        <span className="font-medium">
+                          {selectedSocietyForDetail.advisor_info?.name || advisorInfo?.name || selectedSocietyForDetail.advisor || "N/A"}
+                        </span>
+                      </div>
+                      {(selectedSocietyForDetail.advisor_info?.email || advisorInfo?.email) && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Email:</span>
+                          <span className="font-medium">
+                            {selectedSocietyForDetail.advisor_info?.email || advisorInfo?.email}
+                          </span>
+                        </div>
+                      )}
+                      {(selectedSocietyForDetail.advisor_info?.phone || advisorInfo?.phone) && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Phone:</span>
+                          <span className="font-medium">
+                            {selectedSocietyForDetail.advisor_info?.phone || advisorInfo?.phone}
+                          </span>
+                        </div>
+                      )}
                     </div>
-                    {(selectedSocietyForDetail.advisor_info?.email || advisorInfo?.email) && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Email:</span>
-                        <span className="font-medium">{selectedSocietyForDetail.advisor_info?.email || advisorInfo?.email}</span>
-                      </div>
-                    )}
-                    {(selectedSocietyForDetail.advisor_info?.phone || advisorInfo?.phone) && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Phone:</span>
-                        <span className="font-medium">{selectedSocietyForDetail.advisor_info?.phone || advisorInfo?.phone}</span>
-                      </div>
-                    )}
-                    {(selectedSocietyForDetail.advisor_info?.faculty_id || advisorInfo?.faculty_id) && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Faculty ID:</span>
-                        <span className="font-medium">{selectedSocietyForDetail.advisor_info?.faculty_id || advisorInfo?.faculty_id}</span>
-                      </div>
-                    )}
-                    {(selectedSocietyForDetail.advisor_info?.dept || advisorInfo?.dept) && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Department:</span>
-                        <span className="font-medium">{selectedSocietyForDetail.advisor_info?.dept || advisorInfo?.dept}</span>
-                      </div>
-                    )}
-                    {(selectedSocietyForDetail.advisor_info?.cnic || advisorInfo?.cnic) && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">CNIC:</span>
-                        <span className="font-medium">{selectedSocietyForDetail.advisor_info?.cnic || advisorInfo?.cnic}</span>
-                      </div>
-                    )}
+                    <div className="space-y-2 text-sm">
+                      {(selectedSocietyForDetail.advisor_info?.faculty_id || advisorInfo?.faculty_id) && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Faculty ID:</span>
+                          <span className="font-medium">
+                            {selectedSocietyForDetail.advisor_info?.faculty_id || advisorInfo?.faculty_id}
+                          </span>
+                        </div>
+                      )}
+                      {(selectedSocietyForDetail.advisor_info?.dept || advisorInfo?.dept) && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Department:</span>
+                          <span className="font-medium">
+                            {selectedSocietyForDetail.advisor_info?.dept || advisorInfo?.dept}
+                          </span>
+                        </div>
+                      )}
+                      {(selectedSocietyForDetail.advisor_info?.cnic || advisorInfo?.cnic) && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">CNIC:</span>
+                          <span className="font-medium">
+                            {selectedSocietyForDetail.advisor_info?.cnic || advisorInfo?.cnic}
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </Card>
               )}
 
-              {/* Submitted By (Student) */}
+              {/* Student Information */}
               {selectedSocietyForDetail.student_info && (
-                <Card className="p-6 border-l-4 border-l-university-gold">
-                  <h3 className="font-semibold mb-3 text-university-navy flex items-center gap-2">
-                    <Users className="h-5 w-5" />
-                    Submitted By (Student)
-                  </h3>
-                  <div className="space-y-2 text-sm">
+                <Card className="p-6">
+                  <h3 className="font-semibold mb-3 text-university-navy">Submitted By (Student)</h3>
+                  <div className="grid md:grid-cols-2 gap-4 text-sm">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Name:</span>
-                      <span className="font-medium">{selectedSocietyForDetail.student_info.firstName} {selectedSocietyForDetail.student_info.lastName}</span>
+                      <span className="font-medium">
+                        {selectedSocietyForDetail.student_info.firstName} {selectedSocietyForDetail.student_info.lastName}
+                      </span>
                     </div>
                     {selectedSocietyForDetail.student_info.email && (
                       <div className="flex justify-between">
@@ -1873,7 +2041,7 @@ const AdminDashboard = () => {
                     )}
                     {selectedSocietyForDetail.student_info.rollNo && (
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Roll No:</span>
+                        <span className="text-muted-foreground">Roll Number:</span>
                         <span className="font-medium">{selectedSocietyForDetail.student_info.rollNo}</span>
                       </div>
                     )}
@@ -1905,7 +2073,7 @@ const AdminDashboard = () => {
                       <div key={index} className="flex items-start space-x-2">
                         <div className="w-2 h-2 bg-university-gold rounded-full mt-2"></div>
                         <span className="text-muted-foreground">
-                          {achievement.achievement || achievement || "Untitled Achievement"}
+                          {achievement.achievement || "Untitled Achievement"}
                         </span>
                       </div>
                     ))}
@@ -1913,51 +2081,28 @@ const AdminDashboard = () => {
                 </Card>
               )}
 
-              {/* Events */}
-              {selectedSocietyForDetail.events && selectedSocietyForDetail.events.length > 0 && (
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-3 text-university-navy flex items-center">
-                    <Calendar className="h-5 w-5 mr-2" />
-                    Events ({selectedSocietyForDetail.events.length})
-                  </h3>
-                  <div className="space-y-3">
-                    {selectedSocietyForDetail.events.map((event: any, index: number) => (
-                      <div key={index} className="bg-muted/50 p-3 rounded-lg">
-                        <div className="flex items-center justify-between mb-1">
-                          <h6 className="font-medium text-sm">{event.title || event.event_title || 'Untitled Event'}</h6>
-                          {event.event_date && (
-                            <Badge variant="outline" className="text-xs">
-                              {new Date(event.event_date).toLocaleDateString()}
-                            </Badge>
-                          )}
-                        </div>
-                        {event.description && (
-                          <p className="text-xs text-muted-foreground">
-                            {event.description}
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              )}
-
-              {/* Cover Image */}
-              {selectedSocietyForDetail.cover_photo && (
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-3 text-university-navy">Cover Image</h3>
-                  <img 
-                    src={`${import.meta.env.VITE_API_URL}/${selectedSocietyForDetail.cover_photo}`} 
-                    alt={selectedSocietyForDetail.name}
-                    className="w-full h-48 object-cover rounded-lg"
-                  />
-                </Card>
-              )}
-
               {/* Action Buttons */}
               <div className="flex justify-end space-x-3 pt-4 border-t">
                 <Button variant="outline" onClick={() => setIsSocietyDetailModalOpen(false)}>
                   Close
+                </Button>
+                <Button 
+                  variant="destructive"
+                  onClick={() => {
+                    setConfirmDialog({
+                      open: true,
+                      title: "Delete Society",
+                      description: "Are you sure you want to delete this society? This action cannot be undone.",
+                      onConfirm: () => {
+                        handleDeleteSociety(selectedSocietyForDetail.society_id);
+                        setIsSocietyDetailModalOpen(false);
+                      },
+                      variant: "destructive"
+                    });
+                  }}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Society
                 </Button>
               </div>
             </div>

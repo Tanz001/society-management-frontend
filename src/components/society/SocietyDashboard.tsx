@@ -37,10 +37,18 @@ import {
   Download,
   BarChart3 as BarChartIcon,
   MapPin,
-  ArrowLeft
+  ArrowLeft,
+  Edit,
+  Save,
+  X,
+  Building,
+  Upload,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -75,6 +83,22 @@ const SocietyDashboard = () => {
   const [selectedEventForReport, setSelectedEventForReport] = useState<{id: number, title: string} | null>(null);
   const [isReportUploadOpen, setIsReportUploadOpen] = useState(false);
   const [completingEvent, setCompletingEvent] = useState<number | null>(null);
+  const [viewingMedia, setViewingMedia] = useState<{url: string, type: string, files: any[], currentIndex: number} | null>(null);
+  
+  // Society details edit state
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    name: "",
+    description: "",
+    category: "",
+    location: "",
+    purpose: "",
+  });
+  const [editLogoFile, setEditLogoFile] = useState<File | null>(null);
+  const [editCoverFile, setEditCoverFile] = useState<File | null>(null);
+  const [previewLogo, setPreviewLogo] = useState<string | null>(null);
+  const [previewCover, setPreviewCover] = useState<string | null>(null);
+  const [savingSociety, setSavingSociety] = useState(false);
 
   // Check if user is advisor
   const isAdvisor = () => {
@@ -561,6 +585,91 @@ const SocietyDashboard = () => {
     }
   };
 
+  // Handle update society
+  const handleUpdateSociety = async () => {
+    if (!societyInfo?.society_id) {
+      toast.error("Society information not available");
+      return;
+    }
+
+    try {
+      setSavingSociety(true);
+      const token = localStorage.getItem("token");
+      if (!token) {
+        toast.error("No authentication token found");
+        return;
+      }
+
+      const API_URL = import.meta.env.VITE_API_URL;
+      const hasImages = editLogoFile || editCoverFile;
+      
+      let response;
+      if (hasImages) {
+        const formData = new FormData();
+        formData.append("name", editFormData.name);
+        formData.append("description", editFormData.description);
+        formData.append("category", editFormData.category);
+        formData.append("location", editFormData.location);
+        formData.append("purpose", editFormData.purpose);
+        
+        if (editLogoFile) {
+          formData.append("societyLogo", editLogoFile);
+        }
+        if (editCoverFile) {
+          formData.append("coverPhoto", editCoverFile);
+        }
+
+        response = await axios.put(
+          `${API_URL}/admin/societies/${societyInfo.society_id}`,
+          formData,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "multipart/form-data",
+            },
+          }
+        );
+      } else {
+        const payload = {
+          name: editFormData.name,
+          description: editFormData.description,
+          category: editFormData.category,
+          location: editFormData.location,
+          purpose: editFormData.purpose,
+        };
+
+        response = await axios.put(
+          `${API_URL}/admin/societies/${societyInfo.society_id}`,
+          payload,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+      }
+
+      if (response.data.success) {
+        toast.success("Society details updated successfully!");
+        setIsEditMode(false);
+        setEditLogoFile(null);
+        setEditCoverFile(null);
+        setPreviewLogo(null);
+        setPreviewCover(null);
+        // Refresh society data
+        await fetchSocietyData();
+      } else {
+        toast.error(response.data.message || "Failed to update society details");
+      }
+    } catch (error: any) {
+      console.error("Error updating society:", error);
+      toast.error(error.response?.data?.message || error.message || "Failed to update society details");
+    } finally {
+      setSavingSociety(false);
+    }
+  };
+
   // Fetch data when component loads or when societyId changes
   useEffect(() => {
     // First, try to load from localStorage for instant display
@@ -625,7 +734,13 @@ const SocietyDashboard = () => {
       icon: <Calendar className="h-4 w-4" />,
       onClick: () => setActiveTab("events"),
       variant: (activeTab === "events" ? "active" : "default") as "active" | "default" | "secondary"
-    }
+    },
+    ...(isAdvisor() ? [{
+      label: "Society Details",
+      icon: <Building className="h-4 w-4" />,
+      onClick: () => setActiveTab("society-details"),
+      variant: (activeTab === "society-details" ? "active" : "default") as "active" | "default" | "secondary"
+    }] : []),
   ];
 
   return (
@@ -732,6 +847,14 @@ const SocietyDashboard = () => {
             >
               Events
             </Button>
+            {isAdvisor() && (
+              <Button 
+                variant={activeTab === "society-details" ? "university" : "outline"}
+                onClick={() => setActiveTab("society-details")}
+              >
+                Society Details
+              </Button>
+            )}
           </div>
 
           {/* Mobile Tab Indicator */}
@@ -815,27 +938,117 @@ const SocietyDashboard = () => {
                     ) : posts.length === 0 ? (
                       <p className="text-xs text-muted-foreground text-center py-4">No posts yet</p>
                     ) : (
-                      posts.slice(0, 3).map((post) => (
-                        <div key={post.post_id} className="border-b pb-4 last:border-0">
-                          <h4 className="font-medium text-sm mb-1">{post.title}</h4>
-                          <p className="text-xs text-muted-foreground mb-2 line-clamp-2">
-                            {post.content}
-                          </p>
-                          <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <span>{new Date(post.created_at).toLocaleDateString()}</span>
-                            <div className="flex items-center space-x-3">
-                              <div className="flex items-center">
-                                <Heart className="h-3 w-3 mr-1" />
-                                {post.like_count || 0}
-                              </div>
-                              <div className="flex items-center">
-                                <MessageSquare className="h-3 w-3 mr-1" />
-                                {post.comment_count || 0}
+                      posts
+                        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                        .slice(0, 5)
+                        .map((post) => {
+                          // Parse media_files from the media_files table
+                          let mediaFiles: any[] = [];
+                          
+                          if (post.media_files) {
+                            if (typeof post.media_files === 'string') {
+                              try {
+                                mediaFiles = JSON.parse(post.media_files);
+                              } catch (e) {
+                                mediaFiles = [];
+                              }
+                            } else if (Array.isArray(post.media_files)) {
+                              mediaFiles = post.media_files;
+                            }
+                          }
+                          
+                          // Filter to only show images in overview
+                          const imageFiles = mediaFiles.filter((file: any) => 
+                            file && file.file_type === 'image' && file.file_url
+                          );
+                          
+                          const API_URL = import.meta.env.VITE_API_URL;
+                          
+                          // Process image URLs to ensure they're properly formatted
+                          const processedImages = imageFiles.map((file: any) => {
+                            let imageUrl = file.file_url.trim();
+                            if (!imageUrl.startsWith('http')) {
+                              // Convert Windows path to URL format
+                              const cleanPath = imageUrl.replace(/\\/g, '/');
+                              // Handle both absolute and relative paths
+                              if (cleanPath.includes('assets/')) {
+                                imageUrl = `${API_URL}/${cleanPath.replace(/^.*?\/assets\//, 'assets/')}`;
+                              } else if (cleanPath.startsWith('/')) {
+                                imageUrl = `${API_URL}${cleanPath}`;
+                              } else {
+                                imageUrl = `${API_URL}/assets/${cleanPath}`;
+                              }
+                            }
+                            return { ...file, processedUrl: imageUrl };
+                          });
+                          
+                          return (
+                            <div key={post.post_id} className="border-b pb-4 last:border-0 space-y-2">
+                              <h4 className="font-medium text-sm mb-1">{post.title}</h4>
+                              {post.content && (
+                                <p className="text-xs text-muted-foreground mb-2 line-clamp-2">
+                                  {post.content}
+                                </p>
+                              )}
+                              
+                              {/* Display Images */}
+                              {processedImages.length > 0 && (
+                                <div className={`grid gap-2 mb-2 ${
+                                  processedImages.length === 1 
+                                    ? 'grid-cols-1' 
+                                    : processedImages.length === 2 
+                                    ? 'grid-cols-2' 
+                                    : 'grid-cols-3'
+                                }`}>
+                                  {processedImages.slice(0, 4).map((file: any, index: number) => (
+                                    <div 
+                                      key={file.media_id || index} 
+                                      className="relative group overflow-hidden rounded-lg border border-gray-200 hover:border-university-navy/50 transition-all cursor-pointer"
+                                      onClick={() => setViewingMedia({
+                                        url: file.processedUrl,
+                                        type: 'image',
+                                        files: processedImages,
+                                        currentIndex: index
+                                      })}
+                                    >
+                                      <img 
+                                        src={file.processedUrl}
+                                        alt={`Post image ${index + 1}`}
+                                        className="w-full h-24 md:h-32 object-cover transition-transform duration-300 group-hover:scale-105"
+                                        onError={(e) => {
+                                          console.error('Image failed to load:', file.processedUrl);
+                                          e.currentTarget.style.display = 'none';
+                                        }}
+                                      />
+                                      {processedImages.length > 4 && index === 3 && (
+                                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white text-xs font-semibold backdrop-blur-sm">
+                                          +{processedImages.length - 4} more
+                                        </div>
+                                      )}
+                                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                        <Eye className="h-5 w-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              
+                              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                <span>{new Date(post.created_at).toLocaleDateString()}</span>
+                                <div className="flex items-center space-x-3">
+                                  <div className="flex items-center">
+                                    <Heart className="h-3 w-3 mr-1" />
+                                    {post.like_count || 0}
+                                  </div>
+                                  <div className="flex items-center">
+                                    <MessageSquare className="h-3 w-3 mr-1" />
+                                    {post.comment_count || 0}
+                                  </div>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        </div>
-                      ))
+                          );
+                        })
                     )}
                   </div>
                 </Card>
@@ -1302,76 +1515,145 @@ const SocietyDashboard = () => {
                           <p className="text-muted-foreground leading-relaxed">{post.content}</p>
                         )}
 
-                        {post.post_type === 'photo' && post.media_files && post.media_files.length > 0 && (
-                          <div className="space-y-3">
-                            <p className="text-muted-foreground leading-relaxed">{post.content}</p>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                              {post.media_files.map((file: any) => {
-                                let imageUrl = file.file_url;
-                                if (file.file_url && !file.file_url.startsWith('http')) {
-                                  imageUrl = `${import.meta.env.VITE_API_URL}/${file.file_url.replace(/\\/g, '/').replace(/^.*?\/assets\//, 'assets/')}`;
-
-                                }
-                                return (
-                                  <img 
-                                    key={file.media_id}
-                                    src={imageUrl}
-                                    alt="Post"
-                                    className="w-full h-48 object-cover rounded-lg border"
-                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                  />
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
-
-                        {post.post_type === 'video' && post.media_files && post.media_files.length > 0 && (
-                          <div className="space-y-3">
-                            <p className="text-muted-foreground leading-relaxed">{post.content}</p>
-                            {post.media_files.map((file: any) => {
-                              let videoUrl = file.file_url;
-                              if (file.file_url && !file.file_url.startsWith('http')) {
-                               videoUrl = `${import.meta.env.VITE_API_URL}/${file.file_url.replace(/\\/g, '/').replace(/^.*?\/assets\//, 'assets/')}`;
-
+                        {(() => {
+                          // Parse media_files from the media_files table
+                          let mediaFiles: any[] = [];
+                          
+                          if (post.media_files) {
+                            if (typeof post.media_files === 'string') {
+                              try {
+                                mediaFiles = JSON.parse(post.media_files);
+                              } catch (e) {
+                                mediaFiles = [];
                               }
-                              return (
-                                <video 
-                                  key={file.media_id}
-                                  src={videoUrl}
-                                  controls
-                                  className="w-full max-w-md rounded-lg border"
-                                />
-                              );
-                            })}
-                          </div>
-                        )}
-
-                        {post.post_type === 'document' && post.media_files && post.media_files.length > 0 && (
-                          <div className="space-y-3">
-                            <p className="text-muted-foreground leading-relaxed">{post.content}</p>
-                            {post.media_files.map((file: any) => {
-                              let fileUrl = file.file_url;
-                              if (file.file_url && !file.file_url.startsWith('http')) {
-                                fileUrl = `${import.meta.env.VITE_API_URL}/${file.file_url.replace(/\\/g, '/').replace(/^.*?\/assets\//, 'assets/')}`;
+                            } else if (Array.isArray(post.media_files)) {
+                              mediaFiles = post.media_files;
+                            }
+                          }
+                          
+                          // Filter out NULL values
+                          mediaFiles = mediaFiles.filter((file: any) => file && file.media_id);
+                          
+                          const API_URL = import.meta.env.VITE_API_URL;
+                          
+                          // Process media files to ensure URLs are properly formatted
+                          const processedFiles = mediaFiles.map((file: any) => {
+                            let processedUrl = file.file_url.trim();
+                            if (!processedUrl.startsWith('http')) {
+                              const cleanPath = processedUrl.replace(/\\/g, '/');
+                              if (cleanPath.includes('assets/')) {
+                                processedUrl = `${API_URL}/${cleanPath.replace(/^.*?\/assets\//, 'assets/')}`;
+                              } else if (cleanPath.startsWith('/')) {
+                                processedUrl = `${API_URL}${cleanPath}`;
+                              } else {
+                                processedUrl = `${API_URL}/assets/${cleanPath}`;
                               }
-                              return (
-                                <div key={file.media_id} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                                  <FileText className="h-5 w-5 text-university-navy" />
-                                  <span className="flex-1 text-sm text-muted-foreground truncate">
-                                    {file.file_url.split('/').pop()}
-                                  </span>
-                                  <Button size="sm" variant="outline" asChild>
-                                    <a href={fileUrl} target="_blank" rel="noopener noreferrer">
-                                      <Download className="h-3 w-3 mr-1" />
-                                      Download
-                                    </a>
-                                  </Button>
+                            }
+                            return { ...file, processedUrl };
+                          });
+                          
+                          // Group files by type
+                          const imageFiles = processedFiles.filter((f: any) => f.file_type === 'image');
+                          const videoFiles = processedFiles.filter((f: any) => f.file_type === 'video');
+                          const documentFiles = processedFiles.filter((f: any) => f.file_type === 'document');
+                          
+                          return (
+                            <>
+                              {imageFiles.length > 0 && (
+                                <div className="space-y-3">
+                                  {post.content && (
+                                    <p className="text-muted-foreground leading-relaxed">{post.content}</p>
+                                  )}
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {imageFiles.map((file: any, index: number) => (
+                                      <div
+                                        key={file.media_id}
+                                        className="cursor-pointer rounded-lg border overflow-hidden hover:border-university-navy/50 transition-all"
+                                        onClick={() => setViewingMedia({
+                                          url: file.processedUrl,
+                                          type: 'image',
+                                          files: imageFiles,
+                                          currentIndex: index
+                                        })}
+                                      >
+                                        <img 
+                                          src={file.processedUrl}
+                                          alt={`Post image ${file.media_id}`}
+                                          className="w-full h-48 object-cover hover:scale-105 transition-transform duration-300"
+                                          onError={(e) => { 
+                                            console.error('Image failed to load:', file.processedUrl);
+                                            e.currentTarget.style.display = 'none'; 
+                                          }}
+                                        />
+                                      </div>
+                                    ))}
+                                  </div>
                                 </div>
-                              );
-                            })}
-                          </div>
-                        )}
+                              )}
+
+                              {videoFiles.length > 0 && (
+                                <div className="space-y-3">
+                                  {post.content && (
+                                    <p className="text-muted-foreground leading-relaxed">{post.content}</p>
+                                  )}
+                                  {videoFiles.map((file: any, index: number) => (
+                                    <div
+                                      key={file.media_id}
+                                      className="cursor-pointer rounded-lg border overflow-hidden hover:border-university-navy/50 transition-all"
+                                      onClick={() => setViewingMedia({
+                                        url: file.processedUrl,
+                                        type: 'video',
+                                        files: videoFiles,
+                                        currentIndex: index
+                                      })}
+                                    >
+                                      <video 
+                                        src={file.processedUrl}
+                                        controls
+                                        className="w-full max-w-md rounded-lg"
+                                        onError={(e) => {
+                                          console.error('Video failed to load:', file.processedUrl);
+                                        }}
+                                        onClick={(e) => e.stopPropagation()}
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {documentFiles.length > 0 && (
+                                <div className="space-y-3">
+                                  {post.content && (
+                                    <p className="text-muted-foreground leading-relaxed">{post.content}</p>
+                                  )}
+                                  {documentFiles.map((file: any) => (
+                                    <div 
+                                      key={file.media_id} 
+                                      className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                                      onClick={() => window.open(file.processedUrl, '_blank')}
+                                    >
+                                      <FileText className="h-5 w-5 text-university-navy" />
+                                      <span className="flex-1 text-sm text-muted-foreground truncate">
+                                        {file.file_url.split('/').pop()}
+                                      </span>
+                                      <Button 
+                                        size="sm" 
+                                        variant="outline"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          window.open(file.processedUrl, '_blank');
+                                        }}
+                                      >
+                                        <Download className="h-3 w-3 mr-1" />
+                                        Download
+                                      </Button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
 
                         {post.post_type === 'poll' && post.poll_data && (
                           <div className="space-y-3">
@@ -1479,115 +1761,6 @@ const SocietyDashboard = () => {
                           Like ({post.like_count || 0})
                         </Button>
                         
-                        <Dialog open={commentingOn === post.post_id} onOpenChange={(open) => {
-                          if (!open) {
-                            setCommentingOn(null);
-                            setNewComment("");
-                          } else {
-                            setCommentingOn(post.post_id);
-                          }
-                        }}>
-                          <DialogTrigger asChild>
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              className="text-muted-foreground hover:text-university-navy hover:bg-university-navy/5"
-                            >
-                              <MessageCircle className="h-4 w-4 mr-2" />
-                              Comment ({post.comment_count || 0})
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="sm:max-w-2xl max-h-[80vh] flex flex-col">
-                            <DialogHeader>
-                              <DialogTitle>Comments ({post.comment_count || 0})</DialogTitle>
-                              <DialogDescription>
-                                Share your thoughts and see what others are saying.
-                              </DialogDescription>
-                            </DialogHeader>
-                            
-                            {/* Comments List */}
-                            <div className="flex-1 overflow-y-auto space-y-4 mb-4">
-                              {comments[post.post_id] && comments[post.post_id].length > 0 ? (
-                                comments[post.post_id].map((comment: any) => (
-                                  <div key={comment.id || comment.comment_id} className="flex space-x-3 p-3 bg-gray-50 rounded-lg">
-                                    <Avatar className="h-8 w-8">
-                                      <AvatarFallback className="bg-university-navy text-white text-xs">
-                                        {comment.author ? comment.author.split(' ').map((n: string) => n[0]).join('').toUpperCase() : 'U'}
-                                      </AvatarFallback>
-                                    </Avatar>
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-center space-x-2 mb-1">
-                                        <span className="font-medium text-sm text-university-navy">
-                                          {comment.author || comment.commenter_name || 'Anonymous'}
-                                        </span>
-                                        <span className="text-xs text-muted-foreground">
-                                          {comment.created_at ? new Date(comment.created_at).toLocaleDateString('en-US', { 
-                                            month: 'short', 
-                                            day: 'numeric',
-                                            hour: '2-digit',
-                                            minute: '2-digit'
-                                          }) : ''}
-                                        </span>
-                                      </div>
-                                      <p className="text-sm text-gray-900 leading-relaxed">
-                                        {comment.text || comment.comment_text}
-                                      </p>
-                                    </div>
-                                  </div>
-                                ))
-                              ) : (
-                                <div className="text-center py-8 text-muted-foreground">
-                                  <MessageCircle className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                                  <p>No comments yet. Be the first to comment!</p>
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Add Comment Section */}
-                            <div className="border-t pt-4">
-                              <div className="space-y-3">
-                                <Textarea
-                                  placeholder="Write your comment..."
-                                  value={newComment}
-                                  onChange={(e) => setNewComment(e.target.value)}
-                                  className="min-h-[80px] resize-none"
-                                />
-                                <div className="flex justify-between items-center">
-                                  <span className="text-xs text-muted-foreground">
-                                    {newComment.length}/500 characters
-                                  </span>
-                                  <div className="flex space-x-2">
-                                    <Button 
-                                      variant="outline" 
-                                      onClick={() => {
-                                        setCommentingOn(null);
-                                        setNewComment("");
-                                      }}
-                                    >
-                                      Cancel
-                                    </Button>
-                                    <Button 
-                                      onClick={() => handleComment(post.post_id)}
-                                      disabled={!newComment.trim() || submittingComment || newComment.length > 500}
-                                    >
-                                      {submittingComment ? (
-                                        <>
-                                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                          Posting...
-                                        </>
-                                      ) : (
-                                        <>
-                                          <Send className="h-4 w-4 mr-2" />
-                                          Post Comment
-                                        </>
-                                      )}
-                                    </Button>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </DialogContent>
-                        </Dialog>
                       </div>
                     </Card>
                   ))}
@@ -1896,6 +2069,281 @@ const SocietyDashboard = () => {
               </div>
             </div>
           )}
+
+          {/* Society Details Tab - Only for Advisors */}
+          {isAdvisor() && activeTab === "society-details" && (
+            <div className="space-y-6">
+              {loadingSociety ? (
+                <div className="text-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-university-navy mx-auto mb-4"></div>
+                  <p className="text-muted-foreground">Loading society details...</p>
+                </div>
+              ) : societyInfo ? (
+                <div className="space-y-6">
+                  {/* Header with Edit Button */}
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-2xl font-semibold text-university-navy">Society Details</h2>
+                    {!isEditMode ? (
+                      <Button 
+                        variant="university"
+                        onClick={() => {
+                          setIsEditMode(true);
+                          setEditFormData({
+                            name: societyInfo.name || "",
+                            description: societyInfo.description || "",
+                            category: societyInfo.category || "",
+                            location: societyInfo.location || "",
+                            purpose: societyInfo.purpose || "",
+                          });
+                          setPreviewLogo(societyInfo.society_logo ? `${import.meta.env.VITE_API_URL}/${societyInfo.society_logo}` : null);
+                          setPreviewCover(societyInfo.cover_photo ? `${import.meta.env.VITE_API_URL}/${societyInfo.cover_photo}` : null);
+                        }}
+                      >
+                        <Edit className="h-4 w-4 mr-2" />
+                        Edit Details
+                      </Button>
+                    ) : (
+                      <div className="flex gap-2">
+                        <Button 
+                          variant="outline"
+                          onClick={() => {
+                            setIsEditMode(false);
+                            setEditLogoFile(null);
+                            setEditCoverFile(null);
+                            setPreviewLogo(null);
+                            setPreviewCover(null);
+                          }}
+                        >
+                          <X className="h-4 w-4 mr-2" />
+                          Cancel
+                        </Button>
+                        <Button 
+                          variant="university"
+                          onClick={handleUpdateSociety}
+                          disabled={savingSociety}
+                        >
+                          <Save className="h-4 w-4 mr-2" />
+                          {savingSociety ? "Saving..." : "Save Changes"}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Cover Photo */}
+                  {!isEditMode && societyInfo.cover_photo && (
+                    <div className="relative h-48 rounded-lg overflow-hidden">
+                      <img
+                        src={`${import.meta.env.VITE_API_URL}/${societyInfo.cover_photo}`}
+                        alt={societyInfo.name}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  )}
+
+                  {isEditMode && (
+                    <Card className="p-6">
+                      <Label className="text-base font-semibold mb-3 block">Cover Photo</Label>
+                      <div className="space-y-4">
+                        {(previewCover || editCoverFile) && (
+                          <div className="relative h-48 rounded-lg overflow-hidden border-2 border-dashed border-gray-300">
+                            <img
+                              src={previewCover || (editCoverFile ? URL.createObjectURL(editCoverFile) : "")}
+                              alt="Cover preview"
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        )}
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                setEditCoverFile(file);
+                                setPreviewCover(URL.createObjectURL(file));
+                              }
+                            }}
+                            className="flex-1"
+                          />
+                          {previewCover && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setEditCoverFile(null);
+                                setPreviewCover(societyInfo.cover_photo ? `${import.meta.env.VITE_API_URL}/${societyInfo.cover_photo}` : null);
+                              }}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </Card>
+                  )}
+
+                  {/* Society Basic Info */}
+                  <Card className="p-6">
+                    <div className="flex items-start gap-4 mb-4">
+                      {!isEditMode && societyInfo.society_logo && (
+                        <img
+                          src={`${import.meta.env.VITE_API_URL}/${societyInfo.society_logo}`}
+                          alt={societyInfo.name}
+                          className="w-20 h-20 rounded-lg object-cover border-2 border-university-gold"
+                        />
+                      )}
+                      {isEditMode && (
+                        <div className="space-y-2">
+                          <Label>Society Logo</Label>
+                          <div className="space-y-2">
+                            {(previewLogo || editLogoFile) && (
+                              <div className="w-20 h-20 rounded-lg overflow-hidden border-2 border-dashed border-gray-300">
+                                <img
+                                  src={previewLogo || (editLogoFile ? URL.createObjectURL(editLogoFile) : "")}
+                                  alt="Logo preview"
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                            )}
+                            <div className="flex items-center gap-2">
+                              <Input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    setEditLogoFile(file);
+                                    setPreviewLogo(URL.createObjectURL(file));
+                                  }
+                                }}
+                                className="flex-1"
+                              />
+                              {previewLogo && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setEditLogoFile(null);
+                                    setPreviewLogo(societyInfo.society_logo ? `${import.meta.env.VITE_API_URL}/${societyInfo.society_logo}` : null);
+                                  }}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      <div className="flex-1">
+                        {!isEditMode ? (
+                          <>
+                            <div className="flex items-center gap-2 mb-2">
+                              <h2 className="text-2xl font-bold text-university-navy">{societyInfo.name}</h2>
+                              <Badge variant="secondary">{societyInfo.status_name || "Active"}</Badge>
+                              <Badge variant="outline">{societyInfo.category}</Badge>
+                            </div>
+                            <p className="text-muted-foreground mb-2">
+                              <MapPin className="h-4 w-4 inline mr-1" />
+                              {societyInfo.location}
+                            </p>
+                            <div className="flex items-center text-sm text-muted-foreground">
+                              <Clock className="h-4 w-4 mr-1" />
+                              Created: {new Date(societyInfo.created_at || '').toLocaleDateString()}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="space-y-4">
+                            <div>
+                              <Label htmlFor="name">Society Name *</Label>
+                              <Input
+                                id="name"
+                                value={editFormData.name}
+                                onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                                placeholder="Enter society name"
+                              />
+                            </div>
+                            <div className="grid md:grid-cols-2 gap-4">
+                              <div>
+                                <Label htmlFor="category">Category *</Label>
+                                <Select
+                                  value={editFormData.category}
+                                  onValueChange={(value) => setEditFormData({ ...editFormData, category: value })}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select category" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="academic">Academic</SelectItem>
+                                    <SelectItem value="cultural">Cultural</SelectItem>
+                                    <SelectItem value="sports">Sports</SelectItem>
+                                    <SelectItem value="social">Social</SelectItem>
+                                    <SelectItem value="religious">Religious</SelectItem>
+                                    <SelectItem value="other">Other</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div>
+                                <Label htmlFor="location">Location *</Label>
+                                <Input
+                                  id="location"
+                                  value={editFormData.location}
+                                  onChange={(e) => setEditFormData({ ...editFormData, location: e.target.value })}
+                                  placeholder="Enter location"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Description */}
+                  <Card className="p-6">
+                    <h3 className="font-semibold mb-3 text-university-navy flex items-center">
+                      <FileText className="h-5 w-5 mr-2" />
+                      Description
+                    </h3>
+                    {!isEditMode ? (
+                      <p className="text-muted-foreground leading-relaxed">{societyInfo.description}</p>
+                    ) : (
+                      <Textarea
+                        value={editFormData.description}
+                        onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
+                        placeholder="Enter society description"
+                        rows={5}
+                      />
+                    )}
+                  </Card>
+
+                  {/* Purpose */}
+                  <Card className="p-6">
+                    <h3 className="font-semibold mb-3 text-university-navy flex items-center">
+                      <FileText className="h-5 w-5 mr-2" />
+                      Purpose
+                    </h3>
+                    {!isEditMode ? (
+                      <p className="text-muted-foreground leading-relaxed">{societyInfo.purpose}</p>
+                    ) : (
+                      <Textarea
+                        value={editFormData.purpose}
+                        onChange={(e) => setEditFormData({ ...editFormData, purpose: e.target.value })}
+                        placeholder="Enter society purpose"
+                        rows={5}
+                      />
+                    )}
+                  </Card>
+                </div>
+              ) : (
+                <Card className="p-6 text-center">
+                  <Building className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-medium mb-2">No Society Information</h3>
+                  <p className="text-muted-foreground">Society details not available.</p>
+                </Card>
+              )}
+            </div>
+          )}
         </div>
       </section>
 
@@ -1917,6 +2365,110 @@ const SocietyDashboard = () => {
           }}
         />
       )}
+
+      {/* Media Viewer Modal */}
+      <Dialog open={viewingMedia !== null} onOpenChange={(open) => {
+        if (!open) setViewingMedia(null);
+      }}>
+        <DialogContent className="max-w-7xl max-h-[95vh] p-0 bg-black/95 border-none">
+          {viewingMedia && (
+            <div className="relative w-full h-full flex items-center justify-center">
+              {/* Close Button */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute top-4 right-4 z-50 text-white hover:bg-white/20"
+                onClick={() => setViewingMedia(null)}
+              >
+                <X className="h-6 w-6" />
+              </Button>
+
+              {/* Navigation Buttons */}
+              {viewingMedia.files.length > 1 && (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute left-4 z-50 text-white hover:bg-white/20"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const prevIndex = viewingMedia.currentIndex > 0 
+                        ? viewingMedia.currentIndex - 1 
+                        : viewingMedia.files.length - 1;
+                      setViewingMedia({
+                        ...viewingMedia,
+                        url: viewingMedia.files[prevIndex].processedUrl,
+                        currentIndex: prevIndex
+                      });
+                    }}
+                  >
+                    <ChevronLeft className="h-8 w-8" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-4 z-50 text-white hover:bg-white/20"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const nextIndex = viewingMedia.currentIndex < viewingMedia.files.length - 1
+                        ? viewingMedia.currentIndex + 1
+                        : 0;
+                      setViewingMedia({
+                        ...viewingMedia,
+                        url: viewingMedia.files[nextIndex].processedUrl,
+                        currentIndex: nextIndex
+                      });
+                    }}
+                  >
+                    <ChevronRight className="h-8 w-8" />
+                  </Button>
+                </>
+              )}
+
+              {/* Media Display */}
+              <div className="w-full h-full flex items-center justify-center p-8">
+                {viewingMedia.type === 'image' ? (
+                  <img
+                    src={viewingMedia.url}
+                    alt="Media viewer"
+                    className="max-w-full max-h-[85vh] object-contain"
+                    onError={(e) => {
+                      console.error('Image failed to load in viewer:', viewingMedia.url);
+                    }}
+                  />
+                ) : viewingMedia.type === 'video' ? (
+                  <video
+                    src={viewingMedia.url}
+                    controls
+                    className="max-w-full max-h-[85vh]"
+                    autoPlay
+                  />
+                ) : (
+                  <div className="text-white text-center">
+                    <FileText className="h-16 w-16 mx-auto mb-4" />
+                    <p className="mb-4">Document Preview</p>
+                    <Button
+                      onClick={() => window.open(viewingMedia.url, '_blank')}
+                      variant="outline"
+                      className="text-white border-white hover:bg-white/20"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Open Document
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* Image Counter */}
+              {viewingMedia.files.length > 1 && (
+                <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/50 text-white px-4 py-2 rounded-full text-sm">
+                  {viewingMedia.currentIndex + 1} / {viewingMedia.files.length}
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
