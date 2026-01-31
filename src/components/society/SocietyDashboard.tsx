@@ -2915,12 +2915,9 @@ const SocietyDashboard = () => {
                                     <SelectValue placeholder="Select category" />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="academic">Academic</SelectItem>
-                                    <SelectItem value="cultural">Cultural</SelectItem>
-                                    <SelectItem value="sports">Sports</SelectItem>
-                                    <SelectItem value="social">Social</SelectItem>
-                                    <SelectItem value="religious">Religious</SelectItem>
-                                    <SelectItem value="other">Other</SelectItem>
+                                    <SelectItem value="University Level">University Level</SelectItem>
+                                    <SelectItem value="Intermediate Level">Intermediate Level</SelectItem>
+                                    <SelectItem value="Department Level">Department Level</SelectItem>
                                   </SelectContent>
                                 </Select>
                               </div>
