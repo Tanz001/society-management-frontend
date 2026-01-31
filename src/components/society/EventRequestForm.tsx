@@ -1381,6 +1381,30 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
   ];
   
   /* =====================================================================================
+     DATE VALIDATION HELPERS
+  ===================================================================================== */
+
+  // Calculate minimum date (7 days from today)
+  const getMinDate = () => {
+    const today = new Date();
+    const minDate = new Date(today);
+    minDate.setDate(today.getDate() + 7);
+    return minDate.toISOString().split("T")[0];
+  };
+
+  // Check if date is at least 7 days from today
+  const isDateAtLeast7DaysAway = (dateString: string) => {
+    if (!dateString) return true; // Allow empty dates to be handled by required validation
+    const selectedDate = new Date(dateString);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Reset time to start of day
+    selectedDate.setHours(0, 0, 0, 0);
+    const diffTime = selectedDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays >= 7;
+  };
+
+  /* =====================================================================================
      STEP-SPECIFIC VALIDATION
   ===================================================================================== */
 
@@ -1400,6 +1424,9 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
         }
         if (!main.date_from) {
           errors.date_from = "Please fill the input";
+          isValid = false;
+        } else if (!isDateAtLeast7DaysAway(main.date_from)) {
+          errors.date_from = "You have to send request at least 7 days before the event";
           isValid = false;
         }
         if (!main.time_from) {
@@ -1614,6 +1641,22 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
     
     setMain((prev) => {
       const updated = { ...prev, [name]: value };
+      
+      // Check for 7-day minimum requirement when date_from changes
+      if (name === 'date_from' && value) {
+        if (!isDateAtLeast7DaysAway(value)) {
+          setFieldErrors((prev) => ({
+            ...prev,
+            date_from: "You have to send request at least 7 days before the event"
+          }));
+        } else {
+          setFieldErrors((prev) => {
+            const updated = { ...prev };
+            delete updated.date_from;
+            return updated;
+          });
+        }
+      }
       
       // Check for time slot conflict when time_from or time_to changes
       if ((name === 'time_from' || name === 'time_to') && updated.venue_id && updated.date_from) {
@@ -1845,6 +1888,15 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
     if (!main.date_from) {
       console.error("Validation failed: Start date is required");
       toast.error("Start date is required");
+      return false;
+    }
+    if (!isDateAtLeast7DaysAway(main.date_from)) {
+      console.error("Validation failed: Event date must be at least 7 days from today");
+      toast.error("You have to send request at least 7 days before the event");
+      setFieldErrors((prev) => ({
+        ...prev,
+        date_from: "You have to send request at least 7 days before the event"
+      }));
       return false;
     }
     if (!main.time_from) {
@@ -2298,7 +2350,7 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
                     type="date"
                     value={main.date_from}
                     onChange={handleMainChange}
-                    min={new Date().toISOString().split("T")[0]}
+                    min={getMinDate()}
                     className={`pl-10 ${fieldErrors.date_from ? 'border-red-500' : ''}`}
                   />
                 </div>

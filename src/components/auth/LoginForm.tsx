@@ -20,13 +20,13 @@ const LoginForm = () => {
   // 👉 Detect student roll no
   const isStudentRoll = (value: string) => {
     const trimmed = value.trim();
-    
+
     // If it has dash → treat as student
     if (trimmed.includes("-")) return true;
-  
+
     return false;
   };
-  
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,21 +70,21 @@ const LoginForm = () => {
           // Ne pas bloquer le login si la synchronisation échoue
           console.error("Error syncing student data:", syncError.response?.data || syncError.message);
         }
-        
+
         navigate("/dashboard/student");
         return;
       }
 
       // 👉 FACULTY / ADMIN FLOW
       const roles = user.roles || [];
-      
+
       console.log("User roles from login:", roles);
       console.log("User object:", user);
 
       const roleNames = roles.map((r: any) =>
         String(r.role_name).toLowerCase()
       );
-      
+
       console.log("Role names extracted:", roleNames);
 
       // Admin roles
@@ -114,6 +114,17 @@ const LoginForm = () => {
       }
       if (roleNames.includes("admin")) {
         navigate("/dashboard/admin");
+        return;
+      }
+
+      // Proctor and Security roles
+      if (roleNames.some(r => r === "proctor" || r === "chief_proctor")) {
+        navigate("/dashboard/admin/chief-proctor");
+        return;
+      }
+
+      if (roleNames.some(r => r === "security" || r === "security_office")) {
+        navigate("/dashboard/admin/security-office");
         return;
       }
 
@@ -149,7 +160,7 @@ const LoginForm = () => {
   return (
     <div className="min-h-screen relative flex items-center justify-center overflow-hidden">
       {/* Background Image */}
-      <div 
+      <div
         className="absolute inset-0 bg-cover bg-center bg-no-repeat"
         style={{
           backgroundImage: `url(${home2Image})`,
@@ -165,25 +176,25 @@ const LoginForm = () => {
         <div className="hidden lg:flex flex-col items-start text-white space-y-6">
           {/* Logo with Welcome Message */}
           {!logoError ? (
-              <img 
-                src="/gcu.png" 
-                alt="GCU Logo" 
-                className="h-30 w-40 object-contain drop-shadow-2xl flex-shrink-0"
-                onError={() => setLogoError(true)}
-              />
-            ) : (
-              <div 
-                className="h-24 w-24 rounded-full flex items-center justify-center flex-shrink-0 backdrop-blur-sm border border-white/20"
-                style={{
-                  background: 'rgba(255, 255, 255, 0.1)',
-                }}
-              >
-                <User className="h-12 w-12 text-white" />
-              </div>
-            )}
+            <img
+              src="/gcu.png"
+              alt="GCU Logo"
+              className="h-30 w-40 object-contain drop-shadow-2xl flex-shrink-0"
+              onError={() => setLogoError(true)}
+            />
+          ) : (
+            <div
+              className="h-24 w-24 rounded-full flex items-center justify-center flex-shrink-0 backdrop-blur-sm border border-white/20"
+              style={{
+                background: 'rgba(255, 255, 255, 0.1)',
+              }}
+            >
+              <User className="h-12 w-12 text-white" />
+            </div>
+          )}
           <div className="space-x-4 mb-8">
             <div className="flex flex-col">
-              <span 
+              <span
                 className="text-5xl font-lincoln mb-1 drop-shadow-2xl"
                 style={{
                   textShadow: '0 4px 8px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.3)'
@@ -191,7 +202,7 @@ const LoginForm = () => {
               >
                 Government College University Lahore
               </span>
-              <p 
+              <p
                 className="text-lg leading-relaxed drop-shadow-lg mt-2"
                 style={{
                   color: 'rgba(206, 173, 114, 1)',
@@ -206,7 +217,7 @@ const LoginForm = () => {
 
         {/* Right Side - Login Card */}
         <div className="flex items-center justify-center w-full">
-          <div 
+          <div
             className="w-full max-w-sm p-8 rounded-2xl shadow-2xl backdrop-blur-xl border border-white/20"
             style={{
               background: 'linear-gradient(135deg, rgba(0, 0, 92, 0.25) 0%, rgba(91, 0, 7, 0.25) 50%, rgba(206, 173, 114, 0.2) 100%)',
@@ -216,9 +227,9 @@ const LoginForm = () => {
             {/* Mobile Logo */}
             <div className="lg:hidden flex items-start justify-center mb-6 space-x-3">
               {!logoError ? (
-                <img 
-                  src="/gcu.png" 
-                  alt="GCU Logo" 
+                <img
+                  src="/gcu.png"
+                  alt="GCU Logo"
                   className="h-16 w-16 object-contain flex-shrink-0 drop-shadow-lg"
                   onError={() => setLogoError(true)}
                 />
@@ -226,27 +237,27 @@ const LoginForm = () => {
                 <User className="h-12 w-12 text-white flex-shrink-0 drop-shadow-lg" />
               )}
               <div className="text-center">
-                <div 
+                <div
                   className="text-lg font-lincoln drop-shadow-lg"
-                  style={{ 
+                  style={{
                     color: 'rgba(255, 255, 255, 0.95)',
                     textShadow: '0 2px 4px rgba(0, 0, 0, 0.3)'
                   }}
                 >
                   Government College
                 </div>
-                <div 
+                <div
                   className="text-lg font-lincoln mb-2 drop-shadow-lg"
-                  style={{ 
+                  style={{
                     color: 'rgba(255, 255, 255, 0.95)',
                     textShadow: '0 2px 4px rgba(0, 0, 0, 0.3)'
                   }}
                 >
                   University Lahore
                 </div>
-                <p 
+                <p
                   className="text-sm mt-1 drop-shadow-md"
-                  style={{ 
+                  style={{
                     color: 'rgba(206, 173, 114, 1)',
                     textShadow: '0 1px 2px rgba(0, 0, 0, 0.2)'
                   }}
@@ -258,25 +269,25 @@ const LoginForm = () => {
 
             {/* Card Title */}
             <div className="mb-6">
-              <h2 
+              <h2
                 className="text-2xl font-bold mb-1 font-sans text-center drop-shadow-lg"
-                style={{ 
+                style={{
                   color: '#ffffff',
                   textShadow: '0 2px 4px rgba(0, 0, 0, 0.3)'
                 }}
               >
                 GCU SOCIETIES PORTAL
               </h2>
-              <div 
+              <div
                 className="h-0.5 w-full mb-2 rounded-full"
-                style={{ 
+                style={{
                   background: 'linear-gradient(90deg, rgba(206, 173, 114, 0.8) 0%, rgba(91, 0, 7, 0.8) 50%, rgba(0, 0, 92, 0.8) 100%)',
                   boxShadow: '0 2px 4px rgba(206, 173, 114, 0.4)'
                 }}
               ></div>
-              <p 
+              <p
                 className="text-sm text-center"
-                style={{ 
+                style={{
                   color: 'rgba(255, 255, 255, 0.95)',
                   textShadow: '0 1px 2px rgba(0, 0, 0, 0.2)'
                 }}
@@ -290,7 +301,7 @@ const LoginForm = () => {
               {/* Email/Roll Number Input */}
               <div className="space-y-2">
                 <div className="relative">
-                  <User 
+                  <User
                     className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 z-10"
                     style={{ color: 'rgba(0, 0, 92, 0.8)' }}
                   />
@@ -302,7 +313,7 @@ const LoginForm = () => {
                       setFormData({ ...formData, email: e.target.value })
                     }
                     className="pl-10 h-12 border-2 rounded-lg backdrop-blur-sm"
-                    style={{ 
+                    style={{
                       borderColor: 'rgba(206, 173, 114, 0.5)',
                       backgroundColor: 'rgba(255, 255, 255, 0.85)',
                       boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
@@ -315,7 +326,7 @@ const LoginForm = () => {
               {/* Password Input */}
               <div className="space-y-2 relative">
                 <div className="relative">
-                  <Lock 
+                  <Lock
                     className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 z-10"
                     style={{ color: 'rgba(0, 0, 92, 0.8)' }}
                   />
@@ -327,7 +338,7 @@ const LoginForm = () => {
                       setFormData({ ...formData, password: e.target.value })
                     }
                     className="pl-10 pr-10 h-12 border-2 rounded-lg backdrop-blur-sm"
-                    style={{ 
+                    style={{
                       borderColor: 'rgba(206, 173, 114, 0.5)',
                       backgroundColor: 'rgba(255, 255, 255, 0.85)',
                       boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
@@ -347,9 +358,9 @@ const LoginForm = () => {
 
               {/* Error Message */}
               {error && (
-                <div 
+                <div
                   className="p-3 rounded-md text-sm"
-                  style={{ 
+                  style={{
                     backgroundColor: 'rgba(220, 38, 38, 0.1)',
                     color: '#dc2626',
                     border: '1px solid #dc2626'
@@ -360,8 +371,8 @@ const LoginForm = () => {
               )}
 
               {/* Login Button */}
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 className="w-full h-12 text-white font-bold text-lg rounded-lg shadow-lg hover:shadow-xl transition-all hover:scale-[1.02]"
                 style={{
                   background: 'linear-gradient(135deg, rgba(0, 0, 92, 0.9) 0%, rgba(91, 0, 7, 0.9) 50%, rgba(206, 173, 114, 0.8) 100%)',
@@ -375,27 +386,27 @@ const LoginForm = () => {
 
             {/* Footer Notes */}
             <div className="mt-6 text-center space-y-1">
-              <p 
+              <p
                 className="text-xs"
-                style={{ 
+                style={{
                   color: 'rgba(255, 255, 255, 0.9)',
                   textShadow: '0 1px 2px rgba(0, 0, 0, 0.2)'
                 }}
               >
                 Note: If login does not work, contact DIT
               </p>
-              <p 
+              <p
                 className="text-xs"
-                style={{ 
+                style={{
                   color: 'rgba(255, 255, 255, 0.9)',
                   textShadow: '0 1px 2px rgba(0, 0, 0, 0.2)'
                 }}
               >
                 Need help?{' '}
-                <a 
-                  href="#" 
+                <a
+                  href="#"
                   className="underline font-semibold hover:opacity-80 transition-opacity"
-                  style={{ 
+                  style={{
                     color: 'rgba(206, 173, 114, 1)',
                     textShadow: '0 1px 2px rgba(0, 0, 0, 0.2)'
                   }}

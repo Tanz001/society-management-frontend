@@ -6,11 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MobileSidebar, MobileNav } from "@/components/ui/mobile-sidebar";
 import { ResponsiveHeader } from "@/components/ui/responsive-header";
-import { 
-  Users, 
-  Calendar, 
-  TrendingUp, 
-  Plus, 
+import {
+  Users,
+  Calendar,
+  TrendingUp,
+  Plus,
   Eye,
   MessageSquare,
   Heart,
@@ -44,10 +44,30 @@ import {
   Building,
   Upload,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Crown,
+  Trash2,
+  MoreVertical
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
@@ -74,17 +94,28 @@ const SocietyDashboard = () => {
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [events, setEvents] = useState<any[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(false);
-  const [likedPosts, setLikedPosts] = useState<{[key: number]: boolean}>({});
+  const [likedPosts, setLikedPosts] = useState<{ [key: number]: boolean }>({});
   const [likingPost, setLikingPost] = useState<number | null>(null);
   const [commentingOn, setCommentingOn] = useState<number | null>(null);
   const [newComment, setNewComment] = useState("");
   const [submittingComment, setSubmittingComment] = useState(false);
-  const [comments, setComments] = useState<{[key: number]: any[]}>({});
-  const [selectedEventForReport, setSelectedEventForReport] = useState<{id: number, title: string} | null>(null);
+  const [comments, setComments] = useState<{ [key: number]: any[] }>({});
+  const [selectedEventForReport, setSelectedEventForReport] = useState<{ id: number, title: string } | null>(null);
   const [isReportUploadOpen, setIsReportUploadOpen] = useState(false);
   const [completingEvent, setCompletingEvent] = useState<number | null>(null);
-  const [viewingMedia, setViewingMedia] = useState<{url: string, type: string, files: any[], currentIndex: number} | null>(null);
-  
+  const [viewingMedia, setViewingMedia] = useState<{ url: string, type: string, files: any[], currentIndex: number } | null>(null);
+
+  // Cabinet management state
+  const [cabinetMembers, setCabinetMembers] = useState<any[]>([]);
+  const [loadingCabinet, setLoadingCabinet] = useState(false);
+  const [isCabinetModalOpen, setIsCabinetModalOpen] = useState(false);
+
+  const [editingCabinetMember, setEditingCabinetMember] = useState<any | null>(null);
+  const [cabinetFormData, setCabinetFormData] = useState({ name: "", designation: "" });
+  const [viewingRequestDetails, setViewingRequestDetails] = useState<any | null>(null);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<number | null>(null);
+
   // Society details edit state
   const [isEditMode, setIsEditMode] = useState(false);
   const [editFormData, setEditFormData] = useState({
@@ -105,11 +136,11 @@ const SocietyDashboard = () => {
     try {
       const user = localStorage.getItem("user");
       if (!user) return false;
-      
+
       const userData = JSON.parse(user);
       const roles = userData.roles || [];
       const roleNames = roles.map((r: any) => String(r.role_name || "").toLowerCase());
-      
+
       // Check if user has advisor role or has faculty_id (indicating faculty/advisor)
       return roleNames.includes("advisor") || !!userData.faculty_id;
     } catch (error) {
@@ -147,7 +178,7 @@ const SocietyDashboard = () => {
       // Priority 2: Use stored societyId from localStorage
       // Priority 3: Fetch by user_id (for society owners)
       let currentSocietyId = societyId;
-      
+
       if (!currentSocietyId) {
         const storedSocietyId = localStorage.getItem("currentSocietyId");
         if (storedSocietyId) {
@@ -177,7 +208,7 @@ const SocietyDashboard = () => {
 
         const userData = JSON.parse(storedUser);
         const userId = userData.id || userData.faculty_id;
-        
+
         if (!userId) {
           console.log("No user ID found in user data");
           setLoadingSociety(false);
@@ -198,32 +229,36 @@ const SocietyDashboard = () => {
 
       if (response.data.success) {
         // Handle society data as array - take the first society
-        const societyData = response.data.society && response.data.society.length > 0 
-          ? response.data.society[0] 
+        const societyData = response.data.society && response.data.society.length > 0
+          ? response.data.society[0]
           : null;
-        
+
         setSocietyInfo(societyData);
         console.log("Society data fetched:", societyData);
-        
+
         // If we have society data, save it to localStorage for persistence
         if (societyData && societyData.society_id) {
           // Save society ID to localStorage for persistence across navigation
           localStorage.setItem("currentSocietyId", societyData.society_id.toString());
           // Save full society data to localStorage for quick access
           localStorage.setItem("currentSocietyData", JSON.stringify(societyData));
-          
+
           fetchMembershipRequests(societyData.society_id);
           // Fetch settings using the society ID from the response
           fetchMembershipSettings(societyData.society_id);
           // Fetch posts and events
           fetchSocietyPosts(societyData.society_id);
           fetchSocietyEvents(societyData.society_id);
+          // Fetch cabinet members
+          fetchCabinetMembers(societyData.society_id);
         }
       } else {
         console.error("Failed to fetch society data:", response.data.message);
+        toast.error(response.data.message || "Failed to fetch society data");
       }
     } catch (error: any) {
       console.error("Error fetching society data:", error.response?.data || error.message);
+      toast.error("Failed to fetch society data");
     } finally {
       setLoadingSociety(false);
     }
@@ -232,14 +267,14 @@ const SocietyDashboard = () => {
   // Fetch membership settings from backend
   const fetchMembershipSettings = async (societyId?: number) => {
     const currentSocietyId = societyId || societyInfo?.society_id;
-    
+
     if (!currentSocietyId) {
       console.log("No society ID available for fetching settings");
       return;
     }
 
     try {
-       const API_URL = import.meta.env.VITE_API_URL;
+      const API_URL = import.meta.env.VITE_API_URL;
       const response = await axios.post(
         `${API_URL}/society/membership/form`,
         { society_id: currentSocietyId },
@@ -259,20 +294,21 @@ const SocietyDashboard = () => {
       } else {
         console.log("No settings found in response:", response.data);
       }
-      
+
     } catch (error: any) {
       console.error("Error fetching membership settings:", error.response?.data || error.message);
       // Set default values if fetch fails
       setMembershipFee(250);
       setAccountNumber("");
       setAccountTitle("");
+      toast.error("Failed to load membership settings");
     }
   };
 
   // Fetch membership requests for the society
   const fetchMembershipRequests = async (societyId?: number) => {
     const currentSocietyId = societyId || societyInfo?.society_id;
-    
+
     if (!currentSocietyId) {
       console.log("No society ID available");
       return;
@@ -280,7 +316,7 @@ const SocietyDashboard = () => {
 
     setLoadingRequests(true);
     try {
-       const API_URL = import.meta.env.VITE_API_URL;
+      const API_URL = import.meta.env.VITE_API_URL;
       console.log("Fetching membership requests for society ID:", currentSocietyId);
       const response = await axios.post(
         `${API_URL}/society/membership/requests`,
@@ -298,10 +334,12 @@ const SocietyDashboard = () => {
       } else {
         console.error("Failed to fetch membership requests:", response.data.message);
         setMembershipRequests([]);
+        toast.error(response.data.message || "Failed to fetch membership requests");
       }
     } catch (error: any) {
       console.error("Error fetching membership requests:", error.response?.data || error.message);
       setMembershipRequests([]);
+      toast.error("Failed to fetch membership requests");
     } finally {
       setLoadingRequests(false);
     }
@@ -310,7 +348,7 @@ const SocietyDashboard = () => {
   // Approve membership request
   const handleApproveRequest = async (requestId: number) => {
     try {
-       const API_URL = import.meta.env.VITE_API_URL;
+      const API_URL = import.meta.env.VITE_API_URL;
       const response = await axios.post(
         `${API_URL}/society/membership/approve`,
         { request_id: requestId },
@@ -324,19 +362,20 @@ const SocietyDashboard = () => {
       if (response.data.success) {
         // Refresh the requests list
         fetchMembershipRequests();
-        console.log("Request approved successfully");
+        toast.success("Membership request approved successfully");
       } else {
-        console.error("Failed to approve request:", response.data.message);
+        toast.error(response.data.message || "Failed to approve request");
       }
     } catch (error: any) {
       console.error("Error approving request:", error.response?.data || error.message);
+      toast.error(error.response?.data?.message || "Failed to approve request");
     }
   };
 
   // Decline membership request
   const handleDeclineRequest = async (requestId: number) => {
     try {
-       const API_URL = import.meta.env.VITE_API_URL;
+      const API_URL = import.meta.env.VITE_API_URL;
       const response = await axios.post(
         `${API_URL}/society/membership/reject`,
         { request_id: requestId },
@@ -350,12 +389,13 @@ const SocietyDashboard = () => {
       if (response.data.success) {
         // Refresh the requests list
         fetchMembershipRequests();
-        console.log("Request declined successfully");
+        toast.success("Membership request declined successfully");
       } else {
-        console.error("Failed to decline request:", response.data.message);
+        toast.error(response.data.message || "Failed to decline request");
       }
     } catch (error: any) {
       console.error("Error declining request:", error.response?.data || error.message);
+      toast.error(error.response?.data?.message || "Failed to decline request");
     }
   };
 
@@ -368,17 +408,17 @@ const SocietyDashboard = () => {
   // Save membership settings to backend
   const saveMembershipSettings = async () => {
     if (!societyInfo?.society_id) {
-      console.error("No society ID available");
+      toast.error("Society information not available");
       return;
     }
 
     if (!membershipFee || !accountNumber || !accountTitle) {
-      console.error("All fields are required: fee, account number, and account title");
+      toast.error("All fields are required: fee, account number, and account title");
       return;
     }
 
     try {
-       const API_URL = import.meta.env.VITE_API_URL;
+      const API_URL = import.meta.env.VITE_API_URL;
       const response = await axios.post(
         `${API_URL}/society/membership/settings`,
         {
@@ -394,12 +434,14 @@ const SocietyDashboard = () => {
         }
       );
 
-      if (response.data.message) {
-        console.log("Membership settings saved successfully:", response.data.message);
-        // You can add a success toast here if you have one
+      if (response.data.success || response.data.message) {
+        toast.success("Membership settings saved successfully");
+      } else {
+        toast.error(response.data.message || "Failed to save membership settings");
       }
     } catch (error: any) {
       console.error("Error saving membership settings:", error.response?.data || error.message);
+      toast.error(error.response?.data?.message || "Failed to save membership settings");
     }
   };
 
@@ -407,7 +449,7 @@ const SocietyDashboard = () => {
   // Fetch posts for the society
   const fetchSocietyPosts = async (societyId: number) => {
     try {
-       const API_URL = import.meta.env.VITE_API_URL;
+      const API_URL = import.meta.env.VITE_API_URL;
       setLoadingPosts(true);
       const token = localStorage.getItem("token");
       if (!token) return;
@@ -428,11 +470,11 @@ const SocietyDashboard = () => {
       if (response.data.success) {
         const postsData = response.data.posts || response.data.data || [];
         setPosts(postsData);
-        
+
         // Initialize comments and likes state
-        const commentsState: {[key: number]: any[]} = {};
-        const likedPostsState: {[key: number]: boolean} = {};
-        
+        const commentsState: { [key: number]: any[] } = {};
+        const likedPostsState: { [key: number]: boolean } = {};
+
         postsData.forEach((post: any) => {
           if (post.comments && post.comments.length > 0) {
             commentsState[post.post_id] = post.comments;
@@ -441,12 +483,15 @@ const SocietyDashboard = () => {
             likedPostsState[post.post_id] = post.is_liked_by_user;
           }
         });
-        
+
         setComments(commentsState);
         setLikedPosts(likedPostsState);
+      } else {
+        toast.error(response.data.message || "Failed to fetch posts");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching posts:", error);
+      toast.error("Failed to fetch posts");
     } finally {
       setLoadingPosts(false);
     }
@@ -455,7 +500,7 @@ const SocietyDashboard = () => {
   // Fetch events for the society
   const fetchSocietyEvents = async (societyId: number) => {
     try {
-       const API_URL = import.meta.env.VITE_API_URL;
+      const API_URL = import.meta.env.VITE_API_URL;
       setLoadingEvents(true);
       const token = localStorage.getItem("token");
       if (!token) return;
@@ -496,22 +541,166 @@ const SocietyDashboard = () => {
         });
 
         setEvents(transformedEvents);
+      } else {
+        toast.error(response.data.message || "Failed to fetch events");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching events:", error);
+      toast.error("Failed to fetch events");
     } finally {
       setLoadingEvents(false);
+    }
+  };
+
+  // Fetch cabinet members
+  const fetchCabinetMembers = async (societyId: number) => {
+    try {
+      const API_URL = import.meta.env.VITE_API_URL;
+      setLoadingCabinet(true);
+      const token = localStorage.getItem("token");
+      if (!token) return;
+
+      const response = await axios.post(
+        `${API_URL}/society/cabinet/list`,
+        { society_id: societyId },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.data.success) {
+        setCabinetMembers(response.data.data || []);
+      }
+    } catch (error) {
+      console.error("Error fetching cabinet members:", error);
+      toast.error("Failed to fetch cabinet members");
+    } finally {
+      setLoadingCabinet(false);
+    }
+  };
+
+  // Add or update cabinet member
+  const handleSaveCabinetMember = async () => {
+    if (!cabinetFormData.name.trim() || !cabinetFormData.designation.trim()) {
+      toast.error("Please fill in all fields");
+      return;
+    }
+
+    if (!societyInfo?.society_id) {
+      toast.error("Society ID not found");
+      return;
+    }
+
+    try {
+      const API_URL = import.meta.env.VITE_API_URL;
+      const token = localStorage.getItem("token");
+
+      if (editingCabinetMember) {
+        // Update existing member
+        const response = await axios.put(
+          `${API_URL}/society/cabinet/update`,
+          {
+            id: editingCabinetMember.id,
+            name: cabinetFormData.name.trim(),
+            designation: cabinetFormData.designation.trim()
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (response.data.success) {
+          toast.success("Cabinet member updated successfully");
+          setIsCabinetModalOpen(false);
+          setEditingCabinetMember(null);
+          setCabinetFormData({ name: "", designation: "" });
+          fetchCabinetMembers(societyInfo.society_id);
+        } else {
+          toast.error(response.data.message || "Failed to update cabinet member");
+        }
+      } else {
+        // Add new member
+        const response = await axios.post(
+          `${API_URL}/society/cabinet/add`,
+          {
+            society_id: societyInfo.society_id,
+            name: cabinetFormData.name.trim(),
+            designation: cabinetFormData.designation.trim()
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (response.data.success) {
+          toast.success("Cabinet member added successfully");
+          setIsCabinetModalOpen(false);
+          setCabinetFormData({ name: "", designation: "" });
+          fetchCabinetMembers(societyInfo.society_id);
+        } else {
+          toast.error(response.data.message || "Failed to add cabinet member");
+        }
+      }
+    } catch (error: any) {
+      console.error("Error saving cabinet member:", error);
+      toast.error(error.response?.data?.message || "Failed to save cabinet member");
+    }
+  };
+
+  // Deactivate cabinet member
+  // Deactivate cabinet member (trigger modal)
+  const handleDeactivateCabinetMember = (id: number) => {
+    setItemToDelete(id);
+    setIsDeleteConfirmOpen(true);
+  };
+
+  // Confirm deactivation
+  const confirmDeactivateMember = async () => {
+    if (!itemToDelete) return;
+
+    try {
+      const API_URL = import.meta.env.VITE_API_URL;
+      const token = localStorage.getItem("token");
+
+      const response = await axios.post(
+        `${API_URL}/society/cabinet/deactivate`,
+        { id: itemToDelete },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.data.success) {
+        toast.success("Cabinet member deactivated successfully");
+        if (societyInfo?.society_id) {
+          fetchCabinetMembers(societyInfo.society_id);
+        }
+      }
+    } catch (error: any) {
+      console.error("Error deactivating cabinet member:", error);
+      toast.error(error.response?.data?.message || "Failed to deactivate cabinet member");
+    } finally {
+      setIsDeleteConfirmOpen(false);
+      setItemToDelete(null);
     }
   };
 
   // Handle like/unlike functionality
   const handleLike = async (postId: number) => {
     if (likingPost === postId) return;
-    
+
     try {
-       const API_URL = import.meta.env.VITE_API_URL;
+      const API_URL = import.meta.env.VITE_API_URL;
       setLikingPost(postId);
-      
+
       const response = await axios.post(`${API_URL}/user/like/toggle`, {
         post_id: postId
       }, {
@@ -522,13 +711,13 @@ const SocietyDashboard = () => {
       });
 
       if (response.data.success) {
-        setPosts(prev => prev.map(post => 
-          post.post_id === postId 
-            ? { 
-                ...post, 
-                like_count: response.data.like_count,
-                is_liked_by_user: response.data.is_liked_by_user 
-              }
+        setPosts(prev => prev.map(post =>
+          post.post_id === postId
+            ? {
+              ...post,
+              like_count: response.data.like_count,
+              is_liked_by_user: response.data.is_liked_by_user
+            }
             : post
         ));
 
@@ -536,9 +725,12 @@ const SocietyDashboard = () => {
           ...prev,
           [postId]: response.data.is_liked_by_user
         }));
+      } else {
+        toast.error(response.data.message || "Failed to update like");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error toggling like:', error);
+      toast.error(error.response?.data?.message || "Failed to update like");
     } finally {
       setLikingPost(null);
     }
@@ -547,11 +739,11 @@ const SocietyDashboard = () => {
   // Handle comment submission
   const handleComment = async (postId: number) => {
     if (!newComment.trim() || submittingComment) return;
-    
+
     try {
-       const API_URL = import.meta.env.VITE_API_URL;
+      const API_URL = import.meta.env.VITE_API_URL;
       setSubmittingComment(true);
-      
+
       const response = await axios.post(`${API_URL}/user/comment/add`, {
         post_id: postId,
         comment_text: newComment.trim()
@@ -563,8 +755,8 @@ const SocietyDashboard = () => {
       });
 
       if (response.data.success) {
-        setPosts(prev => prev.map(post => 
-          post.post_id === postId 
+        setPosts(prev => prev.map(post =>
+          post.post_id === postId
             ? { ...post, comment_count: response.data.comment_count }
             : post
         ));
@@ -577,9 +769,13 @@ const SocietyDashboard = () => {
         }
 
         setNewComment("");
+        toast.success("Comment added successfully");
+      } else {
+        toast.error(response.data.message || "Failed to add comment");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding comment:', error);
+      toast.error(error.response?.data?.message || "Failed to add comment");
     } finally {
       setSubmittingComment(false);
     }
@@ -602,7 +798,19 @@ const SocietyDashboard = () => {
 
       const API_URL = import.meta.env.VITE_API_URL;
       const hasImages = editLogoFile || editCoverFile;
-      
+
+      // Get advisor faculty_id from societyInfo
+      const advisorFacultyId = societyInfo?.advisor_info?.faculty_id ||
+        societyInfo?.advisor_faculty_id ||
+        societyInfo?.faculty_id ||
+        null;
+
+      if (!advisorFacultyId) {
+        toast.error("Advisor information not found. Cannot update society details.");
+        setSavingSociety(false);
+        return;
+      }
+
       let response;
       if (hasImages) {
         const formData = new FormData();
@@ -611,7 +819,8 @@ const SocietyDashboard = () => {
         formData.append("category", editFormData.category);
         formData.append("location", editFormData.location);
         formData.append("purpose", editFormData.purpose);
-        
+        formData.append("advisor", String(advisorFacultyId));
+
         if (editLogoFile) {
           formData.append("societyLogo", editLogoFile);
         }
@@ -636,6 +845,7 @@ const SocietyDashboard = () => {
           category: editFormData.category,
           location: editFormData.location,
           purpose: editFormData.purpose,
+          advisor: advisorFacultyId,
         };
 
         response = await axios.put(
@@ -684,7 +894,7 @@ const SocietyDashboard = () => {
         console.error("Error parsing stored society data:", e);
       }
     }
-    
+
     // Fetch society data first, which will trigger fetching members and requests
     fetchSocietyData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -735,12 +945,20 @@ const SocietyDashboard = () => {
       onClick: () => setActiveTab("events"),
       variant: (activeTab === "events" ? "active" : "default") as "active" | "default" | "secondary"
     },
-    ...(isAdvisor() ? [{
-      label: "Society Details",
-      icon: <Building className="h-4 w-4" />,
-      onClick: () => setActiveTab("society-details"),
-      variant: (activeTab === "society-details" ? "active" : "default") as "active" | "default" | "secondary"
-    }] : []),
+    ...(isAdvisor() ? [
+      {
+        label: "Cabinet",
+        icon: <Crown className="h-4 w-4" />,
+        onClick: () => setActiveTab("cabinet"),
+        variant: (activeTab === "cabinet" ? "active" : "default") as "active" | "default" | "secondary"
+      },
+      {
+        label: "Society Details",
+        icon: <Building className="h-4 w-4" />,
+        onClick: () => setActiveTab("society-details"),
+        variant: (activeTab === "society-details" ? "active" : "default") as "active" | "default" | "secondary"
+      }
+    ] : []),
   ];
 
   return (
@@ -756,9 +974,9 @@ const SocietyDashboard = () => {
         leftContent={
           <div className="flex items-center gap-2">
             {isAdvisor() && (
-              <Button 
-                variant="ghost" 
-                size="sm" 
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={handleBackToAdvisorDashboard}
                 className="text-white hover:bg-white/20"
                 title="Back to My Societies"
@@ -775,8 +993,8 @@ const SocietyDashboard = () => {
             }>
               <MobileNav items={navigationItems} />
               <div className="border-t p-4">
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   onClick={handleLogout}
                   className="w-full justify-start text-red-600 hover:bg-red-50"
                 >
@@ -788,9 +1006,9 @@ const SocietyDashboard = () => {
           </div>
         }
         rightContent={
-          <Button 
-            variant="ghost" 
-            size="sm" 
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={handleLogout}
             className="text-white hover:bg-white/20 hidden md:flex"
           >
@@ -805,55 +1023,63 @@ const SocietyDashboard = () => {
         <div className="container mx-auto max-w-7xl">
           {/* Desktop Navigation - Hidden on mobile */}
           <div className="hidden md:flex flex-wrap gap-4 mb-8">
-            <Button 
+            <Button
               variant={activeTab === "overview" ? "university" : "outline"}
               onClick={() => setActiveTab("overview")}
             >
               Overview
             </Button>
-            <Button 
+            <Button
               variant={activeTab === "members" ? "university" : "outline"}
               onClick={() => setActiveTab("members")}
             >
               Members
             </Button>
-            <Button 
+            <Button
               variant={activeTab === "requests" ? "university" : "outline"}
               onClick={() => setActiveTab("requests")}
             >
               Requests
             </Button>
-            <Button 
+            <Button
               variant={activeTab === "membership" ? "university" : "outline"}
               onClick={() => setActiveTab("membership")}
             >
               Membership
             </Button>
-            <Button 
+            <Button
               variant={activeTab === "event-requests" ? "university" : "outline"}
               onClick={() => setActiveTab("event-requests")}
             >
               Event Requests
             </Button>
-            <Button 
+            <Button
               variant={activeTab === "posts" ? "university" : "outline"}
               onClick={() => setActiveTab("posts")}
             >
               Posts
             </Button>
-            <Button 
+            <Button
               variant={activeTab === "events" ? "university" : "outline"}
               onClick={() => setActiveTab("events")}
             >
               Events
             </Button>
             {isAdvisor() && (
-              <Button 
-                variant={activeTab === "society-details" ? "university" : "outline"}
-                onClick={() => setActiveTab("society-details")}
-              >
-                Society Details
-              </Button>
+              <>
+                <Button
+                  variant={activeTab === "cabinet" ? "university" : "outline"}
+                  onClick={() => setActiveTab("cabinet")}
+                >
+                  Cabinet
+                </Button>
+                <Button
+                  variant={activeTab === "society-details" ? "university" : "outline"}
+                  onClick={() => setActiveTab("society-details")}
+                >
+                  Society Details
+                </Button>
+              </>
             )}
           </div>
 
@@ -883,7 +1109,7 @@ const SocietyDashboard = () => {
                 </Card>
 
                 <Card className="p-4 md:p-6 shadow-card">
-                  <div className="flex items-center justify-between">  
+                  <div className="flex items-center justify-between">
                     <div className="min-w-0 flex-1">
                       <p className="text-xs md:text-sm text-muted-foreground">Pending Requests</p>
                       <p className="text-lg md:text-2xl font-bold text-university-navy">
@@ -944,7 +1170,7 @@ const SocietyDashboard = () => {
                         .map((post) => {
                           // Parse media_files from the media_files table
                           let mediaFiles: any[] = [];
-                          
+
                           if (post.media_files) {
                             if (typeof post.media_files === 'string') {
                               try {
@@ -956,14 +1182,14 @@ const SocietyDashboard = () => {
                               mediaFiles = post.media_files;
                             }
                           }
-                          
+
                           // Filter to only show images in overview
-                          const imageFiles = mediaFiles.filter((file: any) => 
+                          const imageFiles = mediaFiles.filter((file: any) =>
                             file && file.file_type === 'image' && file.file_url
                           );
-                          
+
                           const API_URL = import.meta.env.VITE_API_URL;
-                          
+
                           // Process image URLs to ensure they're properly formatted
                           const processedImages = imageFiles.map((file: any) => {
                             let imageUrl = file.file_url.trim();
@@ -981,7 +1207,7 @@ const SocietyDashboard = () => {
                             }
                             return { ...file, processedUrl: imageUrl };
                           });
-                          
+
                           return (
                             <div key={post.post_id} className="border-b pb-4 last:border-0 space-y-2">
                               <h4 className="font-medium text-sm mb-1">{post.title}</h4>
@@ -990,19 +1216,18 @@ const SocietyDashboard = () => {
                                   {post.content}
                                 </p>
                               )}
-                              
+
                               {/* Display Images */}
                               {processedImages.length > 0 && (
-                                <div className={`grid gap-2 mb-2 ${
-                                  processedImages.length === 1 
-                                    ? 'grid-cols-1' 
-                                    : processedImages.length === 2 
-                                    ? 'grid-cols-2' 
+                                <div className={`grid gap-2 mb-2 ${processedImages.length === 1
+                                  ? 'grid-cols-1'
+                                  : processedImages.length === 2
+                                    ? 'grid-cols-2'
                                     : 'grid-cols-3'
-                                }`}>
+                                  }`}>
                                   {processedImages.slice(0, 4).map((file: any, index: number) => (
-                                    <div 
-                                      key={file.media_id || index} 
+                                    <div
+                                      key={file.media_id || index}
                                       className="relative group overflow-hidden rounded-lg border border-gray-200 hover:border-university-navy/50 transition-all cursor-pointer"
                                       onClick={() => setViewingMedia({
                                         url: file.processedUrl,
@@ -1011,7 +1236,7 @@ const SocietyDashboard = () => {
                                         currentIndex: index
                                       })}
                                     >
-                                      <img 
+                                      <img
                                         src={file.processedUrl}
                                         alt={`Post image ${index + 1}`}
                                         className="w-full h-24 md:h-32 object-cover transition-transform duration-300 group-hover:scale-105"
@@ -1032,7 +1257,7 @@ const SocietyDashboard = () => {
                                   ))}
                                 </div>
                               )}
-                              
+
                               <div className="flex items-center justify-between text-xs text-muted-foreground">
                                 <span>{new Date(post.created_at).toLocaleDateString()}</span>
                                 <div className="flex items-center space-x-3">
@@ -1072,20 +1297,20 @@ const SocietyDashboard = () => {
                         .filter(e => new Date(e.event_date) >= new Date())
                         .slice(0, 3)
                         .map((event, index) => (
-                        <div key={event.id || index} className="border-b pb-4 last:border-0">
-                          <div className="flex items-center justify-between mb-2">
-                            <h4 className="font-medium text-sm">{event.title}</h4>
-                            <Badge variant="default" className="text-xs">
-                              {event.status}
-                            </Badge>
+                          <div key={event.id || index} className="border-b pb-4 last:border-0">
+                            <div className="flex items-center justify-between mb-2">
+                              <h4 className="font-medium text-sm">{event.title}</h4>
+                              <Badge variant="default" className="text-xs">
+                                {event.status}
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground mb-1">
+                              {new Date(event.event_date).toLocaleDateString()}
+                              {event.event_time && ` • ${event.event_time}`}
+                              {event.venue && ` • ${event.venue}`}
+                            </p>
                           </div>
-                          <p className="text-xs text-muted-foreground mb-1">
-                            {new Date(event.event_date).toLocaleDateString()}
-                            {event.event_time && ` • ${event.event_time}`}
-                            {event.venue && ` • ${event.venue}`}
-                          </p>
-                        </div>
-                      ))
+                        ))
                     )}
                   </div>
                 </Card>
@@ -1118,9 +1343,9 @@ const SocietyDashboard = () => {
                   >
                     {loadingRequests ? "Refreshing..." : "Export Results"}
                   </Button> */}
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => fetchMembershipRequests()}
                     disabled={loadingRequests}
                     className="w-full sm:w-auto"
@@ -1128,7 +1353,7 @@ const SocietyDashboard = () => {
                     {loadingRequests ? "Refreshing..." : "Refresh"}
                   </Button>
                 </div>
-                
+
                 {loadingRequests ? (
                   <div className="text-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-university-navy mx-auto mb-4"></div>
@@ -1223,9 +1448,9 @@ const SocietyDashboard = () => {
                   <h3 className="font-semibold text-university-navy text-sm md:text-base">
                     Pending Membership Requests ({membershipRequests.filter(req => req.status === 'pending').length})
                   </h3>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => fetchMembershipRequests()}
                     disabled={loadingRequests}
                     className="w-full sm:w-auto"
@@ -1233,7 +1458,7 @@ const SocietyDashboard = () => {
                     {loadingRequests ? "Refreshing..." : "Refresh"}
                   </Button>
                 </div>
-                
+
                 {loadingRequests ? (
                   <div className="text-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-university-navy mx-auto mb-4"></div>
@@ -1248,116 +1473,305 @@ const SocietyDashboard = () => {
                     </p>
                   </div>
                 ) : (
-                <div className="space-y-4">
-                    {membershipRequests.map((request, index) => (
-                    <Card key={index} className="p-4 border border-gray-200 hover:shadow-md transition-all duration-200 hover:border-university-navy/30 bg-gradient-to-br from-white to-gray-50/30">
-                        <div className="space-y-4">
-                          {/* Header Section */}
-                          <div className="flex items-start space-x-3">
-                            <div className="bg-gradient-to-br from-university-gold to-university-gold/80 text-white rounded-full w-12 h-12 md:w-14 md:h-14 flex items-center justify-center font-bold text-sm md:text-base flex-shrink-0 shadow-md">
-                              {(request.firstName || 'S')?.charAt(0).toUpperCase()}{(request.lastName || 'T')?.charAt(0).toUpperCase()}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="min-w-0 flex-1">
-                                  <h4 className="font-semibold text-base md:text-lg text-university-navy">
-                                    {request.firstName} {request.lastName}
-                                  </h4>
-                                  <p className="text-xs text-muted-foreground">
-                                    Membership Applicant
-                                  </p>
-                                </div>
-                                <Badge 
-                                  variant={request.status === 'pending' ? 'secondary' : 
-                                           request.status === 'approved' ? 'default' : 'destructive'}
-                                  className="text-xs flex-shrink-0 ml-2 shadow-sm"
-                                >
-                                  {request.status === 'pending' && <Clock className="h-3 w-3 mr-1" />}
-                                  {request.status === 'approved' && <CheckCircle className="h-3 w-3 mr-1" />}
-                                  {request.status === 'rejected' && <XCircle className="h-3 w-3 mr-1" />}
-                                  {request.status?.charAt(0).toUpperCase() + request.status?.slice(1)}
-                                </Badge>
-                              </div>
-                            </div>
-                          </div>
+                  <div className="space-y-4">
+                    {membershipRequests.map((request, index) => {
+                      // Get student name from membership_requests table (full_name) or fallback to adm_std
+                      const studentName = request.full_name || request.firstName || request.NM || 'Student';
+                      const department = request.request_department || request.department || request.DEPARTMENT || 'N/A';
 
-                          {/* Contact Information */}
-                          <div className="space-y-2">
-                            <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                              <Mail className="h-4 w-4 text-university-navy/60" />
-                              <span className="truncate">{request.email}</span>
-                            </div>
-                            <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                              <Users className="h-4 w-4 text-university-navy/60" />
-                              <span>{request.major} • {request.semester}</span>
-                            </div>
-                            {request.phone && (
-                              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                                <Phone className="h-4 w-4 text-university-navy/60" />
-                                <span>{request.phone}</span>
+                      return (
+                        <Card key={index} className="p-5 border border-gray-200 hover:shadow-lg transition-all duration-200 hover:border-university-navy/50 bg-white">
+                          <div className="flex items-center justify-between">
+                            {/* Left: Avatar and Info */}
+                            <div className="flex items-center space-x-4 flex-1 min-w-0">
+                              <div className="bg-gradient-to-br from-university-navy to-university-navy/80 text-white rounded-full w-14 h-14 md:w-16 md:h-16 flex items-center justify-center font-bold text-lg md:text-xl flex-shrink-0 shadow-lg">
+                                {studentName.charAt(0).toUpperCase()}
                               </div>
-                            )}
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-semibold text-base md:text-lg text-university-navy mb-1 truncate">
+                                  {studentName}
+                                </h4>
+                                <p className="text-sm text-muted-foreground font-medium">
+                                  {department}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Right: Status Badge and Menu */}
+                            <div className="flex items-center gap-3 flex-shrink-0">
+                              <Badge
+                                variant={request.status === 'pending' ? 'secondary' :
+                                  request.status === 'approved' ? 'default' : 'destructive'}
+                                className="text-xs shadow-sm"
+                              >
+                                {request.status === 'pending' && <Clock className="h-3 w-3 mr-1" />}
+                                {request.status === 'approved' && <CheckCircle className="h-3 w-3 mr-1" />}
+                                {request.status === 'rejected' && <XCircle className="h-3 w-3 mr-1" />}
+                                {request.status?.charAt(0).toUpperCase() + request.status?.slice(1)}
+                              </Badge>
+
+                              {/* 3 Dots Menu */}
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-9 w-9 p-0 hover:bg-gray-100"
+                                  >
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-48">
+                                  <DropdownMenuItem onClick={() => setViewingRequestDetails(request)}>
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    View Details
+                                  </DropdownMenuItem>
+                                  {request.status === 'pending' && (
+                                    <>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem
+                                        onClick={() => handleApproveRequest(request.request_id)}
+                                        className="text-green-600 focus:text-green-600 focus:bg-green-50"
+                                      >
+                                        <CheckCircle className="h-4 w-4 mr-2" />
+                                        Accept
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        onClick={() => handleDeclineRequest(request.request_id)}
+                                        className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                                      >
+                                        <XCircle className="h-4 w-4 mr-2" />
+                                        Decline
+                                      </DropdownMenuItem>
+                                    </>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
                           </div>
-                          
-                          {/* Message Section */}
-                          {request.message && (
-                            <div className="bg-gradient-to-r from-university-navy/5 to-university-gold/5 p-3 rounded-lg border border-university-navy/10">
-                              <p className="text-sm text-muted-foreground italic">
-                                "{request.message}"
-                              </p>
-                            </div>
-                          )}
-                          
-                          {/* Action Section */}
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-gray-100">
-                            <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-                              <Calendar className="h-3 w-3" />
-                              <span>Submitted: {request.submitted_at ? new Date(request.submitted_at).toLocaleDateString() : 'Unknown'}</span>
-                            </div>
-                            
-                            <div className="flex gap-2">
-                              {request.status === 'pending' && (
-                                <>
-                                  <Button 
-                                    size="sm" 
-                                    variant="university"
-                                    onClick={() => handleApproveRequest(request.request_id)}
-                                    className="flex-1 sm:flex-none shadow-sm hover:shadow-md transition-shadow"
-                                  >
-                                    <CheckCircle className="h-3 w-3 mr-1" />
-                                    Accept
-                                  </Button>
-                                  <Button 
-                                    size="sm" 
-                                    variant="outline"
-                                    onClick={() => handleDeclineRequest(request.request_id)}
-                                    className="flex-1 sm:flex-none hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-colors"
-                                  >
-                                    <XCircle className="h-3 w-3 mr-1" />
-                                    Decline
-                                  </Button>
-                                </>
-                              )}
-                              {request.status === 'approved' && (
-                                <Badge className="bg-green-100 text-green-800 border-green-200 shadow-sm">
-                                  <CheckCircle className="h-3 w-3 mr-1" />
-                                  Approved
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+              </Card>
+
+              {/* View Request Details Dialog */}
+              <Dialog open={viewingRequestDetails !== null} onOpenChange={(open) => {
+                if (!open) setViewingRequestDetails(null);
+              }}>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                  {viewingRequestDetails && (
+                    <>
+                      <DialogHeader>
+                        <DialogTitle>Membership Request Details</DialogTitle>
+                        <DialogDescription>
+                          Complete information about the membership request
+                        </DialogDescription>
+                      </DialogHeader>
+
+                      <div className="space-y-6">
+                        {/* Personal Information */}
+                        <div>
+                          <h3 className="font-semibold text-university-navy mb-3">Personal Information</h3>
+                          <div className="space-y-3">
+                            <div className="flex items-center space-x-3">
+                              <div className="bg-gradient-to-br from-university-navy to-university-navy/80 text-white rounded-full w-16 h-16 flex items-center justify-center font-bold text-lg flex-shrink-0 shadow-md">
+                                {(viewingRequestDetails.full_name || viewingRequestDetails.firstName || viewingRequestDetails.NM || 'S')?.charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <h4 className="font-semibold text-lg text-university-navy">
+                                  {viewingRequestDetails.full_name || viewingRequestDetails.firstName || viewingRequestDetails.NM || 'Student'}
+                                </h4>
+                                <Badge
+                                  variant={viewingRequestDetails.status === 'pending' ? 'secondary' :
+                                    viewingRequestDetails.status === 'approved' ? 'default' : 'destructive'}
+                                  className="mt-1"
+                                >
+                                  {viewingRequestDetails.status === 'pending' && <Clock className="h-3 w-3 mr-1" />}
+                                  {viewingRequestDetails.status === 'approved' && <CheckCircle className="h-3 w-3 mr-1" />}
+                                  {viewingRequestDetails.status === 'rejected' && <XCircle className="h-3 w-3 mr-1" />}
+                                  {viewingRequestDetails.status?.charAt(0).toUpperCase() + viewingRequestDetails.status?.slice(1)}
                                 </Badge>
-                              )}
-                              {request.status === 'rejected' && (
-                                <Badge className="bg-red-100 text-red-800 border-red-200 shadow-sm">
-                                  <XCircle className="h-3 w-3 mr-1" />
-                                  Rejected
-                                </Badge>
-                              )}
+                              </div>
                             </div>
                           </div>
                         </div>
-                    </Card>
-                  ))}
-                </div>
-                )}
-              </Card>
+
+                        {/* Contact Details */}
+                        <div>
+                          <h3 className="font-semibold text-university-navy mb-3">Contact Details</h3>
+                          <div className="space-y-3">
+                            <div className="flex items-center space-x-2 text-sm">
+                              <Mail className="h-4 w-4 text-university-navy/60 flex-shrink-0" />
+                              <span className="text-muted-foreground">Email:</span>
+                              <span className="font-medium">{viewingRequestDetails.request_email || viewingRequestDetails.email || viewingRequestDetails.EMAIL || 'N/A'}</span>
+                            </div>
+                            <div className="flex items-center space-x-2 text-sm">
+                              <Phone className="h-4 w-4 text-university-navy/60 flex-shrink-0" />
+                              <span className="text-muted-foreground">Phone:</span>
+                              <span className="font-medium">{viewingRequestDetails.request_phone || viewingRequestDetails.phone || viewingRequestDetails.MOB || 'N/A'}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Academic Information */}
+                        <div>
+                          <h3 className="font-semibold text-university-navy mb-3">Academic Information</h3>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <p className="text-xs text-muted-foreground mb-1">Department</p>
+                              <p className="font-medium">{viewingRequestDetails.request_department || viewingRequestDetails.department || viewingRequestDetails.DEPARTMENT || 'N/A'}</p>
+                            </div>
+                            {(viewingRequestDetails.rollNo || viewingRequestDetails.ROLNO || viewingRequestDetails.rollno) && (
+                              <div>
+                                <p className="text-xs text-muted-foreground mb-1">Roll Number</p>
+                                <p className="font-medium">{viewingRequestDetails.rollNo || viewingRequestDetails.ROLNO || viewingRequestDetails.rollno}</p>
+                              </div>
+                            )}
+                            {(viewingRequestDetails.session || viewingRequestDetails.SESSION) && (
+                              <div>
+                                <p className="text-xs text-muted-foreground mb-1">Session</p>
+                                <p className="font-medium">{viewingRequestDetails.session || viewingRequestDetails.SESSION}</p>
+                              </div>
+                            )}
+                            {(viewingRequestDetails.major || viewingRequestDetails.MAJOR) && (
+                              <div>
+                                <p className="text-xs text-muted-foreground mb-1">Major</p>
+                                <p className="font-medium">{viewingRequestDetails.major || viewingRequestDetails.MAJOR}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Payment Receipt */}
+                        {viewingRequestDetails.payment_receipt && (
+                          <div>
+                            <h3 className="font-semibold text-university-navy mb-3">Payment Receipt</h3>
+                            <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-3">
+                                  <FileText className="h-5 w-5 text-university-navy/60" />
+                                  <div>
+                                    <p className="text-sm font-medium text-university-navy">
+                                      Payment Receipt File
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {viewingRequestDetails.payment_receipt.split('/').pop() || viewingRequestDetails.payment_receipt}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="flex gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      const fileUrl = viewingRequestDetails.payment_receipt;
+                                      // Handle both relative and absolute paths
+                                      const fullUrl = fileUrl.startsWith('http')
+                                        ? fileUrl
+                                        : `${import.meta.env.VITE_API_URL?.replace('/api', '') || ''}${fileUrl.startsWith('/') ? '' : '/'}${fileUrl}`;
+                                      window.open(fullUrl, '_blank');
+                                    }}
+                                    className="flex items-center gap-2"
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                    View
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      const fileUrl = viewingRequestDetails.payment_receipt;
+                                      // Handle both relative and absolute paths
+                                      const fullUrl = fileUrl.startsWith('http')
+                                        ? fileUrl
+                                        : `${import.meta.env.VITE_API_URL?.replace('/api', '') || ''}${fileUrl.startsWith('/') ? '' : '/'}${fileUrl}`;
+                                      const link = document.createElement('a');
+                                      link.href = fullUrl;
+                                      link.download = viewingRequestDetails.payment_receipt.split('/').pop() || 'payment-receipt';
+                                      document.body.appendChild(link);
+                                      link.click();
+                                      document.body.removeChild(link);
+                                    }}
+                                    className="flex items-center gap-2"
+                                  >
+                                    <Download className="h-4 w-4" />
+                                    Download
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Message */}
+                        {viewingRequestDetails.message && (
+                          <div>
+                            <h3 className="font-semibold text-university-navy mb-3">Message</h3>
+                            <div className="bg-gradient-to-r from-university-navy/5 to-university-gold/5 p-4 rounded-lg border border-university-navy/10">
+                              <p className="text-sm text-muted-foreground italic">
+                                "{viewingRequestDetails.message}"
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Request Information */}
+                        <div>
+                          <h3 className="font-semibold text-university-navy mb-3">Request Information</h3>
+                          <div className="space-y-2 text-sm">
+                            <div className="flex items-center space-x-2">
+                              <Calendar className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-muted-foreground">Submitted:</span>
+                              <span className="font-medium">
+                                {viewingRequestDetails.submitted_at
+                                  ? new Date(viewingRequestDetails.submitted_at).toLocaleString()
+                                  : 'Unknown'}
+                              </span>
+                            </div>
+                            {viewingRequestDetails.request_id && (
+                              <div className="flex items-center space-x-2">
+                                <FileText className="h-4 w-4 text-muted-foreground" />
+                                <span className="text-muted-foreground">Request ID:</span>
+                                <span className="font-medium">#{viewingRequestDetails.request_id}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        {viewingRequestDetails.status === 'pending' && (
+                          <div className="flex gap-3 pt-4 border-t">
+                            <Button
+                              variant="university"
+                              onClick={() => {
+                                handleApproveRequest(viewingRequestDetails.request_id);
+                                setViewingRequestDetails(null);
+                              }}
+                              className="flex-1"
+                            >
+                              <CheckCircle className="h-4 w-4 mr-2" />
+                              Accept Request
+                            </Button>
+                            <Button
+                              variant="outline"
+                              onClick={() => {
+                                handleDeclineRequest(viewingRequestDetails.request_id);
+                                setViewingRequestDetails(null);
+                              }}
+                              className="flex-1 hover:bg-red-50 hover:border-red-200 hover:text-red-600"
+                            >
+                              <XCircle className="h-4 w-4 mr-2" />
+                              Decline Request
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </DialogContent>
+              </Dialog>
 
               {/* Request Statistics */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
@@ -1440,8 +1854,8 @@ const SocietyDashboard = () => {
             <div className="space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <h2 className="text-xl md:text-2xl font-semibold text-university-navy">Society Posts</h2>
-                <Button 
-                  variant="university" 
+                <Button
+                  variant="university"
                   size="sm"
                   onClick={() => navigate("/society/post/create", {
                     state: {
@@ -1467,7 +1881,7 @@ const SocietyDashboard = () => {
                   <p className="text-muted-foreground mb-4">
                     Start engaging with your members by creating your first post!
                   </p>
-                  <Button 
+                  <Button
                     variant="university"
                     onClick={() => navigate("/society/post/create", {
                       state: {
@@ -1510,7 +1924,7 @@ const SocietyDashboard = () => {
                       {/* Post Content */}
                       <div className="mb-4">
                         <h3 className="font-semibold text-lg mb-2 text-university-navy">{post.title}</h3>
-                        
+
                         {post.post_type === 'text' && (
                           <p className="text-muted-foreground leading-relaxed">{post.content}</p>
                         )}
@@ -1518,7 +1932,7 @@ const SocietyDashboard = () => {
                         {(() => {
                           // Parse media_files from the media_files table
                           let mediaFiles: any[] = [];
-                          
+
                           if (post.media_files) {
                             if (typeof post.media_files === 'string') {
                               try {
@@ -1530,12 +1944,12 @@ const SocietyDashboard = () => {
                               mediaFiles = post.media_files;
                             }
                           }
-                          
+
                           // Filter out NULL values
                           mediaFiles = mediaFiles.filter((file: any) => file && file.media_id);
-                          
+
                           const API_URL = import.meta.env.VITE_API_URL;
-                          
+
                           // Process media files to ensure URLs are properly formatted
                           const processedFiles = mediaFiles.map((file: any) => {
                             let processedUrl = file.file_url.trim();
@@ -1551,12 +1965,12 @@ const SocietyDashboard = () => {
                             }
                             return { ...file, processedUrl };
                           });
-                          
+
                           // Group files by type
                           const imageFiles = processedFiles.filter((f: any) => f.file_type === 'image');
                           const videoFiles = processedFiles.filter((f: any) => f.file_type === 'video');
                           const documentFiles = processedFiles.filter((f: any) => f.file_type === 'document');
-                          
+
                           return (
                             <>
                               {imageFiles.length > 0 && (
@@ -1576,13 +1990,13 @@ const SocietyDashboard = () => {
                                           currentIndex: index
                                         })}
                                       >
-                                        <img 
+                                        <img
                                           src={file.processedUrl}
                                           alt={`Post image ${file.media_id}`}
                                           className="w-full h-48 object-cover hover:scale-105 transition-transform duration-300"
-                                          onError={(e) => { 
+                                          onError={(e) => {
                                             console.error('Image failed to load:', file.processedUrl);
-                                            e.currentTarget.style.display = 'none'; 
+                                            e.currentTarget.style.display = 'none';
                                           }}
                                         />
                                       </div>
@@ -1607,7 +2021,7 @@ const SocietyDashboard = () => {
                                         currentIndex: index
                                       })}
                                     >
-                                      <video 
+                                      <video
                                         src={file.processedUrl}
                                         controls
                                         className="w-full max-w-md rounded-lg"
@@ -1627,8 +2041,8 @@ const SocietyDashboard = () => {
                                     <p className="text-muted-foreground leading-relaxed">{post.content}</p>
                                   )}
                                   {documentFiles.map((file: any) => (
-                                    <div 
-                                      key={file.media_id} 
+                                    <div
+                                      key={file.media_id}
                                       className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
                                       onClick={() => window.open(file.processedUrl, '_blank')}
                                     >
@@ -1636,8 +2050,8 @@ const SocietyDashboard = () => {
                                       <span className="flex-1 text-sm text-muted-foreground truncate">
                                         {file.file_url.split('/').pop()}
                                       </span>
-                                      <Button 
-                                        size="sm" 
+                                      <Button
+                                        size="sm"
                                         variant="outline"
                                         onClick={(e) => {
                                           e.stopPropagation();
@@ -1661,19 +2075,18 @@ const SocietyDashboard = () => {
                             {post.poll_data.options && post.poll_data.options.length > 0 && (() => {
                               const totalVotes = post.poll_data.options.reduce((sum: number, option: any) => sum + (option.vote_count || 0), 0);
                               const pollId = post.poll_data.poll_id || post.poll_id;
-                              
+
                               return (
                                 <div className="space-y-3">
                                   {post.poll_data.options.map((option: any) => {
                                     const percentage = totalVotes > 0 ? ((option.vote_count || 0) / totalVotes) * 100 : 0;
                                     const isVoted = option.user_voted || false;
-                                    
+
                                     return (
-                                      <div 
-                                        key={option.option_id} 
-                                        className={`relative cursor-pointer rounded-lg border-2 p-3 transition-all duration-200 hover:bg-gray-50 ${
-                                          isVoted ? 'border-university-navy bg-university-navy/5' : 'border-gray-200 hover:border-gray-300'
-                                        }`}
+                                      <div
+                                        key={option.option_id}
+                                        className={`relative cursor-pointer rounded-lg border-2 p-3 transition-all duration-200 hover:bg-gray-50 ${isVoted ? 'border-university-navy bg-university-navy/5' : 'border-gray-200 hover:border-gray-300'
+                                          }`}
                                         onClick={() => {
                                           const handlePollVote = async (postId: number, optionId: number, pollId: number) => {
                                             try {
@@ -1695,9 +2108,13 @@ const SocietyDashboard = () => {
                                                 const user = JSON.parse(localStorage.getItem("user") || "{}");
                                                 const userId = user.id || user.user_id;
                                                 fetchSocietyPosts(societyInfo.society_id);
+                                                toast.success("Vote submitted successfully");
+                                              } else {
+                                                toast.error(response.data.message || "Failed to submit vote");
                                               }
-                                            } catch (error) {
+                                            } catch (error: any) {
                                               console.error('Error voting on poll:', error);
+                                              toast.error(error.response?.data?.message || "Failed to submit vote");
                                             }
                                           };
                                           handlePollVote(post.post_id, option.option_id, pollId);
@@ -1717,9 +2134,9 @@ const SocietyDashboard = () => {
                                           </div>
                                         </div>
                                         <div className="relative">
-                                          <Progress 
-                                            value={percentage} 
-                                            className={`h-2 ${isVoted ? '[&>div]:bg-university-navy' : '[&>div]:bg-gray-300'}`} 
+                                          <Progress
+                                            value={percentage}
+                                            className={`h-2 ${isVoted ? '[&>div]:bg-university-navy' : '[&>div]:bg-gray-300'}`}
                                           />
                                         </div>
                                       </div>
@@ -1741,13 +2158,13 @@ const SocietyDashboard = () => {
 
                       {/* Post Actions */}
                       <div className="flex items-center space-x-6 pt-3 border-t border-gray-100">
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           className={`${post.is_liked_by_user === true || likedPosts[post.post_id] === true
-                            ? 'text-red-500 hover:text-red-600 bg-red-50 hover:bg-red-100' 
+                            ? 'text-red-500 hover:text-red-600 bg-red-50 hover:bg-red-100'
                             : 'text-muted-foreground hover:text-university-navy hover:bg-university-navy/5'
-                          }`}
+                            }`}
                           onClick={() => handleLike(post.post_id)}
                           disabled={likingPost === post.post_id}
                         >
@@ -1760,7 +2177,7 @@ const SocietyDashboard = () => {
                           )}
                           Like ({post.like_count || 0})
                         </Button>
-                        
+
                       </div>
                     </Card>
                   ))}
@@ -1794,8 +2211,8 @@ const SocietyDashboard = () => {
                     <Card key={event.id} className="p-6 shadow-card hover:shadow-lg transition-shadow">
                       <div className="flex items-start justify-between mb-3">
                         <h3 className="font-semibold text-lg text-university-navy flex-1">{event.title}</h3>
-                        <Badge 
-                          variant={event.status_id === 11 ? "default" : event.status_id === 10 ? "secondary" : "outline"} 
+                        <Badge
+                          variant={event.status_id === 11 ? "default" : event.status_id === 10 ? "secondary" : "outline"}
                           className="text-xs"
                         >
                           {event.status_name || event.status}
@@ -1807,11 +2224,11 @@ const SocietyDashboard = () => {
                       <div className="space-y-2 text-sm mb-4">
                         <div className="flex items-center text-muted-foreground">
                           <Calendar className="h-4 w-4 mr-2" />
-                          <span>{new Date(event.event_date).toLocaleDateString('en-US', { 
+                          <span>{new Date(event.event_date).toLocaleDateString('en-US', {
                             weekday: 'short',
-                            year: 'numeric', 
-                            month: 'short', 
-                            day: 'numeric' 
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
                           })}</span>
                         </div>
                         {event.event_time && (
@@ -1838,12 +2255,12 @@ const SocietyDashboard = () => {
                               setCompletingEvent(event.id);
                               const API_URL = import.meta.env.VITE_API_URL;
                               const token = localStorage.getItem("token");
-                              
+
                               if (!token) {
                                 toast.error("Authentication required");
                                 return;
                               }
-                              
+
                               const response = await axios.post(
                                 `${API_URL}/society/event-request/complete`,
                                 { event_req_id: event.id },
@@ -1853,7 +2270,7 @@ const SocietyDashboard = () => {
                                   },
                                 }
                               );
-                              
+
                               if (response.data.success) {
                                 toast.success("Event marked as completed. Report pending.");
                                 fetchEvents(); // Refresh events list
@@ -1926,7 +2343,7 @@ const SocietyDashboard = () => {
                   Current Fee: <span className="font-semibold text-university-navy">PKR {membershipFee}</span>
                 </div>
               </div>
-              
+
               <div className="grid lg:grid-cols-3 gap-6">
                 {/* Fee Management Card */}
                 <div className="lg:col-span-1">
@@ -1974,7 +2391,7 @@ const SocietyDashboard = () => {
                           onChange={(e) => setAccountTitle(e.target.value)}
                         />
                       </div>
-                      <Button 
+                      <Button
                         onClick={() => saveMembershipSettings()}
                         className="w-full"
                       >
@@ -2013,7 +2430,7 @@ const SocietyDashboard = () => {
                           </ul>
                         </div>
                       </div>
-                      
+
                       {/* Account Details Section */}
                       <div className="grid md:grid-cols-2 gap-4 pt-4 border-t">
                         <div>
@@ -2044,8 +2461,8 @@ const SocietyDashboard = () => {
                         </div>
                       </div>
                       <div className="pt-4 border-t">
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           className="w-full"
                           onClick={() => {
                             // Store settings in localStorage to pass to registration form
@@ -2071,6 +2488,154 @@ const SocietyDashboard = () => {
           )}
 
           {/* Society Details Tab - Only for Advisors */}
+          {isAdvisor() && activeTab === "cabinet" && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl md:text-2xl font-semibold text-university-navy">Cabinet Management</h2>
+                <Button
+                  variant="university"
+                  onClick={() => {
+                    setEditingCabinetMember(null);
+                    setCabinetFormData({ name: "", designation: "" });
+                    setIsCabinetModalOpen(true);
+                  }}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Cabinet Member
+                </Button>
+              </div>
+
+              {loadingCabinet ? (
+                <div className="text-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-university-navy mx-auto mb-4"></div>
+                  <p className="text-muted-foreground">Loading cabinet members...</p>
+                </div>
+              ) : cabinetMembers.length === 0 ? (
+                <Card className="p-8 text-center shadow-card">
+                  <Crown className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="font-semibold text-university-navy mb-2">No Cabinet Members</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Start building your cabinet by adding members.
+                  </p>
+                  <Button
+                    variant="university"
+                    onClick={() => {
+                      setEditingCabinetMember(null);
+                      setCabinetFormData({ name: "", designation: "" });
+                      setIsCabinetModalOpen(true);
+                    }}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add First Member
+                  </Button>
+                </Card>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {cabinetMembers.map((member) => (
+                    <Card key={member.id} className="p-6 shadow-card hover:shadow-lg transition-shadow">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-12 h-12 bg-university-navy/10 rounded-full flex items-center justify-center">
+                            <Crown className="h-6 w-6 text-university-navy" />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-university-navy">{member.name}</h3>
+                            <p className="text-sm text-muted-foreground">{member.designation}</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between pt-4 border-t">
+                        <div className="text-xs text-muted-foreground">
+                          <Clock className="h-3 w-3 inline mr-1" />
+                          Added {new Date(member.created_at).toLocaleDateString()}
+                        </div>
+                        <div className="flex space-x-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setEditingCabinetMember(member);
+                              setCabinetFormData({
+                                name: member.name,
+                                designation: member.designation
+                              });
+                              setIsCabinetModalOpen(true);
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeactivateCabinetMember(member.id)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
+
+              {/* Add/Edit Cabinet Member Modal */}
+              <Dialog open={isCabinetModalOpen} onOpenChange={setIsCabinetModalOpen}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>
+                      {editingCabinetMember ? "Edit Cabinet Member" : "Add Cabinet Member"}
+                    </DialogTitle>
+                    <DialogDescription>
+                      {editingCabinetMember
+                        ? "Update the cabinet member's information."
+                        : "Add a new member to the society cabinet."}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="cabinet-name">Name</Label>
+                      <Input
+                        id="cabinet-name"
+                        placeholder="Enter member name"
+                        value={cabinetFormData.name}
+                        onChange={(e) => setCabinetFormData({ ...cabinetFormData, name: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="cabinet-designation">Designation</Label>
+                      <Input
+                        id="cabinet-designation"
+                        placeholder="e.g., President, Vice President, Secretary"
+                        value={cabinetFormData.designation}
+                        onChange={(e) => setCabinetFormData({ ...cabinetFormData, designation: e.target.value })}
+                      />
+                    </div>
+                    <div className="flex justify-end space-x-2 pt-4">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setIsCabinetModalOpen(false);
+                          setEditingCabinetMember(null);
+                          setCabinetFormData({ name: "", designation: "" });
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        variant="university"
+                        onClick={handleSaveCabinetMember}
+                        disabled={!cabinetFormData.name.trim() || !cabinetFormData.designation.trim()}
+                      >
+                        {editingCabinetMember ? "Update" : "Add"} Member
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+          )}
+
           {isAdvisor() && activeTab === "society-details" && (
             <div className="space-y-6">
               {loadingSociety ? (
@@ -2084,7 +2649,7 @@ const SocietyDashboard = () => {
                   <div className="flex items-center justify-between">
                     <h2 className="text-2xl font-semibold text-university-navy">Society Details</h2>
                     {!isEditMode ? (
-                      <Button 
+                      <Button
                         variant="university"
                         onClick={() => {
                           setIsEditMode(true);
@@ -2104,7 +2669,7 @@ const SocietyDashboard = () => {
                       </Button>
                     ) : (
                       <div className="flex gap-2">
-                        <Button 
+                        <Button
                           variant="outline"
                           onClick={() => {
                             setIsEditMode(false);
@@ -2117,7 +2682,7 @@ const SocietyDashboard = () => {
                           <X className="h-4 w-4 mr-2" />
                           Cancel
                         </Button>
-                        <Button 
+                        <Button
                           variant="university"
                           onClick={handleUpdateSociety}
                           disabled={savingSociety}
@@ -2392,8 +2957,8 @@ const SocietyDashboard = () => {
                     className="absolute left-4 z-50 text-white hover:bg-white/20"
                     onClick={(e) => {
                       e.stopPropagation();
-                      const prevIndex = viewingMedia.currentIndex > 0 
-                        ? viewingMedia.currentIndex - 1 
+                      const prevIndex = viewingMedia.currentIndex > 0
+                        ? viewingMedia.currentIndex - 1
                         : viewingMedia.files.length - 1;
                       setViewingMedia({
                         ...viewingMedia,
@@ -2469,6 +3034,23 @@ const SocietyDashboard = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently remove the member from the cabinet.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeactivateMember} className="bg-red-600 hover:bg-red-700">
+              Deactivate
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
