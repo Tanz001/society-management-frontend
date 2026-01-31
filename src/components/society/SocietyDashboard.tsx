@@ -799,11 +799,27 @@ const SocietyDashboard = () => {
       const API_URL = import.meta.env.VITE_API_URL;
       const hasImages = editLogoFile || editCoverFile;
 
-      // Get advisor faculty_id from societyInfo
-      const advisorFacultyId = societyInfo?.advisor_info?.faculty_id ||
+      // Get advisor faculty_id from societyInfo or localStorage
+      let advisorFacultyId = societyInfo?.advisor_info?.faculty_id ||
         societyInfo?.advisor_faculty_id ||
         societyInfo?.faculty_id ||
         null;
+
+      // If not found in societyInfo, try to get from localStorage
+      if (!advisorFacultyId) {
+        try {
+          const storedSocietyData = localStorage.getItem("currentSocietyData");
+          if (storedSocietyData) {
+            const parsedData = JSON.parse(storedSocietyData);
+            advisorFacultyId = parsedData?.advisor_info?.faculty_id ||
+              parsedData?.advisor_faculty_id ||
+              parsedData?.faculty_id ||
+              null;
+          }
+        } catch (error) {
+          console.error("Error parsing stored society data:", error);
+        }
+      }
 
       if (!advisorFacultyId) {
         toast.error("Advisor information not found. Cannot update society details.");
