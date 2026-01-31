@@ -5,10 +5,10 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
-import { 
-  Users, 
-  Building, 
-  Calendar, 
+import {
+  Users,
+  Building,
+  Calendar,
   MessageSquare,
   TrendingUp,
   AlertTriangle,
@@ -112,7 +112,7 @@ const AdminDashboard = () => {
     open: false,
     title: "",
     description: "",
-    onConfirm: () => {},
+    onConfirm: () => { },
     variant: "default" as "default" | "destructive"
   });
   const [societyToDelete, setSocietyToDelete] = useState<number | null>(null);
@@ -124,34 +124,34 @@ const AdminDashboard = () => {
     totalSocieties: allSocieties.length,
     totalEventRequests: allEventRequests.length,
     totalUsers: allStudents.length + allFaculty.length,
-    activeSocieties: allSocieties.filter(society => 
+    activeSocieties: allSocieties.filter(society =>
       society.status_name === 'Approved by VC' || society.status === 'active'
     ).length,
-    pendingSocieties: allSocieties.filter(society => 
+    pendingSocieties: allSocieties.filter(society =>
       society.status_id === 1 || society.status === 'pending' || society.status === 'under_review'
     ).length,
-    suspendedSocieties: allSocieties.filter(society => 
+    suspendedSocieties: allSocieties.filter(society =>
       society.status === 'suspended' || society.status_name?.includes('Rejected')
     ).length,
     activeUsers: allStudents.length + allFaculty.filter((f: any) => f.is_active === 1).length,
     totalPosts: 0, // This would need to come from a separate API call
     flaggedPosts: 0, // This would need to come from a separate API call
     totalEvents: allEvents.length || allSocieties.reduce((total, society) => total + (society.events?.length || 0), 0),
-    upcomingEvents: allEvents.length > 0 
+    upcomingEvents: allEvents.length > 0
       ? allEvents.filter((event: any) => event.event_date && new Date(event.event_date) > new Date()).length
       : allSocieties.reduce((total, society) => {
-      if (!society.events) return total;
-      const upcoming = society.events.filter((event: any) => new Date(event.event_date) > new Date());
-      return total + upcoming.length;
-    }, 0),
+        if (!society.events) return total;
+        const upcoming = society.events.filter((event: any) => new Date(event.event_date) > new Date());
+        return total + upcoming.length;
+      }, 0),
     monthlyGrowth: 0, // This would need to be calculated from historical data
     engagementRate: 0 // This would need to be calculated from engagement metrics
   };
 
   // Get pending societies from actual data
-  const pendingSocieties = allSocieties.filter(society => 
-    society.status_id === 1 || 
-    society.status === 'pending' || 
+  const pendingSocieties = allSocieties.filter(society =>
+    society.status_id === 1 ||
+    society.status === 'pending' ||
     society.status === 'under_review'
   );
 
@@ -187,8 +187,8 @@ const AdminDashboard = () => {
     try {
       console.log("Approving society:", societyId);
       const API_URL = import.meta.env.VITE_API_URL;
-      
-      
+
+
       const token = localStorage.getItem("token");
       if (!token) {
         throw new Error("No authentication token found");
@@ -206,18 +206,18 @@ const AdminDashboard = () => {
       );
 
       console.log("Society approved successfully:", response.data);
-      
+
       // Refresh the societies list
       await getAllSocieties();
-      
+
       // Close modal
       handleCloseModal();
-      
+
       toast({
         title: "Success",
         description: "Society approved successfully!",
       });
-      
+
     } catch (err: any) {
       console.error("Error approving society:", err);
       toast({
@@ -230,9 +230,9 @@ const AdminDashboard = () => {
 
   const handleReject = async (societyId) => {
     try {
-       const API_URL = import.meta.env.VITE_API_URL;
+      const API_URL = import.meta.env.VITE_API_URL;
       console.log("Rejecting society:", societyId);
-      
+
       const token = localStorage.getItem("token");
       if (!token) {
         throw new Error("No authentication token found");
@@ -249,18 +249,18 @@ const AdminDashboard = () => {
       );
 
       console.log("Society rejected successfully:", response.data);
-      
+
       // Refresh the societies list
       await getAllSocieties();
-      
+
       // Close modal
       handleCloseModal();
-      
+
       toast({
         title: "Success",
         description: "Society rejected successfully!",
       });
-      
+
     } catch (err: any) {
       console.error("Error rejecting society:", err);
       toast({
@@ -303,11 +303,11 @@ const AdminDashboard = () => {
               headers: { Authorization: `Bearer ${token}` },
             }
           );
-          
+
           const advisor = advisorResponse.data.faculty?.find(
             (f: any) => f.faculty_id === societyData.faculty_id
           );
-          
+
           if (advisor) {
             setAdvisorInfo(advisor);
           } else {
@@ -338,10 +338,10 @@ const AdminDashboard = () => {
   // Function to get all societies
   const getAllSocieties = async () => {
     try {
-       const API_URL = import.meta.env.VITE_API_URL;
+      const API_URL = import.meta.env.VITE_API_URL;
       setLoading(true);
       setError(null);
-      
+
       const token = localStorage.getItem("token");
       if (!token) {
         throw new Error("No authentication token found");
@@ -354,7 +354,7 @@ const AdminDashboard = () => {
       });
 
       console.log("All societies fetched:", response.data);
-      
+
       // Map the societies to match the expected format
       const mappedSocieties = response.data.societies?.map((society: any) => ({
         ...society,
@@ -364,7 +364,7 @@ const AdminDashboard = () => {
         submitted_by: `${society.student_info?.firstName || ''} ${society.student_info?.lastName || ''}`.trim(),
         achievements: society.achievements || []
       })) || [];
-      
+
       setAllSocieties(mappedSocieties);
     } catch (err: any) {
       console.error("Error fetching societies:", err);
@@ -390,7 +390,7 @@ const AdminDashboard = () => {
 
   const performDeleteSociety = async (societyId: number) => {
     try {
-       const API_URL = import.meta.env.VITE_API_URL;
+      const API_URL = import.meta.env.VITE_API_URL;
       const token = localStorage.getItem("token");
       if (!token) {
         throw new Error("No authentication token found");
@@ -406,15 +406,15 @@ const AdminDashboard = () => {
       );
 
       console.log("Society deleted successfully:", response.data);
-      
+
       // Refresh the societies list
       await getAllSocieties();
-      
+
       toast({
         title: "Success",
         description: "Society deleted successfully!",
       });
-      
+
     } catch (err: any) {
       console.error("Error deleting society:", err);
       toast({
@@ -430,10 +430,10 @@ const AdminDashboard = () => {
   // Function to get all events
   const getAllEvents = async () => {
     try {
-       const API_URL = import.meta.env.VITE_API_URL;
+      const API_URL = import.meta.env.VITE_API_URL;
       setEventsLoading(true);
       setError(null);
-      
+
       const token = localStorage.getItem("token");
       if (!token) {
         throw new Error("No authentication token found");
@@ -458,10 +458,10 @@ const AdminDashboard = () => {
   // Function to get all students
   const getAllStudents = async () => {
     try {
-       const API_URL = import.meta.env.VITE_API_URL;
+      const API_URL = import.meta.env.VITE_API_URL;
       setStudentsLoading(true);
       setError(null);
-      
+
       const token = localStorage.getItem("token");
       if (!token) {
         throw new Error("No authentication token found");
@@ -489,7 +489,7 @@ const AdminDashboard = () => {
       const API_URL = import.meta.env.VITE_API_URL;
       setEventRequestsLoading(true);
       setError(null);
-      
+
       const token = localStorage.getItem("token");
       if (!token) {
         throw new Error("No authentication token found");
@@ -508,7 +508,7 @@ const AdminDashboard = () => {
       console.log("All event requests fetched:", response.data);
       const requests = response.data.data || [];
       setAllEventRequests(requests);
-      
+
       // Calculate stats
       const stats = {
         total: requests.length,
@@ -531,7 +531,7 @@ const AdminDashboard = () => {
       const API_URL = import.meta.env.VITE_API_URL;
       setEventReportsLoading(true);
       setError(null);
-      
+
       const token = localStorage.getItem("token");
       if (!token) {
         throw new Error("No authentication token found");
@@ -559,7 +559,7 @@ const AdminDashboard = () => {
       const API_URL = import.meta.env.VITE_API_URL;
       setFacultyLoading(true);
       setError(null);
-      
+
       const token = localStorage.getItem("token");
       if (!token) {
         throw new Error("No authentication token found");
@@ -676,7 +676,7 @@ const AdminDashboard = () => {
 
   const performDeleteStudent = async (studentId: number) => {
     try {
-       const API_URL = import.meta.env.VITE_API_URL;
+      const API_URL = import.meta.env.VITE_API_URL;
       const token = localStorage.getItem("token");
       if (!token) {
         throw new Error("No authentication token found");
@@ -692,17 +692,17 @@ const AdminDashboard = () => {
       );
 
       console.log("Student deleted successfully:", response.data);
-      
+
       // Refresh the students list
       await getAllStudents();
       // Also refresh societies as some may have been deleted
       await getAllSocieties();
-      
+
       toast({
         title: "Success",
         description: "Student deleted successfully!",
       });
-      
+
     } catch (err: any) {
       console.error("Error deleting student:", err);
       toast({
@@ -726,7 +726,7 @@ const AdminDashboard = () => {
     }
 
     try {
-       const API_URL = import.meta.env.VITE_API_URL;
+      const API_URL = import.meta.env.VITE_API_URL;
       const token = localStorage.getItem("token");
       if (!token) {
         throw new Error("No authentication token found");
@@ -746,7 +746,7 @@ const AdminDashboard = () => {
       );
 
       console.log("Advisor created successfully:", response.data);
-      
+
       // Reset form
       setAdvisorData({
         firstName: "",
@@ -761,17 +761,17 @@ const AdminDashboard = () => {
         password: "",
         confirmPassword: "",
       });
-      
+
       setIsAdvisorDialogOpen(false);
-      
+
       // Refresh students list
       await getAllStudents();
-      
+
       toast({
         title: "Success",
         description: "Advisor account created successfully!",
       });
-      
+
     } catch (err: any) {
       console.error("Error creating advisor:", err);
       setError(err.response?.data?.message || err.message || "Failed to create advisor account");
@@ -806,9 +806,9 @@ const AdminDashboard = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     localStorage.clear();
-    
+
     console.log("Admin logged out successfully");
-    
+
     // Navigate to login page
     navigate("/");
   };
@@ -824,9 +824,9 @@ const AdminDashboard = () => {
               <p className="text-white/80">Complete University Societies Management System</p>
             </div>
             <div className="flex items-center space-x-3">
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 className="text-white border-white hover:bg-white/20 bg-transparent"
                 onClick={handleLogout}
               >
@@ -934,75 +934,75 @@ const AdminDashboard = () => {
 
 
               {/* Pending Society Applications - Full Width */}
-                <Card className="p-6 shadow-card">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-semibold text-university-navy">Pending Society Applications</h3>
-                    <Button variant="outline" size="sm" asChild>
-                      <Link to="/admin/societies/pending">View All</Link>
-                    </Button>
-                  </div>
-                  <div className="space-y-4">
-                    {pendingSocieties.map((society) => (
-                      <div key={society.society_id} className="border-b pb-4 last:border-0">
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-medium text-sm">{society.name}</h4>
-                          <Badge variant="secondary" className="text-xs">
-                            {society.status || 'Under Review'}
-                          </Badge>
-                        </div>
-                        <p className="text-xs text-muted-foreground mb-2">
-                          Category: {society.category} • Advisor: {society.advisor}
-                        </p>
-                        <p className="text-xs text-muted-foreground mb-2">
-                          Location: {society.location} • Created: {new Date(society.created_at).toLocaleDateString()}
-                        </p>
-                        <div className="flex space-x-2">
-                          <Button 
-                            size="sm" 
-                            variant="university" 
-                            className="text-xs"
-                            onClick={() => handleReviewClick(society)}
-                          >
-                            <Eye className="h-3 w-3 mr-1" />
-                            Review
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            className="text-xs"
-                            onClick={() => handleApprove(society.society_id)}
-                          >
-                            <CheckCircle className="h-3 w-3 mr-1" />
-                            Approve
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            className="text-xs"
-                            onClick={() => handleReject(society.society_id)}
-                          >
-                            <XCircle className="h-3 w-3 mr-1" />
-                            Reject
-                          </Button>
-                        </div>
+              <Card className="p-6 shadow-card">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold text-university-navy">Pending Society Applications</h3>
+                  <Button variant="outline" size="sm" asChild>
+                    <Link to="/admin/societies/pending">View All</Link>
+                  </Button>
+                </div>
+                <div className="space-y-4">
+                  {pendingSocieties.map((society) => (
+                    <div key={society.society_id} className="border-b pb-4 last:border-0">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-medium text-sm">{society.name}</h4>
+                        <Badge variant="secondary" className="text-xs">
+                          {society.status || 'Under Review'}
+                        </Badge>
                       </div>
-                    ))}
-                  </div>
-                </Card>
+                      <p className="text-xs text-muted-foreground mb-2">
+                        Category: {society.category} • Advisor: {society.advisor}
+                      </p>
+                      <p className="text-xs text-muted-foreground mb-2">
+                        Location: {society.location} • Created: {new Date(society.created_at).toLocaleDateString()}
+                      </p>
+                      <div className="flex space-x-2">
+                        <Button
+                          size="sm"
+                          variant="university"
+                          className="text-xs"
+                          onClick={() => handleReviewClick(society)}
+                        >
+                          <Eye className="h-3 w-3 mr-1" />
+                          Review
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs"
+                          onClick={() => handleApprove(society.society_id)}
+                        >
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          Approve
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs"
+                          onClick={() => handleReject(society.society_id)}
+                        >
+                          <XCircle className="h-3 w-3 mr-1" />
+                          Reject
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
             </TabsContent>
 
             <TabsContent value="societies" className="space-y-6">
               <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-semibold text-university-navy">Society Management</h2>
                 <div className="flex space-x-2">
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     onClick={getAllSocieties}
                     disabled={loading}
                   >
                     {loading ? "Loading..." : "Refresh"}
                   </Button>
-                  <Button 
+                  <Button
                     variant="university"
                     onClick={() => navigate("/society/register", { state: { returnTo: "/dashboard/admin" } })}
                   >
@@ -1069,107 +1069,107 @@ const AdminDashboard = () => {
               {filteredSocieties.length > 0 && (
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold text-university-navy">
-                    {societyFilter === "all" ? "All Societies" : 
-                     societyFilter === "active" ? "Active Societies" :
-                     societyFilter === "pending" ? "Pending Societies" :
-                     "Rejected Societies"} ({filteredSocieties.length})
+                    {societyFilter === "all" ? "All Societies" :
+                      societyFilter === "active" ? "Active Societies" :
+                        societyFilter === "pending" ? "Pending Societies" :
+                          "Rejected Societies"} ({filteredSocieties.length})
                   </h3>
                   <div className="grid gap-6">
                     {filteredSocieties
                       .slice((societiesCurrentPage - 1) * itemsPerPage, societiesCurrentPage * itemsPerPage)
                       .map((society) => (
-                      <Card key={society.society_id} className="p-6 shadow-card">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-start space-x-4 flex-1">
-                            <div className="w-16 h-16 bg-university-navy/10 rounded-lg flex items-center justify-center">
-                              {society.society_logo ? (
-                                <img 
-                                  src={`${import.meta.env.VITE_API_URL}/${society.society_logo}`}
-                                  alt={society.name}
-                                  className="w-12 h-12 rounded-lg object-cover"
-                                />
-                              ) : (
-                                <Building className="h-8 w-8 text-university-navy" />
-                              )}
+                        <Card key={society.society_id} className="p-6 shadow-card">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-start space-x-4 flex-1">
+                              <div className="w-16 h-16 bg-university-navy/10 rounded-lg flex items-center justify-center">
+                                {society.society_logo ? (
+                                  <img
+                                    src={`${import.meta.env.VITE_API_URL}/${society.society_logo}`}
+                                    alt={society.name}
+                                    className="w-12 h-12 rounded-lg object-cover"
+                                  />
+                                ) : (
+                                  <Building className="h-8 w-8 text-university-navy" />
+                                )}
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex items-center mb-2">
+                                  <h3 className="text-xl font-semibold text-university-navy mr-3">{society.name}</h3>
+                                  <Badge variant="secondary" className="mr-2">{society.status_name}</Badge>
+                                  <Badge variant="outline">{society.category}</Badge>
+                                </div>
+                                <p className="text-sm text-muted-foreground mb-2">
+                                  📍 {society.location} • 👨‍🏫 {society.advisor}
+                                </p>
+                                <p className="text-sm text-muted-foreground mb-3">
+                                  {society.description.length > 150
+                                    ? `${society.description.substring(0, 150)}...`
+                                    : society.description
+                                  }
+                                </p>
+                                <div className="flex items-center text-xs text-muted-foreground">
+                                  <Clock className="h-3 w-3 mr-1" />
+                                  Submitted: {new Date(society.created_at).toLocaleDateString()}
+                                </div>
+                              </div>
                             </div>
-                            <div className="flex-1">
-                              <div className="flex items-center mb-2">
-                                <h3 className="text-xl font-semibold text-university-navy mr-3">{society.name}</h3>
-                                <Badge variant="secondary" className="mr-2">{society.status_name}</Badge>
-                                <Badge variant="outline">{society.category}</Badge>
-                              </div>
-                              <p className="text-sm text-muted-foreground mb-2">
-                                📍 {society.location} • 👨‍🏫 {society.advisor}
-                              </p>
-                              <p className="text-sm text-muted-foreground mb-3">
-                                {society.description.length > 150 
-                                  ? `${society.description.substring(0, 150)}...` 
-                                  : society.description
-                                }
-                              </p>
-                              <div className="flex items-center text-xs text-muted-foreground">
-                                <Clock className="h-3 w-3 mr-1" />
-                                Submitted: {new Date(society.created_at).toLocaleDateString()}
-                              </div>
+                            <div className="flex items-center ml-4">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8 p-0"
+                                    disabled={loading}
+                                  >
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => handleViewDetails(society)}>
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    View Details
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    onClick={() => handleDeleteSociety(society.society_id)}
+                                    className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </div>
                           </div>
-                          <div className="flex items-center ml-4">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm"
-                                  className="h-8 w-8 p-0"
-                                  disabled={loading}
-                                >
-                                  <MoreVertical className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => handleViewDetails(society)}>
-                                  <Eye className="h-4 w-4 mr-2" />
-                                  View Details
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem 
-                                  onClick={() => handleDeleteSociety(society.society_id)}
-                                  className="text-red-600 focus:text-red-600 focus:bg-red-50"
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        </div>
-                      </Card>
-                    ))}
+                        </Card>
+                      ))}
                   </div>
-                  
+
                   {/* Pagination for Societies */}
                   {filteredSocieties.length > itemsPerPage && (
                     <div className="mt-6">
                       <Pagination>
                         <PaginationContent>
                           <PaginationItem>
-                            <PaginationPrevious 
+                            <PaginationPrevious
                               onClick={() => setSocietiesCurrentPage(prev => Math.max(1, prev - 1))}
                               className={societiesCurrentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
                             />
                           </PaginationItem>
-                          
+
                           {Array.from({ length: Math.ceil(filteredSocieties.length / itemsPerPage) }, (_, i) => i + 1)
                             .filter(page => {
                               const totalPages = Math.ceil(filteredSocieties.length / itemsPerPage);
-                              return page === 1 || 
-                                     page === totalPages || 
-                                     (page >= societiesCurrentPage - 1 && page <= societiesCurrentPage + 1);
+                              return page === 1 ||
+                                page === totalPages ||
+                                (page >= societiesCurrentPage - 1 && page <= societiesCurrentPage + 1);
                             })
                             .map((page, index, array) => {
                               const totalPages = Math.ceil(filteredSocieties.length / itemsPerPage);
                               const showEllipsisBefore = index > 0 && page - array[index - 1] > 1;
                               const showEllipsisAfter = index < array.length - 1 && array[index + 1] - page > 1;
-                              
+
                               return (
                                 <React.Fragment key={page}>
                                   {showEllipsisBefore && (
@@ -1194,9 +1194,9 @@ const AdminDashboard = () => {
                                 </React.Fragment>
                               );
                             })}
-                          
+
                           <PaginationItem>
-                            <PaginationNext 
+                            <PaginationNext
                               onClick={() => setSocietiesCurrentPage(prev => Math.min(Math.ceil(filteredSocieties.length / itemsPerPage), prev + 1))}
                               className={societiesCurrentPage >= Math.ceil(filteredSocieties.length / itemsPerPage) ? "pointer-events-none opacity-50" : "cursor-pointer"}
                             />
@@ -1222,13 +1222,13 @@ const AdminDashboard = () => {
                   <Building className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                   <h3 className="text-lg font-medium mb-2">
                     {societyFilter === "all" ? "No Societies Found" :
-                     societyFilter === "active" ? "No Active Societies" :
-                     societyFilter === "pending" ? "No Pending Societies" :
-                     "No Rejected Societies"}
+                      societyFilter === "active" ? "No Active Societies" :
+                        societyFilter === "pending" ? "No Pending Societies" :
+                          "No Rejected Societies"}
                   </h3>
                   <p className="text-muted-foreground mb-4">
                     {societyFilter === "all" ? "No societies have been created yet." :
-                     `No ${societyFilter} societies found.`}
+                      `No ${societyFilter} societies found.`}
                   </p>
                   {societyFilter === "all" && (
                     <Button variant="university">Create First Society</Button>
@@ -1240,8 +1240,8 @@ const AdminDashboard = () => {
             <TabsContent value="events" className="space-y-6">
               <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-semibold text-university-navy">All Societies</h2>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={getAllEvents}
                   disabled={eventsLoading}
                 >
@@ -1266,98 +1266,98 @@ const AdminDashboard = () => {
                     {filteredSocieties
                       .slice((societiesCurrentPage - 1) * itemsPerPage, societiesCurrentPage * itemsPerPage)
                       .map((society: any) => (
-                      <Card key={society.society_id} className="p-6 shadow-card">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-start space-x-4 flex-1">
-                            <div className="w-16 h-16 bg-university-navy/10 rounded-lg flex items-center justify-center">
-                              {society.society_logo ? (
-                                <img 
-                                  src={`${import.meta.env.VITE_API_URL}/${society.society_logo}`}
-                                  alt={society.name}
-                                  className="w-12 h-12 rounded-lg object-cover"
-                                />
-                              ) : (
-                                <Building className="h-8 w-8 text-university-navy" />
-                              )}
+                        <Card key={society.society_id} className="p-6 shadow-card">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-start space-x-4 flex-1">
+                              <div className="w-16 h-16 bg-university-navy/10 rounded-lg flex items-center justify-center">
+                                {society.society_logo ? (
+                                  <img
+                                    src={`${import.meta.env.VITE_API_URL}/${society.society_logo}`}
+                                    alt={society.name}
+                                    className="w-12 h-12 rounded-lg object-cover"
+                                  />
+                                ) : (
+                                  <Building className="h-8 w-8 text-university-navy" />
+                                )}
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex items-center mb-2">
+                                  <h3 className="text-xl font-semibold text-university-navy mr-3">{society.name}</h3>
+                                  <Badge variant="secondary" className="mr-2">{society.status_name}</Badge>
+                                  <Badge variant="outline">{society.category}</Badge>
+                                </div>
+                                <p className="text-sm text-muted-foreground mb-2">
+                                  📍 {society.location} • 👨‍🏫 {society.advisor}
+                                </p>
+                                <p className="text-sm text-muted-foreground mb-3">
+                                  {society.description.length > 150
+                                    ? `${society.description.substring(0, 150)}...`
+                                    : society.description
+                                  }
+                                </p>
+                                <div className="flex items-center text-xs text-muted-foreground">
+                                  <Clock className="h-3 w-3 mr-1" />
+                                  Submitted: {new Date(society.created_at).toLocaleDateString()}
+                                </div>
+                              </div>
                             </div>
-                            <div className="flex-1">
-                              <div className="flex items-center mb-2">
-                                <h3 className="text-xl font-semibold text-university-navy mr-3">{society.name}</h3>
-                                <Badge variant="secondary" className="mr-2">{society.status_name}</Badge>
-                                <Badge variant="outline">{society.category}</Badge>
-                              </div>
-                              <p className="text-sm text-muted-foreground mb-2">
-                                📍 {society.location} • 👨‍🏫 {society.advisor}
-                              </p>
-                              <p className="text-sm text-muted-foreground mb-3">
-                                {society.description.length > 150 
-                                  ? `${society.description.substring(0, 150)}...` 
-                                  : society.description
-                                }
-                              </p>
-                              <div className="flex items-center text-xs text-muted-foreground">
-                                <Clock className="h-3 w-3 mr-1" />
-                                Submitted: {new Date(society.created_at).toLocaleDateString()}
-                              </div>
+                            <div className="flex items-center ml-4">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8 p-0"
+                                    disabled={loading}
+                                  >
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => handleViewDetails(society)}>
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    View Details
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    onClick={() => handleDeleteSociety(society.society_id)}
+                                    className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </div>
                           </div>
-                          <div className="flex items-center ml-4">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm"
-                                  className="h-8 w-8 p-0"
-                                  disabled={loading}
-                                >
-                                  <MoreVertical className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => handleViewDetails(society)}>
-                                  <Eye className="h-4 w-4 mr-2" />
-                                  View Details
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem 
-                                  onClick={() => handleDeleteSociety(society.society_id)}
-                                  className="text-red-600 focus:text-red-600 focus:bg-red-50"
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        </div>
-                      </Card>
-                    ))}
+                        </Card>
+                      ))}
                   </div>
-                  
+
                   {/* Pagination for Societies */}
                   {filteredSocieties.length > itemsPerPage && (
                     <div className="mt-6">
                       <Pagination>
                         <PaginationContent>
                           <PaginationItem>
-                            <PaginationPrevious 
+                            <PaginationPrevious
                               onClick={() => setSocietiesCurrentPage(prev => Math.max(1, prev - 1))}
                               className={societiesCurrentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
                             />
                           </PaginationItem>
-                          
+
                           {Array.from({ length: Math.ceil(filteredSocieties.length / itemsPerPage) }, (_, i) => i + 1)
                             .filter(page => {
                               const totalPages = Math.ceil(filteredSocieties.length / itemsPerPage);
-                              return page === 1 || 
-                                     page === totalPages || 
-                                     (page >= societiesCurrentPage - 1 && page <= societiesCurrentPage + 1);
+                              return page === 1 ||
+                                page === totalPages ||
+                                (page >= societiesCurrentPage - 1 && page <= societiesCurrentPage + 1);
                             })
                             .map((page, index, array) => {
                               const totalPages = Math.ceil(filteredSocieties.length / itemsPerPage);
                               const showEllipsisBefore = index > 0 && page - array[index - 1] > 1;
                               const showEllipsisAfter = index < array.length - 1 && array[index + 1] - page > 1;
-                              
+
                               return (
                                 <React.Fragment key={page}>
                                   {showEllipsisBefore && (
@@ -1382,9 +1382,9 @@ const AdminDashboard = () => {
                                 </React.Fragment>
                               );
                             })}
-                          
+
                           <PaginationItem>
-                            <PaginationNext 
+                            <PaginationNext
                               onClick={() => setSocietiesCurrentPage(prev => Math.min(Math.ceil(filteredSocieties.length / itemsPerPage), prev + 1))}
                               className={societiesCurrentPage >= Math.ceil(filteredSocieties.length / itemsPerPage) ? "pointer-events-none opacity-50" : "cursor-pointer"}
                             />
@@ -1417,8 +1417,8 @@ const AdminDashboard = () => {
             <TabsContent value="event-requests" className="space-y-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-semibold text-university-navy">Event Requests</h2>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={getAllEventRequests}
                   disabled={eventRequestsLoading}
                 >
@@ -1474,7 +1474,7 @@ const AdminDashboard = () => {
                     </div>
                     <XCircle className="h-8 w-8 text-red-600" />
                   </div>
-                </Card> 
+                </Card>
               </div>
 
               {/* Filter Buttons */}
@@ -1579,8 +1579,8 @@ const AdminDashboard = () => {
                                   </div>
                                 </div>
                                 <div className="flex flex-col space-y-2 ml-4">
-                                  <Button 
-                                    size="sm" 
+                                  <Button
+                                    size="sm"
                                     variant="university"
                                     onClick={() => handleViewEventRequestDetails(request.req_id)}
                                     disabled={loadingEventRequestDetails}
@@ -1593,7 +1593,7 @@ const AdminDashboard = () => {
                             </Card>
                           ))}
                         </div>
-                        
+
                         {/* Pagination for Event Requests */}
                         {filteredRequests.length > itemsPerPage && (
                           <div className="flex items-center justify-between mt-6">
@@ -1603,21 +1603,21 @@ const AdminDashboard = () => {
                             <Pagination>
                               <PaginationContent>
                                 <PaginationItem>
-                                  <PaginationPrevious 
+                                  <PaginationPrevious
                                     onClick={() => setEventRequestsCurrentPage(prev => Math.max(1, prev - 1))}
                                     className={eventRequestsCurrentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
                                   />
                                 </PaginationItem>
                                 {Array.from({ length: Math.ceil(filteredRequests.length / itemsPerPage) }, (_, i) => i + 1)
                                   .filter(page => {
-                                    return page === 1 || 
-                                           page === Math.ceil(filteredRequests.length / itemsPerPage) ||
-                                           (page >= eventRequestsCurrentPage - 1 && page <= eventRequestsCurrentPage + 1);
+                                    return page === 1 ||
+                                      page === Math.ceil(filteredRequests.length / itemsPerPage) ||
+                                      (page >= eventRequestsCurrentPage - 1 && page <= eventRequestsCurrentPage + 1);
                                   })
                                   .map((page, idx, array) => {
                                     const prevPage = array[idx - 1];
                                     const showEllipsisBefore = prevPage && page - prevPage > 1;
-                                    
+
                                     return (
                                       <React.Fragment key={page}>
                                         {showEllipsisBefore && (
@@ -1638,7 +1638,7 @@ const AdminDashboard = () => {
                                     );
                                   })}
                                 <PaginationItem>
-                                  <PaginationNext 
+                                  <PaginationNext
                                     onClick={() => setEventRequestsCurrentPage(prev => Math.min(Math.ceil(filteredRequests.length / itemsPerPage), prev + 1))}
                                     className={eventRequestsCurrentPage >= Math.ceil(filteredRequests.length / itemsPerPage) ? "pointer-events-none opacity-50" : "cursor-pointer"}
                                   />
@@ -1793,14 +1793,14 @@ const AdminDashboard = () => {
               <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-semibold text-university-navy">All Societies</h2>
                 <div className="flex space-x-2">
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     onClick={getAllSocieties}
                     disabled={loading}
                   >
                     {loading ? "Loading..." : "Refresh"}
                   </Button>
-                  <Button 
+                  <Button
                     variant="university"
                     onClick={() => navigate("/society/register", { state: { returnTo: "/dashboard/admin" } })}
                   >
@@ -1874,10 +1874,10 @@ const AdminDashboard = () => {
               {/* Empty State */}
               {!studentsLoading && allStudents.length === 0 && !error && (
                 <div className="text-center py-8">
-                <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                   <h3 className="text-lg font-medium mb-2">No Students Found</h3>
                   <p className="text-muted-foreground">No students have been registered yet.</p>
-              </div>
+                </div>
               )}
             </TabsContent>
 
@@ -1998,15 +1998,15 @@ const AdminDashboard = () => {
                 <Button variant="outline" onClick={handleCloseModal}>
                   Cancel
                 </Button>
-                <Button 
-                  variant="destructive" 
+                <Button
+                  variant="destructive"
                   onClick={() => handleReject(selectedSociety.id)}
                 >
                   <XCircle className="h-4 w-4 mr-2" />
                   Reject Application
                 </Button>
-                <Button 
-                  variant="university" 
+                <Button
+                  variant="university"
                   onClick={() => handleApprove(selectedSociety.id)}
                 >
                   <CheckCircle className="h-4 w-4 mr-2" />
@@ -2223,7 +2223,7 @@ const AdminDashboard = () => {
                 <Button variant="outline" onClick={() => setIsSocietyDetailModalOpen(false)}>
                   Close
                 </Button>
-                <Button 
+                <Button
                   variant="destructive"
                   onClick={() => {
                     setConfirmDialog({
@@ -2513,10 +2513,10 @@ const AdminDashboard = () => {
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Sponsor Amount:</span>
                         <span className="font-medium text-green-600">
-                          {typeof selectedEventRequest.sponsor_amount === 'string' 
+                          {typeof selectedEventRequest.sponsor_amount === 'string'
                             ? (selectedEventRequest.sponsor_amount.startsWith('PKR') || selectedEventRequest.sponsor_amount.startsWith('$')
-                                ? selectedEventRequest.sponsor_amount.replace(/^\$/, 'PKR ')
-                                : `PKR ${selectedEventRequest.sponsor_amount}`)
+                              ? selectedEventRequest.sponsor_amount.replace(/^\$/, 'PKR ')
+                              : `PKR ${selectedEventRequest.sponsor_amount}`)
                             : `PKR ${selectedEventRequest.sponsor_amount}`}
                         </span>
                       </div>
@@ -2598,54 +2598,54 @@ const AdminDashboard = () => {
               {/* Participants: Students */}
               {Array.isArray(selectedEventRequest.student_participants) &&
                 selectedEventRequest.student_participants.length > 0 && (
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-3 text-university-navy">Student Participants</h3>
-                  <div className="space-y-2 text-sm">
-                    {selectedEventRequest.student_participants.map((s: any, idx: number) => (
-                      <div
-                        key={idx}
-                        className="flex flex-wrap justify-between border-b last:border-0 pb-2 last:pb-0"
-                      >
-                        <span className="font-medium">
-                          {s.academic_program || "Program not specified"}
-                        </span>
-                        <span className="text-muted-foreground">
-                          {s.semester && `Semester: ${s.semester} • `}
-                          {typeof s.no_of_students === "number" && s.no_of_students > 0
-                            ? `${s.no_of_students} students`
-                            : "Count not specified"}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              )}
+                  <Card className="p-4">
+                    <h3 className="font-semibold mb-3 text-university-navy">Student Participants</h3>
+                    <div className="space-y-2 text-sm">
+                      {selectedEventRequest.student_participants.map((s: any, idx: number) => (
+                        <div
+                          key={idx}
+                          className="flex flex-wrap justify-between border-b last:border-0 pb-2 last:pb-0"
+                        >
+                          <span className="font-medium">
+                            {s.academic_program || "Program not specified"}
+                          </span>
+                          <span className="text-muted-foreground">
+                            {s.semester && `Semester: ${s.semester} • `}
+                            {typeof s.no_of_students === "number" && s.no_of_students > 0
+                              ? `${s.no_of_students} students`
+                              : "Count not specified"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
 
               {/* Participants: Staff */}
               {Array.isArray(selectedEventRequest.staff_participants) &&
                 selectedEventRequest.staff_participants.length > 0 && (
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-3 text-university-navy">Staff Participants</h3>
-                  <div className="space-y-2 text-sm">
-                    {selectedEventRequest.staff_participants.map((s: any, idx: number) => (
-                      <div
-                        key={idx}
-                        className="flex flex-wrap justify-between border-b last:border-0 pb-2 last:pb-0"
-                      >
-                        <span className="font-medium">
-                          {s.department || "Department not specified"}
-                        </span>
-                        <span className="text-muted-foreground">
-                          {s.gazetted || "Category not specified"} •{" "}
-                          {typeof s.no_of_staff === "number" && s.no_of_staff > 0
-                            ? `${s.no_of_staff} staff`
-                            : "Count not specified"}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              )}
+                  <Card className="p-4">
+                    <h3 className="font-semibold mb-3 text-university-navy">Staff Participants</h3>
+                    <div className="space-y-2 text-sm">
+                      {selectedEventRequest.staff_participants.map((s: any, idx: number) => (
+                        <div
+                          key={idx}
+                          className="flex flex-wrap justify-between border-b last:border-0 pb-2 last:pb-0"
+                        >
+                          <span className="font-medium">
+                            {s.department || "Department not specified"}
+                          </span>
+                          <span className="text-muted-foreground">
+                            {s.gazetted || "Category not specified"} •{" "}
+                            {typeof s.no_of_staff === "number" && s.no_of_staff > 0
+                              ? `${s.no_of_staff} staff`
+                              : "Count not specified"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
 
               {/* Management Requirements */}
               {selectedEventRequest.management_requirements && (
@@ -2724,129 +2724,129 @@ const AdminDashboard = () => {
               {/* Transport Requests */}
               {Array.isArray(selectedEventRequest.transport_requests) &&
                 selectedEventRequest.transport_requests.length > 0 && (
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-3 text-university-navy">Transport Requests</h3>
-                  <div className="space-y-2 text-sm">
-                    {selectedEventRequest.transport_requests.map((t: any, idx: number) => (
-                      <div
-                        key={idx}
-                        className="border rounded p-2 flex flex-wrap justify-between gap-2"
-                      >
-                        <div>
-                          <p className="font-medium">{t.vehicle_type || "Vehicle not specified"}</p>
-                          <p className="text-muted-foreground">
-                            {t.purpose || "Purpose not specified"}
-                          </p>
+                  <Card className="p-4">
+                    <h3 className="font-semibold mb-3 text-university-navy">Transport Requests</h3>
+                    <div className="space-y-2 text-sm">
+                      {selectedEventRequest.transport_requests.map((t: any, idx: number) => (
+                        <div
+                          key={idx}
+                          className="border rounded p-2 flex flex-wrap justify-between gap-2"
+                        >
+                          <div>
+                            <p className="font-medium">{t.vehicle_type || "Vehicle not specified"}</p>
+                            <p className="text-muted-foreground">
+                              {t.purpose || "Purpose not specified"}
+                            </p>
+                          </div>
+                          <div className="text-right text-xs text-muted-foreground">
+                            {t.date && <div>📅 {new Date(t.date).toLocaleDateString()}</div>}
+                            {t.time && <div>🕐 {t.time}</div>}
+                            {t.destination && <div>📍 {t.destination}</div>}
+                            {typeof t.no_of_persons === "number" && t.no_of_persons > 0 && (
+                              <div>👥 {t.no_of_persons} persons</div>
+                            )}
+                          </div>
                         </div>
-                        <div className="text-right text-xs text-muted-foreground">
-                          {t.date && <div>📅 {new Date(t.date).toLocaleDateString()}</div>}
-                          {t.time && <div>🕐 {t.time}</div>}
-                          {t.destination && <div>📍 {t.destination}</div>}
-                          {typeof t.no_of_persons === "number" && t.no_of_persons > 0 && (
-                            <div>👥 {t.no_of_persons} persons</div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              )}
+                      ))}
+                    </div>
+                  </Card>
+                )}
 
               {/* Documents */}
               {Array.isArray(selectedEventRequest.documents) &&
                 selectedEventRequest.documents.length > 0 && (
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-3 text-university-navy">Attached Documents</h3>
-                  <div className="space-y-2 text-sm">
-                    {selectedEventRequest.documents.map((doc: any) => (
-                      <div
-                        key={doc.doc_id}
-                        className="flex items-center justify-between border-b last:border-0 pb-2 last:pb-0"
-                      >
-                        <span>
-                          <span className="font-medium capitalize">{doc.doc_type}</span>
-                          {" – "}
-                          {doc.file_path.split("/").pop()}
-                        </span>
-                        <a
-                          href={`${import.meta.env.VITE_API_URL}${doc.file_path}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-blue-600 hover:underline"
+                  <Card className="p-4">
+                    <h3 className="font-semibold mb-3 text-university-navy">Attached Documents</h3>
+                    <div className="space-y-2 text-sm">
+                      {selectedEventRequest.documents.map((doc: any) => (
+                        <div
+                          key={doc.doc_id}
+                          className="flex items-center justify-between border-b last:border-0 pb-2 last:pb-0"
                         >
-                          View
-                        </a>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              )}
+                          <span>
+                            <span className="font-medium capitalize">{doc.doc_type}</span>
+                            {" – "}
+                            {doc.file_path.split("/").pop()}
+                          </span>
+                          <a
+                            href={`${import.meta.env.VITE_API_URL}${doc.file_path}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-blue-600 hover:underline"
+                          >
+                            View
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
 
               {/* Admin Notes from History - Grouped by Role */}
               {Array.isArray(selectedEventRequest.status_history) &&
                 selectedEventRequest.status_history.length > 0 && (
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-4 text-university-navy">Admin Notes & Status History</h3>
-                  <div className="space-y-6">
-                    {/* Group notes by role */}
-                    {(() => {
-                      const notesByRole: { [key: string]: any[] } = {};
-                      selectedEventRequest.status_history
-                        .filter((h: any) => h.note && h.note.trim() !== "")
-                        .forEach((history: any) => {
-                          const role = history.role || history.role_display_name || history.role_name || "Admin";
-                          if (!notesByRole[role]) {
-                            notesByRole[role] = [];
-                          }
-                          notesByRole[role].push(history);
+                  <Card className="p-4">
+                    <h3 className="font-semibold mb-4 text-university-navy">Admin Notes & Status History</h3>
+                    <div className="space-y-6">
+                      {/* Group notes by role */}
+                      {(() => {
+                        const notesByRole: { [key: string]: any[] } = {};
+                        selectedEventRequest.status_history
+                          .filter((h: any) => h.note && h.note.trim() !== "")
+                          .forEach((history: any) => {
+                            const role = history.role || history.role_display_name || history.role_name || "Admin";
+                            if (!notesByRole[role]) {
+                              notesByRole[role] = [];
+                            }
+                            notesByRole[role].push(history);
+                          });
+
+                        const roleOrder = ["Board Secretary", "Board President", "Registrar", "VC", "Transport Office", "Protocol Office"];
+                        const sortedRoles = Object.keys(notesByRole).sort((a, b) => {
+                          const aIndex = roleOrder.indexOf(a);
+                          const bIndex = roleOrder.indexOf(b);
+                          if (aIndex === -1 && bIndex === -1) return a.localeCompare(b);
+                          if (aIndex === -1) return 1;
+                          if (bIndex === -1) return -1;
+                          return aIndex - bIndex;
                         });
 
-                      const roleOrder = ["Board Secretary", "Board President", "Registrar", "VC", "Transport Office", "Protocol Office"];
-                      const sortedRoles = Object.keys(notesByRole).sort((a, b) => {
-                        const aIndex = roleOrder.indexOf(a);
-                        const bIndex = roleOrder.indexOf(b);
-                        if (aIndex === -1 && bIndex === -1) return a.localeCompare(b);
-                        if (aIndex === -1) return 1;
-                        if (bIndex === -1) return -1;
-                        return aIndex - bIndex;
-                      });
+                        if (sortedRoles.length === 0) {
+                          return <p className="text-sm text-muted-foreground italic">No admin notes yet.</p>;
+                        }
 
-                      if (sortedRoles.length === 0) {
-                        return <p className="text-sm text-muted-foreground italic">No admin notes yet.</p>;
-                      }
-
-                      return sortedRoles.map((role) => (
-                        <div key={role} className="space-y-3">
-                          <h4 className="font-semibold text-sm text-university-navy border-b pb-2">
-                            {role} Notes
-                          </h4>
-                          {notesByRole[role].map((history: any, idx: number) => (
-                            <div
-                              key={history.history_id || idx}
-                              className="border-l-4 border-blue-500 pl-4 py-2 bg-blue-50 rounded-r"
-                            >
-                              <div className="flex items-start justify-between mb-2">
-                                <div>
-                                  <p className="text-xs text-muted-foreground">
-                                    {history.firstName && history.lastName
-                                      ? `${history.firstName} ${history.lastName}`
-                                      : "Unknown"}
-                                    {history.status_name && ` • ${history.status_name}`}
-                                  </p>
+                        return sortedRoles.map((role) => (
+                          <div key={role} className="space-y-3">
+                            <h4 className="font-semibold text-sm text-university-navy border-b pb-2">
+                              {role} Notes
+                            </h4>
+                            {notesByRole[role].map((history: any, idx: number) => (
+                              <div
+                                key={history.history_id || idx}
+                                className="border-l-4 border-blue-500 pl-4 py-2 bg-blue-50 rounded-r"
+                              >
+                                <div className="flex items-start justify-between mb-2">
+                                  <div>
+                                    <p className="text-xs text-muted-foreground">
+                                      {history.firstName && history.lastName
+                                        ? `${history.firstName} ${history.lastName}`
+                                        : role}
+                                      {history.status_name && ` • ${history.status_name}`}
+                                    </p>
+                                  </div>
+                                  <span className="text-xs text-muted-foreground">
+                                    {new Date(history.changed_at).toLocaleString()}
+                                  </span>
                                 </div>
-                                <span className="text-xs text-muted-foreground">
-                                  {new Date(history.changed_at).toLocaleString()}
-                                </span>
+                                <p className="text-sm text-gray-700 mt-1">{history.note}</p>
                               </div>
-                              <p className="text-sm text-gray-700 mt-1">{history.note}</p>
-                            </div>
-                          ))}
-                        </div>
-                      ));
-                    })()}
-                  </div>
-                </Card>
-              )}
+                            ))}
+                          </div>
+                        ));
+                      })()}
+                    </div>
+                  </Card>
+                )}
             </div>
           ) : null}
           <div className="flex justify-end space-x-2 pt-4">

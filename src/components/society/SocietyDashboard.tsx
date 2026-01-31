@@ -1280,7 +1280,7 @@ const SocietyDashboard = () => {
 
                 <Card className="p-4 md:p-6 shadow-card">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-semibold text-university-navy text-sm md:text-base">Upcoming Events</h3>
+                    <h3 className="font-semibold text-university-navy text-sm md:text-base">Approved Events</h3>
                     <Button variant="outline" size="sm" onClick={() => setActiveTab("events")}>
                       View All
                     </Button>
@@ -1290,18 +1290,19 @@ const SocietyDashboard = () => {
                       <div className="text-center py-4">
                         <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-university-navy mx-auto"></div>
                       </div>
-                    ) : events.filter(e => new Date(e.event_date) >= new Date()).length === 0 ? (
-                      <p className="text-xs text-muted-foreground text-center py-4">No upcoming events</p>
+                    ) : events.filter(e => e.status_id === 10 && e.source_table === 'event_req').length === 0 ? (
+                      <p className="text-xs text-muted-foreground text-center py-4">No approved events</p>
                     ) : (
                       events
-                        .filter(e => new Date(e.event_date) >= new Date())
+                        .filter(e => e.status_id === 10 && e.source_table === 'event_req')
+                        .sort((a, b) => new Date(b.created_at || b.event_date).getTime() - new Date(a.created_at || a.event_date).getTime())
                         .slice(0, 3)
                         .map((event, index) => (
                           <div key={event.id || index} className="border-b pb-4 last:border-0">
                             <div className="flex items-center justify-between mb-2">
                               <h4 className="font-medium text-sm">{event.title}</h4>
                               <Badge variant="default" className="text-xs">
-                                {event.status}
+                                {event.status_name || event.status}
                               </Badge>
                             </div>
                             <p className="text-xs text-muted-foreground mb-1">
@@ -2070,28 +2071,46 @@ const SocietyDashboard = () => {
                         })()}
 
                         {post.post_type === 'poll' && post.poll_data && (
-                          <div className="space-y-3">
-                            <p className="text-muted-foreground leading-relaxed font-medium">{post.poll_data.question || post.content}</p>
+                          <div className="space-y-4 bg-gradient-to-br from-gray-50 to-white p-5 rounded-lg border border-gray-200">
+                            <div className="flex items-start space-x-3">
+                              <div className="p-2 bg-university-navy/10 rounded-lg">
+                                <BarChartIcon className="h-5 w-5 text-university-navy" />
+                              </div>
+                              <div className="flex-1">
+                                <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                                  {post.poll_data.question || post.content || "Poll"}
+                                </h3>
+                                <p className="text-sm text-muted-foreground">Cast your vote below</p>
+                              </div>
+                            </div>
                             {post.poll_data.options && post.poll_data.options.length > 0 && (() => {
                               const totalVotes = post.poll_data.options.reduce((sum: number, option: any) => sum + (option.vote_count || 0), 0);
                               const pollId = post.poll_data.poll_id || post.poll_id;
 
                               return (
-                                <div className="space-y-3">
-                                  {post.poll_data.options.map((option: any) => {
-                                    const percentage = totalVotes > 0 ? ((option.vote_count || 0) / totalVotes) * 100 : 0;
+                                <div className="space-y-3 mt-4">
+                                  {post.poll_data.options.map((option: any, index: number) => {
+                                    const voteCount = option.vote_count || 0;
+                                    const percentage = totalVotes > 0 ? (voteCount / totalVotes) * 100 : 0;
                                     const isVoted = option.user_voted || false;
+                                    const isLeading = totalVotes > 0 && voteCount === Math.max(...post.poll_data.options.map((opt: any) => opt.vote_count || 0));
 
                                     return (
                                       <div
                                         key={option.option_id}
-                                        className={`relative cursor-pointer rounded-lg border-2 p-3 transition-all duration-200 hover:bg-gray-50 ${isVoted ? 'border-university-navy bg-university-navy/5' : 'border-gray-200 hover:border-gray-300'
-                                          }`}
+                                        className={`relative cursor-pointer rounded-xl border-2 p-4 transition-all duration-300 ${
+                                          isVoted 
+                                            ? 'border-university-navy bg-university-navy/10 shadow-md hover:shadow-lg' 
+                                            : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
+                                        } ${isLeading && totalVotes > 0 ? 'ring-2 ring-university-gold/30' : ''}`}
                                         onClick={() => {
                                           const handlePollVote = async (postId: number, optionId: number, pollId: number) => {
                                             try {
                                               const token = localStorage.getItem("token");
-                                              if (!token) return;
+                                              if (!token) {
+                                                toast.error("Please login to vote");
+                                                return;
+                                              }
 
                                               const response = await axios.post(
                                                 `${import.meta.env.VITE_API_URL}/user/poll/vote`,
@@ -2105,8 +2124,6 @@ const SocietyDashboard = () => {
                                               );
 
                                               if (response.data.success && societyInfo?.society_id) {
-                                                const user = JSON.parse(localStorage.getItem("user") || "{}");
-                                                const userId = user.id || user.user_id;
                                                 fetchSocietyPosts(societyInfo.society_id);
                                                 toast.success("Vote submitted successfully");
                                               } else {
@@ -2120,38 +2137,78 @@ const SocietyDashboard = () => {
                                           handlePollVote(post.post_id, option.option_id, pollId);
                                         }}
                                       >
-                                        <div className="flex items-center justify-between mb-2">
-                                          <span className={`font-medium ${isVoted ? 'text-university-navy' : 'text-gray-900'}`}>
-                                            {option.option_text}
-                                          </span>
-                                          <div className="flex items-center space-x-2">
-                                            <span className="text-sm text-muted-foreground">
-                                              {option.vote_count || 0} {option.vote_count === 1 ? 'vote' : 'votes'}
+                                        <div className="flex items-center justify-between mb-3">
+                                          <div className="flex items-center space-x-3 flex-1">
+                                            <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-semibold text-sm ${
+                                              isVoted 
+                                                ? 'bg-university-navy text-white' 
+                                                : 'bg-gray-100 text-gray-600'
+                                            }`}>
+                                              {String.fromCharCode(65 + index)}
+                                            </div>
+                                            <span className={`font-medium text-base flex-1 ${
+                                              isVoted ? 'text-university-navy' : 'text-gray-900'
+                                            }`}>
+                                              {option.option_text}
                                             </span>
+                                          </div>
+                                          <div className="flex items-center space-x-3 ml-4">
+                                            {isLeading && totalVotes > 0 && (
+                                              <Badge variant="outline" className="bg-university-gold/10 text-university-gold border-university-gold/30">
+                                                Leading
+                                              </Badge>
+                                            )}
+                                            <div className="text-right">
+                                              <div className={`text-sm font-semibold ${isVoted ? 'text-university-navy' : 'text-gray-700'}`}>
+                                                {percentage.toFixed(1)}%
+                                              </div>
+                                              <div className="text-xs text-muted-foreground">
+                                                {voteCount} {voteCount === 1 ? 'vote' : 'votes'}
+                                              </div>
+                                            </div>
                                             {isVoted && (
-                                              <div className="w-2 h-2 bg-university-navy rounded-full"></div>
+                                              <div className="flex-shrink-0">
+                                                <CheckCircle className="h-5 w-5 text-university-navy" />
+                                              </div>
                                             )}
                                           </div>
                                         </div>
                                         <div className="relative">
-                                          <Progress
-                                            value={percentage}
-                                            className={`h-2 ${isVoted ? '[&>div]:bg-university-navy' : '[&>div]:bg-gray-300'}`}
-                                          />
+                                          <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                                            <div
+                                              className={`h-full rounded-full transition-all duration-500 ${
+                                                isVoted 
+                                                  ? 'bg-university-navy' 
+                                                  : 'bg-gradient-to-r from-gray-300 to-gray-400'
+                                              }`}
+                                              style={{ width: `${percentage}%` }}
+                                            />
+                                          </div>
                                         </div>
                                       </div>
                                     );
                                   })}
-                                  <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
-                                    <div className="flex items-center space-x-2">
-                                      <BarChartIcon className="h-3 w-3" />
-                                      <span>{totalVotes} {totalVotes === 1 ? 'total vote' : 'total votes'}</span>
+                                  <div className="flex items-center justify-between pt-4 mt-4 border-t border-gray-200">
+                                    <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                                      <BarChartIcon className="h-4 w-4" />
+                                      <span className="font-medium">
+                                        {totalVotes} {totalVotes === 1 ? 'total vote' : 'total votes'}
+                                      </span>
                                     </div>
-                                    <span>{post.poll_data.options.length} {post.poll_data.options.length === 1 ? 'option' : 'options'}</span>
+                                    <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                                      <span>{post.poll_data.options.length} {post.poll_data.options.length === 1 ? 'option' : 'options'}</span>
+                                    </div>
                                   </div>
                                 </div>
                               );
                             })()}
+                            
+                            {(!post.poll_data.options || post.poll_data.options.length === 0) && (
+                              <div className="text-center py-8 text-muted-foreground">
+                                <BarChartIcon className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                                <p>No poll options available</p>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -2212,8 +2269,20 @@ const SocietyDashboard = () => {
                       <div className="flex items-start justify-between mb-3">
                         <h3 className="font-semibold text-lg text-university-navy flex-1">{event.title}</h3>
                         <Badge
-                          variant={event.status_id === 11 ? "default" : event.status_id === 10 ? "secondary" : "outline"}
-                          className="text-xs"
+                          variant={
+                            event.status_id === 12 ? "default" : 
+                            event.status_id === 13 ? "secondary" : 
+                            event.status_id === 11 ? "default" : 
+                            event.status_id === 10 ? "default" : 
+                            "outline"
+                          }
+                          className={`text-xs ${
+                            event.status_id === 12 ? "bg-green-100 text-green-800" :
+                            event.status_id === 13 ? "bg-yellow-100 text-yellow-800" :
+                            event.status_id === 11 ? "bg-purple-100 text-purple-800" :
+                            event.status_id === 10 ? "bg-blue-100 text-blue-800" :
+                            ""
+                          }`}
                         >
                           {event.status_name || event.status}
                         </Badge>
@@ -2244,8 +2313,8 @@ const SocietyDashboard = () => {
                           </div>
                         )}
                       </div>
-                      {/* Mark as Complete Button - Only show for Active events (status_id = 10) */}
-                      {event.status_id === 10 && event.source_table === 'event_req' && (
+                      {/* Mark as Complete Button - Only show for Approved events (status_id = 10) */}
+                      {event.status_id === 10 && event.source_table === 'event_req' && isAdvisor() && (
                         <Button
                           variant="university"
                           size="sm"
@@ -2272,8 +2341,8 @@ const SocietyDashboard = () => {
                               );
 
                               if (response.data.success) {
-                                toast.success("Event marked as completed. Report pending.");
-                                fetchEvents(); // Refresh events list
+                                toast.success("Event marked as completed. Report missing.");
+                                fetchSocietyEvents(societyInfo?.society_id); // Refresh events list
                               } else {
                                 toast.error(response.data.message || "Failed to mark event as complete");
                               }
@@ -2299,8 +2368,8 @@ const SocietyDashboard = () => {
                           )}
                         </Button>
                       )}
-                      {/* Submit Report Button - Only show for Completed events (status_id = 17) */}
-                      {event.status_id === 17 && event.source_table === 'event_req' && (
+                      {/* Upload Report Button - Only show for Report Missing events (status_id = 13) */}
+                      {event.status_id === 13 && event.source_table === 'event_req' && isAdvisor() && (
                         <Button
                           variant="outline"
                           size="sm"
@@ -2310,22 +2379,29 @@ const SocietyDashboard = () => {
                             setIsReportUploadOpen(true);
                           }}
                         >
-                          <FileText className="h-4 w-4 mr-2" />
-                          Submit Report
+                          <Upload className="h-4 w-4 mr-2" />
+                          Upload Report
                         </Button>
                       )}
-                      {/* Report Submitted - Show for status_id = 11 */}
+                      {/* Complete - Show for status_id = 11 */}
                       {event.status_id === 11 && (
+                        <div className="flex items-center justify-center text-sm text-purple-600 bg-purple-50 rounded-lg p-2">
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          Complete
+                        </div>
+                      )}
+                      {/* Report Submitted - Show for status_id = 12 */}
+                      {event.status_id === 12 && (
                         <div className="flex items-center justify-center text-sm text-green-600 bg-green-50 rounded-lg p-2">
                           <CheckCircle className="h-4 w-4 mr-2" />
                           Report Submitted
                         </div>
                       )}
-                      {/* Completed with Report Pending - Show for status_id = 17 */}
-                      {event.status_id === 17 && (
+                      {/* Report Missing - Show for status_id = 13 */}
+                      {event.status_id === 13 && !isAdvisor() && (
                         <div className="flex items-center justify-center text-sm text-yellow-600 bg-yellow-50 rounded-lg p-2">
                           <AlertCircle className="h-4 w-4 mr-2" />
-                          Completed - Report Pending
+                          Report Missing
                         </div>
                       )}
                     </Card>

@@ -82,7 +82,7 @@ const ProtocolOfficeDashboard = () => {
   const [eventRequestStats, setEventRequestStats] = useState({
     total: 0,
     pending: 0,
-    approved: 0,
+    granted: 0,
     rejected: 0
   });
   const [statsLoading, setStatsLoading] = useState(false);
@@ -262,7 +262,7 @@ const ProtocolOfficeDashboard = () => {
     }
   };
 
-  // Fetch event request stats
+  // Fetch protocol office stats (based on slot status)
   const fetchEventRequestStats = async () => {
     try {
       const API_URL = import.meta.env.VITE_API_URL;
@@ -272,15 +272,13 @@ const ProtocolOfficeDashboard = () => {
         throw new Error("No authentication token found");
       }
 
-      const response = await axios.post(`${API_URL}/admin/event-requests/stats`, {
-        role: "protocol_office_view"
-      }, {
+      const response = await axios.get(`${API_URL}/admin/protocol/stats`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      setEventRequestStats(response.data.data || { total: 0, pending: 0, approved: 0, rejected: 0 });
+      setEventRequestStats(response.data.data || { total: 0, pending: 0, granted: 0, rejected: 0 });
     } catch (err) {
-      console.error("Error fetching event request stats:", err);
+      console.error("Error fetching protocol stats:", err);
     } finally {
       setStatsLoading(false);
     }
@@ -527,12 +525,12 @@ const ProtocolOfficeDashboard = () => {
             <Card className="p-6 shadow-card">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Approved</p>
+                  <p className="text-sm text-muted-foreground">Granted</p>
                   <p className="text-2xl font-bold text-university-navy">
-                    {statsLoading ? "..." : eventRequestStats.approved}
+                    {statsLoading ? "..." : eventRequestStats.granted}
                   </p>
                 </div>
-                <FileText className="h-8 w-8 text-green-600" />
+                <CheckCircle className="h-8 w-8 text-green-600" />
               </div>
             </Card>
 
@@ -681,7 +679,7 @@ const ProtocolOfficeDashboard = () => {
                               )}
                               {request.event_status_id && (
                                 <Badge variant={getStatusVariant(request.event_status_id)}>
-                                  Event: {request.status_name || "Pending"}
+                                  Event: {request.event_status_name || request.status_name || "Pending"}
                                 </Badge>
                               )}
                               {request.society_name && (

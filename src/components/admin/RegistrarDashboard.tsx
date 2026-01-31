@@ -5,12 +5,18 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AdminEventReportsSection from "@/components/admin/AdminEventReportsSection";
-import { 
-  Users, 
-  Building, 
-  Calendar, 
+import {
+  Users,
+  Building,
+  Calendar,
   CheckCircle,
   XCircle,
   Eye,
@@ -24,7 +30,8 @@ import {
   Search,
   TrendingUp,
   Edit,
-  MapPin
+  MapPin,
+  MoreVertical
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -38,6 +45,7 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { useToast } from "@/components/ui/use-toast";
+import { formatTimeToAMPM } from "@/lib/utils";
 
 interface Society {
   society_id: number;
@@ -108,7 +116,7 @@ const RegistrarDashboard = () => {
   });
   const [statsLoading, setStatsLoading] = useState(false);
   const [eventRequestFilter, setEventRequestFilter] = useState<string>("all"); // all, pending, approved, rejected
-  
+
   // Pagination states
   const [societiesCurrentPage, setSocietiesCurrentPage] = useState(1);
   const [eventRequestsCurrentPage, setEventRequestsCurrentPage] = useState(1);
@@ -162,13 +170,13 @@ const RegistrarDashboard = () => {
   // Fetch all societies
   const fetchAllSocieties = async () => {
     try {
-       const API_URL = import.meta.env.VITE_API_URL;
+      const API_URL = import.meta.env.VITE_API_URL;
       setLoading(true);
       setError("");
-  
+
       const token = localStorage.getItem("token");
       if (!token) throw new Error("No authentication token found");
-  
+
       const response = await axios.post(
         `${API_URL}/admin/societies-by-role`,
         { role: "registrar" },
@@ -178,7 +186,7 @@ const RegistrarDashboard = () => {
           },
         }
       );
-  
+
       console.log("Societies for VC fetched:", response.data);
       setSocieties(response.data.societies || []);
     } catch (err: any) {
@@ -188,12 +196,12 @@ const RegistrarDashboard = () => {
       setLoading(false);
     }
   };
-  
+
   // Fetch all statuses
   // Fetch allowed statuses for Registrar based on current status
   const fetchStatuses = async (currentStatusId: number = 4) => {
     try {
-       const API_URL = import.meta.env.VITE_API_URL;
+      const API_URL = import.meta.env.VITE_API_URL;
       const token = localStorage.getItem("token");
       if (!token) return;
 
@@ -211,10 +219,10 @@ const RegistrarDashboard = () => {
   // Handle society review/detail view
   const handleViewDetails = async (society: Society) => {
     try {
-       const API_URL = import.meta.env.VITE_API_URL;
+      const API_URL = import.meta.env.VITE_API_URL;
       setLoading(true);
       const token = localStorage.getItem("token");
-      
+
       // Fetch detailed society information
       const response = await axios.get(`${API_URL}/admin/societies/${society.society_id}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -223,7 +231,7 @@ const RegistrarDashboard = () => {
       setSelectedSociety(response.data.data);
       setIsModalOpen(true);
       setReviewNote("");
-      
+
       // Fetch allowed statuses based on the society's current status
       await fetchStatuses(society.status_id);
     } catch (err: any) {
@@ -249,7 +257,7 @@ const RegistrarDashboard = () => {
     if (!selectedSociety || !selectedStatus) return;
 
     try {
-      const API_URL = import.meta.env.VITE_API_URL; 
+      const API_URL = import.meta.env.VITE_API_URL;
       setActionLoading(true);
       const token = localStorage.getItem("token");
       const currentUser = getCurrentUser();
@@ -277,23 +285,23 @@ const RegistrarDashboard = () => {
       );
 
       console.log("Status updated successfully:", response.data);
-      
+
       // Refresh the societies list
       await fetchAllSocieties();
-      
+
       // Close modal
       setIsStatusModalOpen(false);
       setSelectedSociety(null);
       setSelectedStatus(0);
       setStatusNote("");
-      
+
       // Show success toast
       toast({
         title: "Success",
         description: "Society status updated successfully!",
         variant: "default",
       });
-      
+
     } catch (err: any) {
       console.error("Error updating status:", err);
       toast({
@@ -333,7 +341,7 @@ const RegistrarDashboard = () => {
     // Search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(s => 
+      filtered = filtered.filter(s =>
         s.name.toLowerCase().includes(query) ||
         s.description.toLowerCase().includes(query) ||
         s.category.toLowerCase().includes(query) ||
@@ -348,20 +356,20 @@ const RegistrarDashboard = () => {
   // Fetch all event requests
   const fetchAllEventRequests = async () => {
     try {
-       const API_URL = import.meta.env.VITE_API_URL;
+      const API_URL = import.meta.env.VITE_API_URL;
       setLoadingEventRequests(true);
       setError("");
-  
+
       const currentUser = getCurrentUser();
       const token = localStorage.getItem("token");
-  
+
       if (!token) {
         throw new Error("No authentication token found");
       }
-  
+
       const response = await axios.post(
         `${API_URL}/admin/event-requests`,  // ✅ POST
-        { 
+        {
           role: currentUser?.role || "registrar",
           filter: eventRequestFilter
         },                   // ✅ send role in body
@@ -371,7 +379,7 @@ const RegistrarDashboard = () => {
           },
         }
       );
-  
+
       console.log("Event requests fetched:", response.data);
       setEventRequests(response.data.data || []);
       setEventRequestsCurrentPage(1); // Reset to first page when data changes
@@ -382,14 +390,14 @@ const RegistrarDashboard = () => {
       setLoadingEventRequests(false);
     }
   };
-  
+
   // Handle view event request details
   const handleViewEventRequest = async (reqId: number) => {
     try {
-       const API_URL = import.meta.env.VITE_API_URL;
+      const API_URL = import.meta.env.VITE_API_URL;
       setLoading(true);
       const token = localStorage.getItem("token");
-      
+
       const response = await axios.get(`${API_URL}/admin/event-requests/${reqId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -446,7 +454,7 @@ const RegistrarDashboard = () => {
     if (!selectedEventRequest || !selectedEventStatus) return;
 
     try {
-       const API_URL = import.meta.env.VITE_API_URL;
+      const API_URL = import.meta.env.VITE_API_URL;
       setActionLoading(true);
       const token = localStorage.getItem("token");
       const currentUser = getCurrentUser();
@@ -476,23 +484,23 @@ const RegistrarDashboard = () => {
       );
 
       console.log("Event request status updated successfully:", response.data);
-      
+
       // Refresh the event requests list
       await fetchAllEventRequests();
-      
+
       // Close modal
       setIsEventStatusModalOpen(false);
       setSelectedEventRequest(null);
       setSelectedEventStatus(0);
       setEventStatusNote("");
-      
+
       // Show success toast
       toast({
         title: "Success",
         description: "Event request status updated successfully!",
         variant: "default",
       });
-      
+
     } catch (err: any) {
       console.error("Error updating event request status:", err);
       toast({
@@ -555,9 +563,9 @@ const RegistrarDashboard = () => {
               <p className="text-white/80">Complete Society Management System</p>
             </div>
             <div className="flex items-center space-x-3">
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 className="text-white border-white hover:bg-white/20 bg-transparent"
                 onClick={handleLogout}
               >
@@ -573,13 +581,13 @@ const RegistrarDashboard = () => {
       <section className="py-8 px-4">
         <div className="container mx-auto max-w-7xl">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2">
-            {/* Societies/Overview tabs hidden as per latest requirements */}
-            {/* <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2">
+              {/* Societies/Overview tabs hidden as per latest requirements */}
+              {/* <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="societies">All Societies</TabsTrigger> */}
-            <TabsTrigger value="event-requests">Event Requests</TabsTrigger>
-            <TabsTrigger value="event-reports">Event Reports</TabsTrigger>
-          </TabsList>
+              <TabsTrigger value="event-requests">Event Requests</TabsTrigger>
+              <TabsTrigger value="event-reports">Event Reports</TabsTrigger>
+            </TabsList>
 
             {/* Overview content kept for reference but no longer reachable */}
             <TabsContent value="overview" className="space-y-6">
@@ -630,8 +638,8 @@ const RegistrarDashboard = () => {
               <Card className="p-6 shadow-card">
                 <h3 className="text-lg font-semibold mb-4 text-university-navy">Quick Actions</h3>
                 <div className="grid md:grid-cols-3 gap-4">
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     onClick={() => {
                       setStatusFilter("board_approved");
                       setActiveTab("societies");
@@ -641,7 +649,7 @@ const RegistrarDashboard = () => {
                     <Eye className="h-5 w-5 mb-2" />
                     Review Board Approved
                   </Button>
-                  <Button 
+                  <Button
                     variant="outline"
                     onClick={() => {
                       setStatusFilter("pending");
@@ -652,7 +660,7 @@ const RegistrarDashboard = () => {
                     <AlertTriangle className="h-5 w-5 mb-2" />
                     View Pending
                   </Button>
-                  <Button 
+                  <Button
                     variant="outline"
                     onClick={() => {
                       setStatusFilter("all");
@@ -687,7 +695,7 @@ const RegistrarDashboard = () => {
                       className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-university-navy"
                     />
                   </div>
-                  
+
                   {/* Status Filter */}
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
                     <SelectTrigger className="w-full md:w-[200px]">
@@ -718,8 +726,8 @@ const RegistrarDashboard = () => {
                   </Select>
 
                   {/* Refresh Button */}
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     onClick={fetchAllSocieties}
                     disabled={loading}
                   >
@@ -732,8 +740,8 @@ const RegistrarDashboard = () => {
                     Showing {societies.length} of {allSocieties.length} societies
                   </p>
                   {statusFilter !== "all" && (
-                    <Button 
-                      variant="link" 
+                    <Button
+                      variant="link"
                       size="sm"
                       onClick={() => {
                         setStatusFilter("all");
@@ -762,147 +770,147 @@ const RegistrarDashboard = () => {
                 </div>
               ) : societies.length > 0 ? (
                 <>
-                <div className="grid gap-6">
-                  {societies.slice((societiesCurrentPage - 1) * itemsPerPage, societiesCurrentPage * itemsPerPage).map((society) => (
-                    <Card key={society.society_id} className="p-6 shadow-card hover:shadow-lg transition-shadow">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start space-x-4 flex-1">
-                          <div className="w-20 h-20 bg-university-navy/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                            {society.society_logo ? (
-                              <img 
-                             src={`${import.meta.env.VITE_API_URL}/${society.society_logo}`}
+                  <div className="grid gap-6">
+                    {societies.slice((societiesCurrentPage - 1) * itemsPerPage, societiesCurrentPage * itemsPerPage).map((society) => (
+                      <Card key={society.society_id} className="p-6 shadow-card hover:shadow-lg transition-shadow">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-start space-x-4 flex-1">
+                            <div className="w-20 h-20 bg-university-navy/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                              {society.society_logo ? (
+                                <img
+                                  src={`${import.meta.env.VITE_API_URL}/${society.society_logo}`}
 
-                                alt={society.name}
-                                className="w-16 h-16 rounded-lg object-cover"
-                              />
-                            ) : (
-                              <Building className="h-10 w-10 text-university-navy" />
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center mb-2 flex-wrap gap-2">
-                              <h3 className="text-xl font-semibold text-university-navy">{society.name}</h3>
-                              <Badge 
-                                variant={
-                                  society.status_id === 6 ? 'default' :
-                                  society.status_id === 4 ? 'default' :
-                                  society.status_id === 2 ? 'default' :
-                                  society.status_id === 1 ? 'secondary' :
-                                  'destructive'
-                                }
-                                className={
-                                  society.status_id === 6 ? 'bg-green-600' :
-                                  society.status_id === 4 ? 'bg-blue-600' :
-                                  society.status_id === 2 ? 'bg-green-600' :
-                                  ''
-                                }
-                              >
-                                {society.status_name}
-                              </Badge>
-                              <Badge variant="outline">{society.category}</Badge>
-                            </div>
-                            <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
-                              {society.description}
-                            </p>
-                            <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mb-2">
-                              <span>📍 {society.location}</span>
-                              <span>👨‍🏫 {society.advisor}</span>
-                              <span>📧 {society.student_info.firstName} {society.student_info.lastName}</span>
-                            </div>
-                            <div className="flex items-center text-xs text-muted-foreground">
-                              <Clock className="h-3 w-3 mr-1" />
-                              Created: {new Date(society.created_at).toLocaleDateString()}
-                              {society.updated_at && (
-                                <> • Updated: {new Date(society.updated_at).toLocaleDateString()}</>
+                                  alt={society.name}
+                                  className="w-16 h-16 rounded-lg object-cover"
+                                />
+                              ) : (
+                                <Building className="h-10 w-10 text-university-navy" />
                               )}
                             </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center mb-2 flex-wrap gap-2">
+                                <h3 className="text-xl font-semibold text-university-navy">{society.name}</h3>
+                                <Badge
+                                  variant={
+                                    society.status_id === 6 ? 'default' :
+                                      society.status_id === 4 ? 'default' :
+                                        society.status_id === 2 ? 'default' :
+                                          society.status_id === 1 ? 'secondary' :
+                                            'destructive'
+                                  }
+                                  className={
+                                    society.status_id === 6 ? 'bg-green-600' :
+                                      society.status_id === 4 ? 'bg-blue-600' :
+                                        society.status_id === 2 ? 'bg-green-600' :
+                                          ''
+                                  }
+                                >
+                                  {society.status_name}
+                                </Badge>
+                                <Badge variant="outline">{society.category}</Badge>
+                              </div>
+                              <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
+                                {society.description}
+                              </p>
+                              <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mb-2">
+                                <span>📍 {society.location}</span>
+                                <span>👨‍🏫 {society.advisor}</span>
+                                <span>📧 {society.student_info.firstName} {society.student_info.lastName}</span>
+                              </div>
+                              <div className="flex items-center text-xs text-muted-foreground">
+                                <Clock className="h-3 w-3 mr-1" />
+                                Created: {new Date(society.created_at).toLocaleDateString()}
+                                {society.updated_at && (
+                                  <> • Updated: {new Date(society.updated_at).toLocaleDateString()}</>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                        <div className="flex flex-col space-y-2 ml-4">
-                          <Button 
-                            size="sm" 
-                            variant="university"
-                            onClick={() => handleViewDetails(society)}
-                            disabled={loading}
-                          >
-                            <Eye className="h-3 w-3 mr-1" />
-                            View Details
-                          </Button>
-                          {/* Only show Change Status button for Approved by Board President (status 4) - Registrar's pending items */}
-                          {society.status_id === 4 ? (
-                            <Button 
-                              size="sm" 
-                              variant="outline"
-                              onClick={() => handleChangeStatus(society)}
+                          <div className="flex flex-col space-y-2 ml-4">
+                            <Button
+                              size="sm"
+                              variant="university"
+                              onClick={() => handleViewDetails(society)}
                               disabled={loading}
                             >
-                              <Edit className="h-3 w-3 mr-1" />
-                              Change Status
+                              <Eye className="h-3 w-3 mr-1" />
+                              View Details
                             </Button>
-                          ) : (
-                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                              Tracked: {society.status_name}
-                            </Badge>
-                          )}
+                            {/* Only show Change Status button for Approved by Board President (status 4) - Registrar's pending items */}
+                            {society.status_id === 4 ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleChangeStatus(society)}
+                                disabled={loading}
+                              >
+                                <Edit className="h-3 w-3 mr-1" />
+                                Change Status
+                              </Button>
+                            ) : (
+                              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                Tracked: {society.status_name}
+                              </Badge>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-                
-                {/* Pagination for Societies */}
-                {societies.length > itemsPerPage && (
-                  <div className="flex items-center justify-between mt-6">
-                    <div className="text-sm text-muted-foreground">
-                      Showing {(societiesCurrentPage - 1) * itemsPerPage + 1} to {Math.min(societiesCurrentPage * itemsPerPage, societies.length)} of {societies.length} societies
-                    </div>
-                    <Pagination>
-                      <PaginationContent>
-                        <PaginationItem>
-                          <PaginationPrevious 
-                            onClick={() => setSocietiesCurrentPage(prev => Math.max(1, prev - 1))}
-                            className={societiesCurrentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                          />
-                        </PaginationItem>
-                        {Array.from({ length: Math.ceil(societies.length / itemsPerPage) }, (_, i) => i + 1)
-                          .filter(page => {
-                            return page === 1 || 
-                                   page === Math.ceil(societies.length / itemsPerPage) ||
-                                   (page >= societiesCurrentPage - 1 && page <= societiesCurrentPage + 1);
-                          })
-                          .map((page, idx, array) => {
-                            const prevPage = array[idx - 1];
-                            const showEllipsisBefore = prevPage && page - prevPage > 1;
-                            
-                            return (
-                              <React.Fragment key={page}>
-                                {showEllipsisBefore && (
-                                  <PaginationItem>
-                                    <PaginationEllipsis />
-                                  </PaginationItem>
-                                )}
-                                <PaginationItem>
-                                  <PaginationLink
-                                    onClick={() => setSocietiesCurrentPage(page)}
-                                    isActive={societiesCurrentPage === page}
-                                    className="cursor-pointer"
-                                  >
-                                    {page}
-                                  </PaginationLink>
-                                </PaginationItem>
-                              </React.Fragment>
-                            );
-                          })}
-                        <PaginationItem>
-                          <PaginationNext 
-                            onClick={() => setSocietiesCurrentPage(prev => Math.min(Math.ceil(societies.length / itemsPerPage), prev + 1))}
-                            className={societiesCurrentPage >= Math.ceil(societies.length / itemsPerPage) ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                          />
-                        </PaginationItem>
-                      </PaginationContent>
-                    </Pagination>
+                      </Card>
+                    ))}
                   </div>
-                )}
+
+                  {/* Pagination for Societies */}
+                  {societies.length > itemsPerPage && (
+                    <div className="flex items-center justify-between mt-6">
+                      <div className="text-sm text-muted-foreground">
+                        Showing {(societiesCurrentPage - 1) * itemsPerPage + 1} to {Math.min(societiesCurrentPage * itemsPerPage, societies.length)} of {societies.length} societies
+                      </div>
+                      <Pagination>
+                        <PaginationContent>
+                          <PaginationItem>
+                            <PaginationPrevious
+                              onClick={() => setSocietiesCurrentPage(prev => Math.max(1, prev - 1))}
+                              className={societiesCurrentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                            />
+                          </PaginationItem>
+                          {Array.from({ length: Math.ceil(societies.length / itemsPerPage) }, (_, i) => i + 1)
+                            .filter(page => {
+                              return page === 1 ||
+                                page === Math.ceil(societies.length / itemsPerPage) ||
+                                (page >= societiesCurrentPage - 1 && page <= societiesCurrentPage + 1);
+                            })
+                            .map((page, idx, array) => {
+                              const prevPage = array[idx - 1];
+                              const showEllipsisBefore = prevPage && page - prevPage > 1;
+
+                              return (
+                                <React.Fragment key={page}>
+                                  {showEllipsisBefore && (
+                                    <PaginationItem>
+                                      <PaginationEllipsis />
+                                    </PaginationItem>
+                                  )}
+                                  <PaginationItem>
+                                    <PaginationLink
+                                      onClick={() => setSocietiesCurrentPage(page)}
+                                      isActive={societiesCurrentPage === page}
+                                      className="cursor-pointer"
+                                    >
+                                      {page}
+                                    </PaginationLink>
+                                  </PaginationItem>
+                                </React.Fragment>
+                              );
+                            })}
+                          <PaginationItem>
+                            <PaginationNext
+                              onClick={() => setSocietiesCurrentPage(prev => Math.min(Math.ceil(societies.length / itemsPerPage), prev + 1))}
+                              className={societiesCurrentPage >= Math.ceil(societies.length / itemsPerPage) ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                            />
+                          </PaginationItem>
+                        </PaginationContent>
+                      </Pagination>
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="text-center py-12">
@@ -914,7 +922,7 @@ const RegistrarDashboard = () => {
                       : "No societies have been registered yet"}
                   </p>
                   {(searchQuery || statusFilter !== "all" || categoryFilter !== "all") && (
-                    <Button 
+                    <Button
                       variant="outline"
                       onClick={() => {
                         setSearchQuery("");
@@ -1030,154 +1038,148 @@ const RegistrarDashboard = () => {
                 </div>
               ) : eventRequests.length > 0 ? (
                 <>
-                <div className="grid gap-6">
-                  {eventRequests.slice((eventRequestsCurrentPage - 1) * itemsPerPage, eventRequestsCurrentPage * itemsPerPage).map((request: any) => (
-                    <Card key={request.req_id} className="p-6 shadow-card hover:shadow-lg transition-shadow">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start space-x-4 flex-1">
-                          <div className="w-16 h-16 bg-university-navy/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                            <Calendar className="h-8 w-8 text-university-navy" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center mb-2 flex-wrap gap-2">
-                              <h3 className="text-xl font-semibold text-university-navy">{request.title}</h3>
-                              <Badge 
-                                variant={
-                                  request.status_id === 6 ? 'default' :
-                                  request.status_id === 4 ? 'default' :
-                                  request.status_id === 2 ? 'default' :
-                                  request.status_id === 1 ? 'secondary' :
-                                  'destructive'
-                                }
-                                className={
-                                  request.status_id === 6 ? 'bg-green-600' :
-                                  request.status_id === 4 ? 'bg-blue-600' :
-                                  request.status_id === 2 ? 'bg-green-600' :
-                                  ''
-                                }
-                              >
-                                {request.status_name}
-                              </Badge>
-                              {request.society_name && (
-                                <Badge variant="outline">{request.society_name}</Badge>
-                              )}
+                  <div className="grid gap-6">
+                    {eventRequests.slice((eventRequestsCurrentPage - 1) * itemsPerPage, eventRequestsCurrentPage * itemsPerPage).map((request: any) => (
+                      <Card key={request.req_id} className="p-6 shadow-card hover:shadow-lg transition-shadow">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-start space-x-4 flex-1">
+                            <div className="w-16 h-16 bg-university-navy/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                              <Calendar className="h-8 w-8 text-university-navy" />
                             </div>
-                            <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                              {request.description}
-                            </p>
-                            <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mb-2">
-                              <span>📅 {new Date(request.event_date).toLocaleDateString()}</span>
-                              <span>🕐 {request.event_time}</span>
-                              <span>📍 {request.venue}</span>
-                              {request.firstName && request.lastName && (
-                                <span>👤 {request.firstName} {request.lastName}</span>
-                              )}
-                            </div>
-                            {request.note && (
-                              <div className="bg-blue-50 border-l-4 border-blue-200 p-2 mt-2 rounded">
-                                <p className="text-xs font-medium text-blue-900 mb-1">Note:</p>
-                                <p className="text-xs text-blue-800">{request.note}</p>
-                              </div>
-                            )}
-                            <div className="flex items-center text-xs text-muted-foreground mt-2">
-                              <Clock className="h-3 w-3 mr-1" />
-                              Created: {new Date(request.created_at).toLocaleString()}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex flex-col space-y-2 ml-4">
-                          <Button 
-                            size="sm" 
-                            variant="university"
-                            onClick={() => handleViewEventRequest(request.req_id)}
-                            disabled={loading}
-                          >
-                            <Eye className="h-3 w-3 mr-1" />
-                            View Details
-                          </Button>
-                          {/* Show Update Status button for status 4 (pending for registrar), show status badge for others */}
-                          {request.status_id === 4 ? (
-                            <Button 
-                              size="sm" 
-                              variant="outline"
-                              onClick={() => handleChangeEventStatus(request)}
-                              disabled={loading}
-                            >
-                              <Edit className="h-3 w-3 mr-1" />
-                              Update Status
-                            </Button>
-                          ) : request.status_id === 6 ? (
-                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-center">
-                              Approved: {request.status_name}
-                            </Badge>
-                          ) : request.status_id === 5 || request.status_id === 7 ? (
-                            <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 text-center">
-                              Rejected: {request.status_name}
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-center">
-                              {request.status_name}
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-                
-                {/* Pagination for Event Requests */}
-                {eventRequests.length > itemsPerPage && (
-                  <div className="flex items-center justify-between mt-6">
-                    <div className="text-sm text-muted-foreground">
-                      Showing {(eventRequestsCurrentPage - 1) * itemsPerPage + 1} to {Math.min(eventRequestsCurrentPage * itemsPerPage, eventRequests.length)} of {eventRequests.length} event requests
-                    </div>
-                    <Pagination>
-                      <PaginationContent>
-                        <PaginationItem>
-                          <PaginationPrevious 
-                            onClick={() => setEventRequestsCurrentPage(prev => Math.max(1, prev - 1))}
-                            className={eventRequestsCurrentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                          />
-                        </PaginationItem>
-                        {Array.from({ length: Math.ceil(eventRequests.length / itemsPerPage) }, (_, i) => i + 1)
-                          .filter(page => {
-                            return page === 1 || 
-                                   page === Math.ceil(eventRequests.length / itemsPerPage) ||
-                                   (page >= eventRequestsCurrentPage - 1 && page <= eventRequestsCurrentPage + 1);
-                          })
-                          .map((page, idx, array) => {
-                            const prevPage = array[idx - 1];
-                            const showEllipsisBefore = prevPage && page - prevPage > 1;
-                            
-                            return (
-                              <React.Fragment key={page}>
-                                {showEllipsisBefore && (
-                                  <PaginationItem>
-                                    <PaginationEllipsis />
-                                  </PaginationItem>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center mb-2 flex-wrap gap-2">
+                                <h3 className="text-xl font-semibold text-university-navy">{request.title}</h3>
+                                <Badge
+                                  variant={
+                                    request.status_id === 6 ? 'default' :
+                                      request.status_id === 4 ? 'default' :
+                                        request.status_id === 2 ? 'default' :
+                                          request.status_id === 1 ? 'secondary' :
+                                            'destructive'
+                                  }
+                                  className={
+                                    request.status_id === 6 ? 'bg-green-600' :
+                                      request.status_id === 4 ? 'bg-blue-600' :
+                                        request.status_id === 2 ? 'bg-green-600' :
+                                          ''
+                                  }
+                                >
+                                  {request.status_name}
+                                </Badge>
+                                {request.society_name && (
+                                  <Badge variant="outline">{request.society_name}</Badge>
                                 )}
-                                <PaginationItem>
-                                  <PaginationLink
-                                    onClick={() => setEventRequestsCurrentPage(page)}
-                                    isActive={eventRequestsCurrentPage === page}
-                                    className="cursor-pointer"
-                                  >
-                                    {page}
-                                  </PaginationLink>
-                                </PaginationItem>
-                              </React.Fragment>
-                            );
-                          })}
-                        <PaginationItem>
-                          <PaginationNext 
-                            onClick={() => setEventRequestsCurrentPage(prev => Math.min(Math.ceil(eventRequests.length / itemsPerPage), prev + 1))}
-                            className={eventRequestsCurrentPage >= Math.ceil(eventRequests.length / itemsPerPage) ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                          />
-                        </PaginationItem>
-                      </PaginationContent>
-                    </Pagination>
+                              </div>
+                              <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                                {request.description}
+                              </p>
+                              <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mb-2">
+                                <span>📅 {new Date(request.event_date).toLocaleDateString()}</span>
+                                <span>🕐 {request.event_time}</span>
+                                <span>📍 {request.venue}</span>
+                                {request.firstName && request.lastName && (
+                                  <span>👤 {request.firstName} {request.lastName}</span>
+                                )}
+                              </div>
+                              {request.note && (
+                                <div className="bg-blue-50 border-l-4 border-blue-200 p-2 mt-2 rounded">
+                                  <p className="text-xs font-medium text-blue-900 mb-1">Note:</p>
+                                  <p className="text-xs text-blue-800">{request.note}</p>
+                                </div>
+                              )}
+                              <div className="flex items-center text-xs text-muted-foreground mt-2">
+                                <Clock className="h-3 w-3 mr-1" />
+                                Created: {new Date(request.created_at).toLocaleString()}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-start gap-2 ml-4">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onClick={() => handleViewEventRequest(request.req_id)}
+                                  disabled={loadingEventRequests}
+                                >
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View Details
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => handleChangeEventStatus(request)}
+                                  disabled={loadingEventRequests}
+                                >
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Update Status
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
                   </div>
-                )}
+
+                  {/* Pagination for Event Requests */}
+                  {eventRequests.length > itemsPerPage && (
+                    <div className="flex items-center justify-between mt-6">
+                      <div className="text-sm text-muted-foreground">
+                        Showing {(eventRequestsCurrentPage - 1) * itemsPerPage + 1} to {Math.min(eventRequestsCurrentPage * itemsPerPage, eventRequests.length)} of {eventRequests.length} event requests
+                      </div>
+                      <Pagination>
+                        <PaginationContent>
+                          <PaginationItem>
+                            <PaginationPrevious
+                              onClick={() => setEventRequestsCurrentPage(prev => Math.max(1, prev - 1))}
+                              className={eventRequestsCurrentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                            />
+                          </PaginationItem>
+                          {Array.from({ length: Math.ceil(eventRequests.length / itemsPerPage) }, (_, i) => i + 1)
+                            .filter(page => {
+                              return page === 1 ||
+                                page === Math.ceil(eventRequests.length / itemsPerPage) ||
+                                (page >= eventRequestsCurrentPage - 1 && page <= eventRequestsCurrentPage + 1);
+                            })
+                            .map((page, idx, array) => {
+                              const prevPage = array[idx - 1];
+                              const showEllipsisBefore = prevPage && page - prevPage > 1;
+
+                              return (
+                                <React.Fragment key={page}>
+                                  {showEllipsisBefore && (
+                                    <PaginationItem>
+                                      <PaginationEllipsis />
+                                    </PaginationItem>
+                                  )}
+                                  <PaginationItem>
+                                    <PaginationLink
+                                      onClick={() => setEventRequestsCurrentPage(page)}
+                                      isActive={eventRequestsCurrentPage === page}
+                                      className="cursor-pointer"
+                                    >
+                                      {page}
+                                    </PaginationLink>
+                                  </PaginationItem>
+                                </React.Fragment>
+                              );
+                            })}
+                          <PaginationItem>
+                            <PaginationNext
+                              onClick={() => setEventRequestsCurrentPage(prev => Math.min(Math.ceil(eventRequests.length / itemsPerPage), prev + 1))}
+                              className={eventRequestsCurrentPage >= Math.ceil(eventRequests.length / itemsPerPage) ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                            />
+                          </PaginationItem>
+                        </PaginationContent>
+                      </Pagination>
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="text-center py-12">
@@ -1210,7 +1212,7 @@ const RegistrarDashboard = () => {
                 <div className="flex items-start space-x-4">
                   <div className="w-24 h-24 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
                     {selectedSociety.society_logo || selectedSociety.logo_path ? (
-                      <img 
+                      <img
                         src={`${import.meta.env.VITE_API_URL}/${selectedSociety.society_logo || selectedSociety.logo_path}`}
                         alt={selectedSociety.name}
                         className="w-20 h-20 rounded-lg object-cover"
@@ -1224,8 +1226,8 @@ const RegistrarDashboard = () => {
                       <Badge variant="secondary" className="bg-white/20 text-white">
                         {selectedSociety.category}
                       </Badge>
-                      <Badge 
-                        variant="outline" 
+                      <Badge
+                        variant="outline"
                         className="text-white border-white"
                       >
                         {selectedSociety.status_name}
@@ -1372,8 +1374,8 @@ const RegistrarDashboard = () => {
                 <Button variant="outline" onClick={() => setIsModalOpen(false)}>
                   Close
                 </Button>
-                <Button 
-                  variant="university" 
+                <Button
+                  variant="university"
                   onClick={() => {
                     setIsModalOpen(false);
                     handleChangeStatus(selectedSociety);
@@ -1409,8 +1411,8 @@ const RegistrarDashboard = () => {
 
               <div>
                 <label className="text-sm font-medium mb-2 block">Select New Status</label>
-                <Select 
-                  value={selectedStatus.toString()} 
+                <Select
+                  value={selectedStatus.toString()}
                   onValueChange={(value) => setSelectedStatus(parseInt(value))}
                 >
                   <SelectTrigger>
@@ -1445,8 +1447,8 @@ const RegistrarDashboard = () => {
                 <Button variant="outline" onClick={() => setIsStatusModalOpen(false)} disabled={actionLoading}>
                   Cancel
                 </Button>
-                <Button 
-                  variant="university" 
+                <Button
+                  variant="university"
                   onClick={handleUpdateStatus}
                   disabled={actionLoading || selectedStatus === selectedSociety.status_id}
                 >
@@ -1523,11 +1525,11 @@ const RegistrarDashboard = () => {
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Date From:</span>
                       <span className="font-medium">
-                        {selectedEventRequest.date_from 
+                        {selectedEventRequest.date_from
                           ? new Date(selectedEventRequest.date_from).toLocaleDateString()
-                          : selectedEventRequest.event_date 
-                          ? new Date(selectedEventRequest.event_date).toLocaleDateString()
-                          : "Not specified"}
+                          : selectedEventRequest.event_date
+                            ? new Date(selectedEventRequest.event_date).toLocaleDateString()
+                            : "Not specified"}
                       </span>
                     </div>
                     {selectedEventRequest.date_to && (
@@ -1566,10 +1568,10 @@ const RegistrarDashboard = () => {
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Sponsor Amount:</span>
                         <span className="font-medium text-green-600">
-                          {typeof selectedEventRequest.sponsor_amount === 'string' 
+                          {typeof selectedEventRequest.sponsor_amount === 'string'
                             ? (selectedEventRequest.sponsor_amount.startsWith('PKR') || selectedEventRequest.sponsor_amount.startsWith('$')
-                                ? selectedEventRequest.sponsor_amount.replace(/^\$/, 'PKR ')
-                                : `PKR ${selectedEventRequest.sponsor_amount}`)
+                              ? selectedEventRequest.sponsor_amount.replace(/^\$/, 'PKR ')
+                              : `PKR ${selectedEventRequest.sponsor_amount}`)
                             : `PKR ${selectedEventRequest.sponsor_amount}`}
                         </span>
                       </div>
@@ -1636,6 +1638,74 @@ const RegistrarDashboard = () => {
                 </Card>
               </div>
 
+              {/* Slot Details */}
+              {(selectedEventRequest.slot_status_name || selectedEventRequest.slot_date || selectedEventRequest.slot_time_from) && (
+                <Card className="p-4 shadow-sm border-slate-200 border-l-4 border-l-blue-500">
+                  <h3 className="font-semibold mb-3 text-slate-800 border-b pb-2 flex items-center gap-2">
+                    <Calendar className="h-5 w-5 text-blue-500" />
+                    Slot Details
+                  </h3>
+                  <div className="space-y-3 text-sm">
+                    {selectedEventRequest.slot_status_name && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Status:</span>
+                        <Badge variant={selectedEventRequest.slot_status_id === 2 ? "default" : selectedEventRequest.slot_status_id === 3 ? "destructive" : "secondary"}>
+                          {selectedEventRequest.slot_status_name}
+                        </Badge>
+                      </div>
+                    )}
+                    {selectedEventRequest.slot_date && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground flex items-center gap-1">
+                          <Calendar className="h-4 w-4" />
+                          Date:
+                        </span>
+                        <span className="font-medium text-slate-900">
+                          {new Date(selectedEventRequest.slot_date).toLocaleDateString('en-US', {
+                            weekday: 'long',
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })}
+                        </span>
+                      </div>
+                    )}
+                    {(selectedEventRequest.slot_time_from || selectedEventRequest.slot_time_to) && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground flex items-center gap-1">
+                          <Clock className="h-4 w-4" />
+                          Time:
+                        </span>
+                        <span className="font-medium text-slate-900">
+                          {selectedEventRequest.slot_time_from
+                            ? formatTimeToAMPM(selectedEventRequest.slot_time_from)
+                            : "Not specified"}
+                          {selectedEventRequest.slot_time_to && selectedEventRequest.slot_time_from && (
+                            <> - {formatTimeToAMPM(selectedEventRequest.slot_time_to)}</>
+                          )}
+                        </span>
+                      </div>
+                    )}
+                    {(selectedEventRequest.venue_name || selectedEventRequest.venue) && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground flex items-center gap-1">
+                          <MapPin className="h-4 w-4" />
+                          Venue:
+                        </span>
+                        <span className="font-medium text-slate-900">
+                          {selectedEventRequest.venue_name || selectedEventRequest.venue || "Not specified"}
+                        </span>
+                      </div>
+                    )}
+                    {selectedEventRequest.slot_status_id === 2 && (
+                      <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded text-green-800 text-sm">
+                        ✓ Slot has been granted by Protocol Office.
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              )}
+
               {/* Description / Media Coverage */}
               {(selectedEventRequest.description || selectedEventRequest.media_coverage) && (
                 <Card className="p-4">
@@ -1655,54 +1725,54 @@ const RegistrarDashboard = () => {
               {/* Participants: Students */}
               {Array.isArray(selectedEventRequest.student_participants) &&
                 selectedEventRequest.student_participants.length > 0 && (
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-3 text-university-navy">Student Participants</h3>
-                  <div className="space-y-2 text-sm">
-                    {selectedEventRequest.student_participants.map((s: any, idx: number) => (
-                      <div
-                        key={idx}
-                        className="flex flex-wrap justify-between border-b last:border-0 pb-2 last:pb-0"
-                      >
-                        <span className="font-medium">
-                          {s.academic_program || "Program not specified"}
-                        </span>
-                        <span className="text-muted-foreground">
-                          {s.semester && `Semester: ${s.semester} • `}
-                          {typeof s.no_of_students === "number" && s.no_of_students > 0
-                            ? `${s.no_of_students} students`
-                            : "Count not specified"}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              )}
+                  <Card className="p-4">
+                    <h3 className="font-semibold mb-3 text-university-navy">Student Participants</h3>
+                    <div className="space-y-2 text-sm">
+                      {selectedEventRequest.student_participants.map((s: any, idx: number) => (
+                        <div
+                          key={idx}
+                          className="flex flex-wrap justify-between border-b last:border-0 pb-2 last:pb-0"
+                        >
+                          <span className="font-medium">
+                            {s.academic_program || "Program not specified"}
+                          </span>
+                          <span className="text-muted-foreground">
+                            {s.semester && `Semester: ${s.semester} • `}
+                            {typeof s.no_of_students === "number" && s.no_of_students > 0
+                              ? `${s.no_of_students} students`
+                              : "Count not specified"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
 
               {/* Participants: Staff */}
               {Array.isArray(selectedEventRequest.staff_participants) &&
                 selectedEventRequest.staff_participants.length > 0 && (
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-3 text-university-navy">Staff Participants</h3>
-                  <div className="space-y-2 text-sm">
-                    {selectedEventRequest.staff_participants.map((s: any, idx: number) => (
-                      <div
-                        key={idx}
-                        className="flex flex-wrap justify-between border-b last:border-0 pb-2 last:pb-0"
-                      >
-                        <span className="font-medium">
-                          {s.department || "Department not specified"}
-                        </span>
-                        <span className="text-muted-foreground">
-                          {s.gazetted || "Category not specified"} •{" "}
-                          {typeof s.no_of_staff === "number" && s.no_of_staff > 0
-                            ? `${s.no_of_staff} staff`
-                            : "Count not specified"}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              )}
+                  <Card className="p-4">
+                    <h3 className="font-semibold mb-3 text-university-navy">Staff Participants</h3>
+                    <div className="space-y-2 text-sm">
+                      {selectedEventRequest.staff_participants.map((s: any, idx: number) => (
+                        <div
+                          key={idx}
+                          className="flex flex-wrap justify-between border-b last:border-0 pb-2 last:pb-0"
+                        >
+                          <span className="font-medium">
+                            {s.department || "Department not specified"}
+                          </span>
+                          <span className="text-muted-foreground">
+                            {s.gazetted || "Category not specified"} •{" "}
+                            {typeof s.no_of_staff === "number" && s.no_of_staff > 0
+                              ? `${s.no_of_staff} staff`
+                              : "Count not specified"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
 
               {/* Management Requirements */}
               {selectedEventRequest.management_requirements && (
@@ -1781,137 +1851,137 @@ const RegistrarDashboard = () => {
               {/* Transport Requests */}
               {Array.isArray(selectedEventRequest.transport_requests) &&
                 selectedEventRequest.transport_requests.length > 0 && (
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-3 text-university-navy">Transport Requests</h3>
-                  <div className="space-y-2 text-sm">
-                    {selectedEventRequest.transport_requests.map((t: any, idx: number) => (
-                      <div
-                        key={idx}
-                        className="border rounded p-2 flex flex-wrap justify-between gap-2"
-                      >
-                        <div>
-                          <p className="font-medium">{t.vehicle_type || "Vehicle not specified"}</p>
-                          <p className="text-muted-foreground">
-                            {t.purpose || "Purpose not specified"}
-                          </p>
+                  <Card className="p-4">
+                    <h3 className="font-semibold mb-3 text-university-navy">Transport Requests</h3>
+                    <div className="space-y-2 text-sm">
+                      {selectedEventRequest.transport_requests.map((t: any, idx: number) => (
+                        <div
+                          key={idx}
+                          className="border rounded p-2 flex flex-wrap justify-between gap-2"
+                        >
+                          <div>
+                            <p className="font-medium">{t.vehicle_type || "Vehicle not specified"}</p>
+                            <p className="text-muted-foreground">
+                              {t.purpose || "Purpose not specified"}
+                            </p>
+                          </div>
+                          <div className="text-right text-xs text-muted-foreground">
+                            {t.date && <div>📅 {new Date(t.date).toLocaleDateString()}</div>}
+                            {t.time && <div>🕐 {t.time}</div>}
+                            {t.destination && <div>📍 {t.destination}</div>}
+                            {typeof t.no_of_persons === "number" && t.no_of_persons > 0 && (
+                              <div>👥 {t.no_of_persons} persons</div>
+                            )}
+                          </div>
                         </div>
-                        <div className="text-right text-xs text-muted-foreground">
-                          {t.date && <div>📅 {new Date(t.date).toLocaleDateString()}</div>}
-                          {t.time && <div>🕐 {t.time}</div>}
-                          {t.destination && <div>📍 {t.destination}</div>}
-                          {typeof t.no_of_persons === "number" && t.no_of_persons > 0 && (
-                            <div>👥 {t.no_of_persons} persons</div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              )}
+                      ))}
+                    </div>
+                  </Card>
+                )}
 
               {/* Documents */}
               {Array.isArray(selectedEventRequest.documents) &&
                 selectedEventRequest.documents.length > 0 && (
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-3 text-university-navy">Attached Documents</h3>
-                  <div className="space-y-2 text-sm">
-                    {selectedEventRequest.documents.map((doc: any) => (
-                      <div
-                        key={doc.doc_id}
-                        className="flex items-center justify-between border-b last:border-0 pb-2 last:pb-0"
-                      >
-                        <span>
-                          <span className="font-medium capitalize">{doc.doc_type}</span>
-                          {" – "}
-                          {doc.file_path.split("/").pop()}
-                        </span>
-                        <a
-                          href={`${import.meta.env.VITE_API_URL}${doc.file_path}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-blue-600 hover:underline"
+                  <Card className="p-4">
+                    <h3 className="font-semibold mb-3 text-university-navy">Attached Documents</h3>
+                    <div className="space-y-2 text-sm">
+                      {selectedEventRequest.documents.map((doc: any) => (
+                        <div
+                          key={doc.doc_id}
+                          className="flex items-center justify-between border-b last:border-0 pb-2 last:pb-0"
                         >
-                          View
-                        </a>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              )}
+                          <span>
+                            <span className="font-medium capitalize">{doc.doc_type}</span>
+                            {" – "}
+                            {doc.file_path.split("/").pop()}
+                          </span>
+                          <a
+                            href={`${import.meta.env.VITE_API_URL}${doc.file_path}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-blue-600 hover:underline"
+                          >
+                            View
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
 
               {/* Admin Notes from History - Grouped by Role */}
               {Array.isArray(selectedEventRequest.status_history) &&
                 selectedEventRequest.status_history.length > 0 && (
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-4 text-university-navy">Admin Notes & Status History</h3>
-                  <div className="space-y-6">
-                    {/* Group notes by role */}
-                    {(() => {
-                      const notesByRole: { [key: string]: any[] } = {};
-                      selectedEventRequest.status_history
-                        .filter((h: any) => h.note && h.note.trim() !== "")
-                        .forEach((history: any) => {
-                          const role = history.role || history.role_display_name || history.role_name || "Admin";
-                          if (!notesByRole[role]) {
-                            notesByRole[role] = [];
-                          }
-                          notesByRole[role].push(history);
+                  <Card className="p-4">
+                    <h3 className="font-semibold mb-4 text-university-navy">Admin Notes & Status History</h3>
+                    <div className="space-y-6">
+                      {/* Group notes by role */}
+                      {(() => {
+                        const notesByRole: { [key: string]: any[] } = {};
+                        selectedEventRequest.status_history
+                          .filter((h: any) => h.note && h.note.trim() !== "")
+                          .forEach((history: any) => {
+                            const role = history.role || history.role_display_name || history.role_name || "Admin";
+                            if (!notesByRole[role]) {
+                              notesByRole[role] = [];
+                            }
+                            notesByRole[role].push(history);
+                          });
+
+                        const roleOrder = ["Board Secretary", "Board President", "Registrar", "VC", "Transport Office", "Protocol Office"];
+                        const sortedRoles = Object.keys(notesByRole).sort((a, b) => {
+                          const aIndex = roleOrder.indexOf(a);
+                          const bIndex = roleOrder.indexOf(b);
+                          if (aIndex === -1 && bIndex === -1) return a.localeCompare(b);
+                          if (aIndex === -1) return 1;
+                          if (bIndex === -1) return -1;
+                          return aIndex - bIndex;
                         });
 
-                      const roleOrder = ["Board Secretary", "Board President", "Registrar", "VC", "Transport Office", "Protocol Office"];
-                      const sortedRoles = Object.keys(notesByRole).sort((a, b) => {
-                        const aIndex = roleOrder.indexOf(a);
-                        const bIndex = roleOrder.indexOf(b);
-                        if (aIndex === -1 && bIndex === -1) return a.localeCompare(b);
-                        if (aIndex === -1) return 1;
-                        if (bIndex === -1) return -1;
-                        return aIndex - bIndex;
-                      });
+                        if (sortedRoles.length === 0) {
+                          return <p className="text-sm text-muted-foreground italic">No admin notes yet.</p>;
+                        }
 
-                      if (sortedRoles.length === 0) {
-                        return <p className="text-sm text-muted-foreground italic">No admin notes yet.</p>;
-                      }
-
-                      return sortedRoles.map((role) => (
-                        <div key={role} className="space-y-3">
-                          <h4 className="font-semibold text-sm text-university-navy border-b pb-2">
-                            {role} Notes
-                          </h4>
-                          {notesByRole[role].map((history: any, idx: number) => (
-                            <div
-                              key={history.history_id || idx}
-                              className="border-l-4 border-blue-500 pl-4 py-2 bg-blue-50 rounded-r"
-                            >
-                              <div className="flex items-start justify-between mb-2">
-                                <div>
-                                  <p className="text-xs text-muted-foreground">
-                                    {history.firstName && history.lastName
-                                      ? `${history.firstName} ${history.lastName}`
-                                      : "Unknown"}
-                                    {history.status_name && ` • ${history.status_name}`}
-                                  </p>
+                        return sortedRoles.map((role) => (
+                          <div key={role} className="space-y-3">
+                            <h4 className="font-semibold text-sm text-university-navy border-b pb-2">
+                              {role} Notes
+                            </h4>
+                            {notesByRole[role].map((history: any, idx: number) => (
+                              <div
+                                key={history.history_id || idx}
+                                className="border-l-4 border-blue-500 pl-4 py-2 bg-blue-50 rounded-r"
+                              >
+                                <div className="flex items-start justify-between mb-2">
+                                  <div>
+                                    <p className="text-xs text-muted-foreground">
+                                      {history.firstName && history.lastName
+                                        ? `${history.firstName} ${history.lastName}`
+                                        : role}
+                                      {history.status_name && ` • ${history.status_name}`}
+                                    </p>
+                                  </div>
+                                  <span className="text-xs text-muted-foreground">
+                                    {new Date(history.changed_at).toLocaleString()}
+                                  </span>
                                 </div>
-                                <span className="text-xs text-muted-foreground">
-                                  {new Date(history.changed_at).toLocaleString()}
-                                </span>
+                                <p className="text-sm text-gray-700 mt-1">{history.note}</p>
                               </div>
-                              <p className="text-sm text-gray-700 mt-1">{history.note}</p>
-                            </div>
-                          ))}
-                        </div>
-                      ));
-                    })()}
-                  </div>
-                </Card>
-              )}
+                            ))}
+                          </div>
+                        ));
+                      })()}
+                    </div>
+                  </Card>
+                )}
 
               {/* Action Buttons */}
               <div className="flex justify-end space-x-3 pt-4 border-t">
                 <Button variant="outline" onClick={() => setIsEventRequestModalOpen(false)}>
                   Close
                 </Button>
-                <Button 
-                  variant="university" 
+                <Button
+                  variant="university"
                   onClick={() => {
                     setIsEventRequestModalOpen(false);
                     handleChangeEventStatus(selectedEventRequest);
@@ -1947,8 +2017,8 @@ const RegistrarDashboard = () => {
 
               <div>
                 <label className="text-sm font-medium mb-2 block">Select New Status</label>
-                <Select 
-                  value={selectedEventStatus.toString()} 
+                <Select
+                  value={selectedEventStatus.toString()}
                   onValueChange={(value) => setSelectedEventStatus(parseInt(value))}
                 >
                   <SelectTrigger>
@@ -1983,8 +2053,8 @@ const RegistrarDashboard = () => {
                 <Button variant="outline" onClick={() => setIsEventStatusModalOpen(false)} disabled={actionLoading}>
                   Cancel
                 </Button>
-                <Button 
-                  variant="university" 
+                <Button
+                  variant="university"
                   onClick={handleUpdateEventStatus}
                   disabled={actionLoading || selectedEventStatus === selectedEventRequest.status_id}
                 >

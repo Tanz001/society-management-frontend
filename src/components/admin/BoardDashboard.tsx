@@ -5,6 +5,12 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AdminEventReportsSection from "@/components/admin/AdminEventReportsSection";
 import {
@@ -21,7 +27,8 @@ import {
   Award,
   Edit,
   MapPin,
-  PlusCircle
+  PlusCircle,
+  MoreVertical
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -589,25 +596,34 @@ const BoardDashboard = () => {
                             Created: {new Date(request.created_at).toLocaleString()}
                           </div>
                         </div>
-                        <div className="flex flex-col space-y-2 ml-4">
-                          <Button
-                            size="sm"
-                            variant="university"
-                            onClick={() => handleViewEventRequest(request.req_id)}
-                            disabled={loading}
-                          >
-                            <Eye className="h-3 w-3 mr-1" />
-                            View Details
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleChangeEventStatus(request)}
-                            disabled={loading}
-                          >
-                            <Edit className="h-3 w-3 mr-1" />
-                            Update Status
-                          </Button>
+                        <div className="flex items-start gap-2 ml-4">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0"
+                              >
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => handleViewEventRequest(request.req_id)}
+                                disabled={loadingEventRequests}
+                              >
+                                <Eye className="h-4 w-4 mr-2" />
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleChangeEventStatus(request)}
+                                disabled={loadingEventRequests}
+                              >
+                                <Edit className="h-4 w-4 mr-2" />
+                                Update Status
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </div>
                     </Card>
@@ -1209,7 +1225,7 @@ const BoardDashboard = () => {
                                     <p className="text-xs text-muted-foreground">
                                       {history.firstName && history.lastName
                                         ? `${history.firstName} ${history.lastName}`
-                                        : "Unknown"}
+                                        : role}
                                       {history.status_name && ` • ${history.status_name}`}
                                     </p>
                                   </div>

@@ -78,9 +78,9 @@ const EventReportUpload = ({ eventId, eventTitle, isOpen, onClose, onSuccess }: 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!eventId) {
+    if (!eventId || eventId === 0) {
       toast.error("Event ID is missing");
-      console.error("Event ID is missing:", eventId);
+      console.error("Event ID is missing or invalid:", eventId);
       return;
     }
     
@@ -95,7 +95,7 @@ const EventReportUpload = ({ eventId, eventTitle, isOpen, onClose, onSuccess }: 
     }
 
     try {
-       const API_URL = import.meta.env.VITE_API_URL;
+      const API_URL = import.meta.env.VITE_API_URL;
       setUploading(true);
       const token = localStorage.getItem("token");
       
@@ -104,16 +104,31 @@ const EventReportUpload = ({ eventId, eventTitle, isOpen, onClose, onSuccess }: 
         return;
       }
 
+      // Create FormData and ensure event_req_id is sent first (before file)
+      // This helps multer parse text fields correctly
       const formData = new FormData();
       formData.append("event_req_id", String(eventId));
       formData.append("report_title", reportTitle);
       formData.append("report_description", reportDescription);
       formData.append("report_file", selectedFile);
       
+      // Log FormData contents for debugging
+      console.log("Uploading event report - FormData contents:");
+      for (const [key, value] of formData.entries()) {
+        if (value instanceof File) {
+          console.log(`  ${key}: [File] ${value.name} (${value.size} bytes)`);
+        } else {
+          console.log(`  ${key}: ${value}`);
+        }
+      }
+      
       console.log("Uploading event report:", {
         event_req_id: eventId,
+        event_req_id_type: typeof eventId,
         report_title: reportTitle,
-        has_file: !!selectedFile
+        has_file: !!selectedFile,
+        file_name: selectedFile.name,
+        file_size: selectedFile.size
       });
 
       const response = await axios.post(

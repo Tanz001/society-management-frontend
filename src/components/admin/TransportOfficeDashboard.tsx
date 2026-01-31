@@ -3,8 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { 
-  Calendar, 
+import {
+  Calendar,
   Eye,
   AlertTriangle,
   LogOut,
@@ -65,18 +65,18 @@ const TransportOfficeDashboard = () => {
   // Fetch all event requests (read-only view)
   const fetchAllEventRequests = async () => {
     try {
-       const API_URL = import.meta.env.VITE_API_URL;
+      const API_URL = import.meta.env.VITE_API_URL;
       setLoading(true);
       setError("");
-  
+
       const token = localStorage.getItem("token");
       if (!token) {
         throw new Error("No authentication token found");
       }
-  
+
       const response = await axios.post(
         `${API_URL}/admin/event-requests`,
-        { 
+        {
           role: "transport_office_view", // Special role for read-only view
           filter: eventRequestFilter
         },
@@ -86,7 +86,7 @@ const TransportOfficeDashboard = () => {
           },
         }
       );
-  
+
       console.log("Event requests fetched:", response.data);
       setEventRequests(response.data.data || []);
     } catch (err) {
@@ -100,10 +100,10 @@ const TransportOfficeDashboard = () => {
   // Handle view event request details
   const handleViewEventRequest = async (reqId) => {
     try {
-       const API_URL = import.meta.env.VITE_API_URL;
+      const API_URL = import.meta.env.VITE_API_URL;
       setLoading(true);
       const token = localStorage.getItem("token");
-      
+
       const response = await axios.get(`${API_URL}/admin/event-requests/${reqId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -167,9 +167,9 @@ const TransportOfficeDashboard = () => {
               <p className="text-white/80">View All Event Transport Requests (Read-Only)</p>
             </div>
             <div className="flex items-center space-x-3">
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 className="text-white border-white hover:bg-white/20 bg-transparent"
                 onClick={handleLogout}
               >
@@ -251,8 +251,8 @@ const TransportOfficeDashboard = () => {
           {/* Actions */}
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-semibold text-university-navy">All Event Requests</h2>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={fetchAllEventRequests}
               disabled={loading}
             >
@@ -357,8 +357,8 @@ const TransportOfficeDashboard = () => {
                       </div>
                     </div>
                     <div className="flex flex-col space-y-2 ml-4">
-                      <Button 
-                        size="sm" 
+                      <Button
+                        size="sm"
                         variant="university"
                         onClick={() => handleViewEventRequest(request.req_id)}
                         disabled={loading}
@@ -448,11 +448,11 @@ const TransportOfficeDashboard = () => {
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Date From:</span>
                       <span className="font-medium">
-                        {selectedEventRequest.date_from 
+                        {selectedEventRequest.date_from
                           ? new Date(selectedEventRequest.date_from).toLocaleDateString()
-                          : selectedEventRequest.event_date 
-                          ? new Date(selectedEventRequest.event_date).toLocaleDateString()
-                          : "Not specified"}
+                          : selectedEventRequest.event_date
+                            ? new Date(selectedEventRequest.event_date).toLocaleDateString()
+                            : "Not specified"}
                       </span>
                     </div>
                     {selectedEventRequest.date_to && (
@@ -491,10 +491,10 @@ const TransportOfficeDashboard = () => {
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Sponsor Amount:</span>
                         <span className="font-medium text-green-600">
-                          {typeof selectedEventRequest.sponsor_amount === 'string' 
+                          {typeof selectedEventRequest.sponsor_amount === 'string'
                             ? (selectedEventRequest.sponsor_amount.startsWith('PKR') || selectedEventRequest.sponsor_amount.startsWith('$')
-                                ? selectedEventRequest.sponsor_amount.replace(/^\$/, 'PKR ')
-                                : `PKR ${selectedEventRequest.sponsor_amount}`)
+                              ? selectedEventRequest.sponsor_amount.replace(/^\$/, 'PKR ')
+                              : `PKR ${selectedEventRequest.sponsor_amount}`)
                             : `PKR ${selectedEventRequest.sponsor_amount}`}
                         </span>
                       </div>
@@ -572,54 +572,54 @@ const TransportOfficeDashboard = () => {
               {/* Participants: Students */}
               {Array.isArray(selectedEventRequest.student_participants) &&
                 selectedEventRequest.student_participants.length > 0 && (
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-3 text-university-navy">Student Participants</h3>
-                  <div className="space-y-2 text-sm">
-                    {selectedEventRequest.student_participants.map((s: any, idx: number) => (
-                      <div
-                        key={idx}
-                        className="flex flex-wrap justify-between border-b last:border-0 pb-2 last:pb-0"
-                      >
-                        <span className="font-medium">
-                          {s.academic_program || "Program not specified"}
-                        </span>
-                        <span className="text-muted-foreground">
-                          {s.semester && `Semester: ${s.semester} • `}
-                          {typeof s.no_of_students === "number" && s.no_of_students > 0
-                            ? `${s.no_of_students} students`
-                            : "Count not specified"}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              )}
+                  <Card className="p-4">
+                    <h3 className="font-semibold mb-3 text-university-navy">Student Participants</h3>
+                    <div className="space-y-2 text-sm">
+                      {selectedEventRequest.student_participants.map((s: any, idx: number) => (
+                        <div
+                          key={idx}
+                          className="flex flex-wrap justify-between border-b last:border-0 pb-2 last:pb-0"
+                        >
+                          <span className="font-medium">
+                            {s.academic_program || "Program not specified"}
+                          </span>
+                          <span className="text-muted-foreground">
+                            {s.semester && `Semester: ${s.semester} • `}
+                            {typeof s.no_of_students === "number" && s.no_of_students > 0
+                              ? `${s.no_of_students} students`
+                              : "Count not specified"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
 
               {/* Participants: Staff */}
               {Array.isArray(selectedEventRequest.staff_participants) &&
                 selectedEventRequest.staff_participants.length > 0 && (
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-3 text-university-navy">Staff Participants</h3>
-                  <div className="space-y-2 text-sm">
-                    {selectedEventRequest.staff_participants.map((s: any, idx: number) => (
-                      <div
-                        key={idx}
-                        className="flex flex-wrap justify-between border-b last:border-0 pb-2 last:pb-0"
-                      >
-                        <span className="font-medium">
-                          {s.department || "Department not specified"}
-                        </span>
-                        <span className="text-muted-foreground">
-                          {s.gazetted || "Category not specified"} •{" "}
-                          {typeof s.no_of_staff === "number" && s.no_of_staff > 0
-                            ? `${s.no_of_staff} staff`
-                            : "Count not specified"}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              )}
+                  <Card className="p-4">
+                    <h3 className="font-semibold mb-3 text-university-navy">Staff Participants</h3>
+                    <div className="space-y-2 text-sm">
+                      {selectedEventRequest.staff_participants.map((s: any, idx: number) => (
+                        <div
+                          key={idx}
+                          className="flex flex-wrap justify-between border-b last:border-0 pb-2 last:pb-0"
+                        >
+                          <span className="font-medium">
+                            {s.department || "Department not specified"}
+                          </span>
+                          <span className="text-muted-foreground">
+                            {s.gazetted || "Category not specified"} •{" "}
+                            {typeof s.no_of_staff === "number" && s.no_of_staff > 0
+                              ? `${s.no_of_staff} staff`
+                              : "Count not specified"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
 
               {/* Management Requirements */}
               {selectedEventRequest.management_requirements && (
@@ -698,129 +698,129 @@ const TransportOfficeDashboard = () => {
               {/* Transport Requests */}
               {Array.isArray(selectedEventRequest.transport_requests) &&
                 selectedEventRequest.transport_requests.length > 0 && (
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-3 text-university-navy">Transport Requests</h3>
-                  <div className="space-y-2 text-sm">
-                    {selectedEventRequest.transport_requests.map((t: any, idx: number) => (
-                      <div
-                        key={idx}
-                        className="border rounded p-2 flex flex-wrap justify-between gap-2"
-                      >
-                        <div>
-                          <p className="font-medium">{t.vehicle_type || "Vehicle not specified"}</p>
-                          <p className="text-muted-foreground">
-                            {t.purpose || "Purpose not specified"}
-                          </p>
+                  <Card className="p-4">
+                    <h3 className="font-semibold mb-3 text-university-navy">Transport Requests</h3>
+                    <div className="space-y-2 text-sm">
+                      {selectedEventRequest.transport_requests.map((t: any, idx: number) => (
+                        <div
+                          key={idx}
+                          className="border rounded p-2 flex flex-wrap justify-between gap-2"
+                        >
+                          <div>
+                            <p className="font-medium">{t.vehicle_type || "Vehicle not specified"}</p>
+                            <p className="text-muted-foreground">
+                              {t.purpose || "Purpose not specified"}
+                            </p>
+                          </div>
+                          <div className="text-right text-xs text-muted-foreground">
+                            {t.date && <div>📅 {new Date(t.date).toLocaleDateString()}</div>}
+                            {t.time && <div>🕐 {t.time}</div>}
+                            {t.destination && <div>📍 {t.destination}</div>}
+                            {typeof t.no_of_persons === "number" && t.no_of_persons > 0 && (
+                              <div>👥 {t.no_of_persons} persons</div>
+                            )}
+                          </div>
                         </div>
-                        <div className="text-right text-xs text-muted-foreground">
-                          {t.date && <div>📅 {new Date(t.date).toLocaleDateString()}</div>}
-                          {t.time && <div>🕐 {t.time}</div>}
-                          {t.destination && <div>📍 {t.destination}</div>}
-                          {typeof t.no_of_persons === "number" && t.no_of_persons > 0 && (
-                            <div>👥 {t.no_of_persons} persons</div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              )}
+                      ))}
+                    </div>
+                  </Card>
+                )}
 
               {/* Documents */}
               {Array.isArray(selectedEventRequest.documents) &&
                 selectedEventRequest.documents.length > 0 && (
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-3 text-university-navy">Attached Documents</h3>
-                  <div className="space-y-2 text-sm">
-                    {selectedEventRequest.documents.map((doc: any) => (
-                      <div
-                        key={doc.doc_id}
-                        className="flex items-center justify-between border-b last:border-0 pb-2 last:pb-0"
-                      >
-                        <span>
-                          <span className="font-medium capitalize">{doc.doc_type}</span>
-                          {" – "}
-                          {doc.file_path.split("/").pop()}
-                        </span>
-                        <a
-                          href={`${import.meta.env.VITE_API_URL}${doc.file_path}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-blue-600 hover:underline"
+                  <Card className="p-4">
+                    <h3 className="font-semibold mb-3 text-university-navy">Attached Documents</h3>
+                    <div className="space-y-2 text-sm">
+                      {selectedEventRequest.documents.map((doc: any) => (
+                        <div
+                          key={doc.doc_id}
+                          className="flex items-center justify-between border-b last:border-0 pb-2 last:pb-0"
                         >
-                          View
-                        </a>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              )}
+                          <span>
+                            <span className="font-medium capitalize">{doc.doc_type}</span>
+                            {" – "}
+                            {doc.file_path.split("/").pop()}
+                          </span>
+                          <a
+                            href={`${import.meta.env.VITE_API_URL}${doc.file_path}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-blue-600 hover:underline"
+                          >
+                            View
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
 
               {/* Admin Notes from History - Grouped by Role */}
               {Array.isArray(selectedEventRequest.status_history) &&
                 selectedEventRequest.status_history.length > 0 && (
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-4 text-university-navy">Admin Notes & Status History</h3>
-                  <div className="space-y-6">
-                    {/* Group notes by role */}
-                    {(() => {
-                      const notesByRole: { [key: string]: any[] } = {};
-                      selectedEventRequest.status_history
-                        .filter((h: any) => h.note && h.note.trim() !== "")
-                        .forEach((history: any) => {
-                          const role = history.role || history.role_display_name || history.role_name || "Admin";
-                          if (!notesByRole[role]) {
-                            notesByRole[role] = [];
-                          }
-                          notesByRole[role].push(history);
+                  <Card className="p-4">
+                    <h3 className="font-semibold mb-4 text-university-navy">Admin Notes & Status History</h3>
+                    <div className="space-y-6">
+                      {/* Group notes by role */}
+                      {(() => {
+                        const notesByRole: { [key: string]: any[] } = {};
+                        selectedEventRequest.status_history
+                          .filter((h: any) => h.note && h.note.trim() !== "")
+                          .forEach((history: any) => {
+                            const role = history.role || history.role_display_name || history.role_name || "Admin";
+                            if (!notesByRole[role]) {
+                              notesByRole[role] = [];
+                            }
+                            notesByRole[role].push(history);
+                          });
+
+                        const roleOrder = ["Board Secretary", "Board President", "Registrar", "VC", "Transport Office", "Protocol Office"];
+                        const sortedRoles = Object.keys(notesByRole).sort((a, b) => {
+                          const aIndex = roleOrder.indexOf(a);
+                          const bIndex = roleOrder.indexOf(b);
+                          if (aIndex === -1 && bIndex === -1) return a.localeCompare(b);
+                          if (aIndex === -1) return 1;
+                          if (bIndex === -1) return -1;
+                          return aIndex - bIndex;
                         });
 
-                      const roleOrder = ["Board Secretary", "Board President", "Registrar", "VC", "Transport Office", "Protocol Office"];
-                      const sortedRoles = Object.keys(notesByRole).sort((a, b) => {
-                        const aIndex = roleOrder.indexOf(a);
-                        const bIndex = roleOrder.indexOf(b);
-                        if (aIndex === -1 && bIndex === -1) return a.localeCompare(b);
-                        if (aIndex === -1) return 1;
-                        if (bIndex === -1) return -1;
-                        return aIndex - bIndex;
-                      });
+                        if (sortedRoles.length === 0) {
+                          return <p className="text-sm text-muted-foreground italic">No admin notes yet.</p>;
+                        }
 
-                      if (sortedRoles.length === 0) {
-                        return <p className="text-sm text-muted-foreground italic">No admin notes yet.</p>;
-                      }
-
-                      return sortedRoles.map((role) => (
-                        <div key={role} className="space-y-3">
-                          <h4 className="font-semibold text-sm text-university-navy border-b pb-2">
-                            {role} Notes
-                          </h4>
-                          {notesByRole[role].map((history: any, idx: number) => (
-                            <div
-                              key={history.history_id || idx}
-                              className="border-l-4 border-blue-500 pl-4 py-2 bg-blue-50 rounded-r"
-                            >
-                              <div className="flex items-start justify-between mb-2">
-                                <div>
-                                  <p className="text-xs text-muted-foreground">
-                                    {history.firstName && history.lastName
-                                      ? `${history.firstName} ${history.lastName}`
-                                      : "Unknown"}
-                                    {history.status_name && ` • ${history.status_name}`}
-                                  </p>
+                        return sortedRoles.map((role) => (
+                          <div key={role} className="space-y-3">
+                            <h4 className="font-semibold text-sm text-university-navy border-b pb-2">
+                              {role} Notes
+                            </h4>
+                            {notesByRole[role].map((history: any, idx: number) => (
+                              <div
+                                key={history.history_id || idx}
+                                className="border-l-4 border-blue-500 pl-4 py-2 bg-blue-50 rounded-r"
+                              >
+                                <div className="flex items-start justify-between mb-2">
+                                  <div>
+                                    <p className="text-xs text-muted-foreground">
+                                      {history.firstName && history.lastName
+                                        ? `${history.firstName} ${history.lastName}`
+                                        : role}
+                                      {history.status_name && ` • ${history.status_name}`}
+                                    </p>
+                                  </div>
+                                  <span className="text-xs text-muted-foreground">
+                                    {new Date(history.changed_at).toLocaleString()}
+                                  </span>
                                 </div>
-                                <span className="text-xs text-muted-foreground">
-                                  {new Date(history.changed_at).toLocaleString()}
-                                </span>
+                                <p className="text-sm text-gray-700 mt-1">{history.note}</p>
                               </div>
-                              <p className="text-sm text-gray-700 mt-1">{history.note}</p>
-                            </div>
-                          ))}
-                        </div>
-                      ));
-                    })()}
-                  </div>
-                </Card>
-              )}
+                            ))}
+                          </div>
+                        ));
+                      })()}
+                    </div>
+                  </Card>
+                )}
 
               {/* Action Buttons */}
               <div className="flex justify-end space-x-3 pt-4 border-t">

@@ -1422,40 +1422,34 @@ const BoardSecretaryDashboard = () => {
                               Created: {new Date(request.created_at).toLocaleString()}
                             </div>
                           </div>
-                          <div className="flex flex-col space-y-2 ml-4">
-                            <Button
-                              size="sm"
-                              variant="university"
-                              onClick={() => handleViewEventRequest(request.req_id)}
-                              disabled={loading}
-                            >
-                              <Eye className="h-3 w-3 mr-1" />
-                              View Details
-                            </Button>
-                            {/* Show Update Status button for Pending (status 1), show status badge for others */}
-                            {/* {request.status_id === 1 ? (
-                              <Button 
-                                size="sm" 
-                                variant="outline"
-                                onClick={() => handleChangeEventStatus(request)}
-                                disabled={loading}
-                              >
-                                <Edit className="h-3 w-3 mr-1" />
-                                Update Status
-                              </Button>
-                            ) : request.status_id === 2 ? (
-                              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-center">
-                                Approved: {request.status_name}
-                              </Badge>
-                            ) : request.status_id === 3 ? (
-                              <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 text-center">
-                                Rejected: {request.status_name}
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-center">
-                                {request.status_name}
-                              </Badge>
-                            )} */}
+                          <div className="flex items-start gap-2 ml-4">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onClick={() => handleViewEventRequest(request.req_id)}
+                                  disabled={loadingEventRequests}
+                                >
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View Details
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => handleChangeEventStatus(request)}
+                                  disabled={loadingEventRequests}
+                                >
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Update Status
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </div>
                       </Card>

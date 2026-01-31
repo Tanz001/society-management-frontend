@@ -264,43 +264,72 @@ const EventRequestDetailModal: React.FC<EventRequestDetailModalProps> = ({
                             </Card>
                         )}
 
-                        <Card className="p-4 shadow-sm border-slate-200">
-                            <h3 className="font-semibold mb-3 text-slate-800 border-b pb-2">Submitted By (Student)</h3>
-                            <div className="space-y-2 text-sm">
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Name:</span>
-                                    <span className="font-medium text-slate-900">
-                                        {getRequesterName(eventRequest)}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Email:</span>
-                                    <span className="font-medium text-slate-900">{eventRequest.president_email || getRequesterEmail(eventRequest)}</span>
-                                </div>
-                                {getRequesterRoll(eventRequest) && (
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Roll No:</span>
-                                        <span className="font-medium text-slate-900">{getRequesterRoll(eventRequest)}</span>
-                                    </div>
-                                )}
-                            </div>
-                        </Card>
-
-                        {/* Slot Status Information */}
-                        {eventRequest.slot_status_name && (
-                            <Card className="p-4 shadow-sm border-slate-200">
-                                <h3 className="font-semibold mb-3 text-slate-800 border-b pb-2">Slot Status</h3>
-                                <div className="space-y-2 text-sm">
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Slot Status:</span>
-                                        <Badge variant={eventRequest.slot_status_id === 2 ? "default" : "secondary"}>
-                                            {eventRequest.slot_status_name}
-                                        </Badge>
-                                    </div>
+                        {/* Slot Information */}
+                        {(eventRequest.slot_status_name || eventRequest.slot_date || eventRequest.slot_time_from) && (
+                            <Card className="p-4 shadow-sm border-slate-200 border-l-4 border-l-blue-500">
+                                <h3 className="font-semibold mb-3 text-slate-800 border-b pb-2 flex items-center gap-2">
+                                    <Calendar className="h-5 w-5 text-blue-500" />
+                                    Slot Details
+                                </h3>
+                                <div className="space-y-3 text-sm">
+                                    {eventRequest.slot_status_name && (
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-muted-foreground">Status:</span>
+                                            <Badge variant={eventRequest.slot_status_id === 2 ? "default" : eventRequest.slot_status_id === 3 ? "destructive" : "secondary"}>
+                                                {eventRequest.slot_status_name}
+                                            </Badge>
+                                        </div>
+                                    )}
+                                    {eventRequest.slot_date && (
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground flex items-center gap-1">
+                                                <Calendar className="h-4 w-4" />
+                                                Date:
+                                            </span>
+                                            <span className="font-medium text-slate-900">
+                                                {new Date(eventRequest.slot_date).toLocaleDateString('en-US', {
+                                                    weekday: 'long',
+                                                    year: 'numeric',
+                                                    month: 'long',
+                                                    day: 'numeric'
+                                                })}
+                                            </span>
+                                        </div>
+                                    )}
+                                    {(eventRequest.slot_time_from || eventRequest.slot_time_to) && (
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground flex items-center gap-1">
+                                                <Clock className="h-4 w-4" />
+                                                Time:
+                                            </span>
+                                            <span className="font-medium text-slate-900">
+                                                {eventRequest.slot_time_from
+                                                    ? formatTimeToAMPM(eventRequest.slot_time_from)
+                                                    : "Not specified"}
+                                                {eventRequest.slot_time_to && eventRequest.slot_time_from && (
+                                                    <> - {formatTimeToAMPM(eventRequest.slot_time_to)}</>
+                                                )}
+                                            </span>
+                                        </div>
+                                    )}
+                                    {(eventRequest.venue_name || eventRequest.venue) && (
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground flex items-center gap-1">
+                                                <MapPin className="h-4 w-4" />
+                                                Venue:
+                                            </span>
+                                            <span className="font-medium text-slate-900">
+                                                {eventRequest.venue_name || eventRequest.venue || "Not specified"}
+                                            </span>
+                                        </div>
+                                    )}
                                     {eventRequest.slot_status_id === 2 && (
-                                        <p className="text-xs text-green-600 mt-2 font-medium">
-                                            ✓ Slot has been granted by Protocol Office.
-                                        </p>
+                                        <div className="mt-3 pt-3 border-t border-slate-200">
+                                            <p className="text-xs text-green-600 font-medium flex items-center gap-1">
+                                                <span className="text-green-600">✓</span>
+                                                Slot has been granted by Protocol Office.
+                                            </p>
+                                        </div>
                                     )}
                                 </div>
                             </Card>
@@ -561,7 +590,7 @@ const EventRequestDetailModal: React.FC<EventRequestDetailModalProps> = ({
                                                                 <p className="text-xs font-medium text-slate-700">
                                                                     {history.firstName && history.lastName
                                                                         ? `${history.firstName} ${history.lastName}`
-                                                                        : "Unknown"}
+                                                                        : role}
                                                                     {history.status_name && <span className="text-muted-foreground font-normal"> changed status to {history.status_name}</span>}
                                                                 </p>
                                                             </div>

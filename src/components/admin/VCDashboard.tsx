@@ -5,11 +5,17 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Users, 
-  Building, 
-  Calendar, 
+import {
+  Users,
+  Building,
+  Calendar,
   CheckCircle,
   XCircle,
   Eye,
@@ -21,7 +27,8 @@ import {
   Crown,
   Edit,
   MapPin,
-  Download
+  Download,
+  MoreVertical
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -79,8 +86,8 @@ const VCDashboard = () => {
   const [error, setError] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
   const [reviewNote, setReviewNote] = useState("");
-  // Default to event-requests tab; societies overview is now hidden
-  const [activeTab, setActiveTab] = useState<string>("event-requests");
+  // Default to overview (societies) tab
+  const [activeTab, setActiveTab] = useState<string>("overview");
   const navigate = useNavigate();
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [eventRequests, setEventRequests] = useState<any[]>([]);
@@ -102,7 +109,13 @@ const VCDashboard = () => {
   const [loadingEventReports, setLoadingEventReports] = useState(false);
   const [selectedReport, setSelectedReport] = useState<any | null>(null);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
-  
+
+  // Society detail modal states
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [selectedSocietyDetail, setSelectedSocietyDetail] = useState<Society | null>(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [advisorInfo, setAdvisorInfo] = useState<any>(null);
+
   // Pagination states
   const [societiesCurrentPage, setSocietiesCurrentPage] = useState(1);
   const [eventRequestsCurrentPage, setEventRequestsCurrentPage] = useState(1);
@@ -119,34 +132,57 @@ const VCDashboard = () => {
     }
   };
 
- // Fetch societies approved by registrar for VC
-const fetchSocietiesForVC = async () => {
-  try {
-    setLoading(true);
-    setError("");
+  // Fetch societies approved by registrar for VC
+  const fetchSocietiesForVC = async () => {
+    try {
+      setLoading(true);
+      setError("");
 
-    const token = localStorage.getItem("token");
-    if (!token) throw new Error("No authentication token found");
+      const token = localStorage.getItem("token");
+      if (!token) throw new Error("No authentication token found");
 
-    const response = await axios.post(
-      `${import.meta.env.VITE_API_URL}/admin/societies-by-role`,
-      { role: "vc" },
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+      const response = await axios.post(
+        `${import.meta.env.VITE_API_URL}/admin/societies-by-role`,
+        { role: "vc" },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      console.log("Societies for VC - Full response:", response.data);
+      console.log("Societies for VC - Success:", response.data.success);
+      console.log("Societies for VC - Count:", response.data.count || response.data.societies?.length || 0);
+      console.log("Societies for VC - Data:", response.data.societies);
+      
+      if (response.data && response.data.success) {
+        const societiesList = response.data.societies || [];
+        console.log("Setting societies:", societiesList.length);
+        setSocieties(societiesList);
+        
+        if (societiesList.length === 0) {
+          console.warn("No societies found with status_id IN (6, 8, 10, 11)");
+        }
+      } else {
+        console.error("API response indicates failure:", response.data);
+        setSocieties([]);
+        setError(response.data?.message || "Failed to fetch societies");
       }
-    );
-
-    console.log("Societies for VC fetched:", response.data);
-    setSocieties(response.data.societies || []);
-  } catch (err: any) {
-    console.error("Error fetching societies:", err);
-    setError(err.response?.data?.message || err.message || "Failed to fetch societies");
-  } finally {
-    setLoading(false);
-  }
-};
+    } catch (err: any) {
+      console.error("Error fetching societies:", err);
+      const errorMessage = err.response?.data?.message || err.message || "Failed to fetch societies";
+      setError(errorMessage);
+      setSocieties([]);
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
 
   // Handle society review
@@ -154,7 +190,7 @@ const fetchSocietiesForVC = async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem("token");
-      
+
       // Fetch detailed society information
       const response = await axios.get(`${import.meta.env.VITE_API_URL}/admin/societies/${society.society_id}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -163,7 +199,7 @@ const fetchSocietiesForVC = async () => {
       setSelectedSociety(response.data.data);
       setIsModalOpen(true);
       setReviewNote("");
-      
+
       // Fetch allowed statuses based on the society's current status
       await fetchStatuses(society.status_id);
     } catch (err: any) {
@@ -171,6 +207,58 @@ const fetchSocietiesForVC = async () => {
       setError(err.response?.data?.message || "Failed to fetch society details");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Handle view society details (for detail modal)
+  const handleViewDetails = async (society: Society) => {
+    try {
+      setLoadingDetails(true);
+      const token = localStorage.getItem("token");
+      if (!token) return;
+
+      // Fetch detailed society information with advisor details
+      const response = await axios.get(
+        `${import.meta.env.VITE_API_URL}/admin/societies/${society.society_id}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      const societyData = response.data.data;
+      setSelectedSocietyDetail(societyData);
+
+      // Fetch advisor details from faculty table if faculty_id exists
+      if (societyData.faculty_id) {
+        try {
+          const advisorResponse = await axios.get(
+            `${import.meta.env.VITE_API_URL}/admin/faculty`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            }
+          );
+
+          const advisor = advisorResponse.data.faculty?.find(
+            (f: any) => f.faculty_id === societyData.faculty_id
+          );
+          if (advisor) {
+            setAdvisorInfo(advisor);
+          }
+        } catch (advisorErr) {
+          console.error("Error fetching advisor details:", advisorErr);
+        }
+      }
+
+      setIsDetailModalOpen(true);
+    } catch (err: any) {
+      console.error("Error fetching society details:", err);
+      toast({
+        title: "Error",
+        description: err.response?.data?.message || "Failed to fetch society details",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingDetails(false);
     }
   };
 
@@ -206,25 +294,25 @@ const fetchSocietiesForVC = async () => {
       );
 
       console.log(`Society ${action}d successfully:`, response.data);
-      
+
       // Refresh the societies list
       await fetchSocietiesForVC();
-      
+
       // Close modal
       setIsModalOpen(false);
       setSelectedSociety(null);
       setReviewNote("");
-      
+
       // Show success toast
-      const message = action === 'approve' 
-        ? "Society has been officially approved and is now active!" 
+      const message = action === 'approve'
+        ? "Society has been officially approved and is now active!"
         : "Society application has been rejected.";
       toast({
         title: "Success",
         description: message,
         variant: "default",
       });
-      
+
     } catch (err: any) {
       console.error(`Error ${action}ing society:`, err);
       toast({
@@ -258,17 +346,17 @@ const fetchSocietiesForVC = async () => {
     try {
       setLoadingEventRequests(true);
       setError("");
-  
+
       const currentUser = getCurrentUser();
       const token = localStorage.getItem("token");
-  
+
       if (!token) {
         throw new Error("No authentication token found");
       }
-  
+
       const response = await axios.post(
         `${import.meta.env.VITE_API_URL}/admin/event-requests`,  // ✅ POST
-        { 
+        {
           role: currentUser?.role || "vc",
           filter: eventRequestFilter
         },
@@ -278,7 +366,7 @@ const fetchSocietiesForVC = async () => {
           },
         }
       );
-  
+
       console.log("Event requests fetched:", response.data);
       setEventRequests(response.data.data || []);
       setEventRequestsCurrentPage(1); // Reset to first page when data changes
@@ -289,7 +377,7 @@ const fetchSocietiesForVC = async () => {
       setLoadingEventRequests(false);
     }
   };
-  
+
 
 
   // Handle view event request details
@@ -297,7 +385,7 @@ const fetchSocietiesForVC = async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem("token");
-      
+
       const response = await axios.get(`${import.meta.env.VITE_API_URL}/admin/event-requests/${reqId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -382,25 +470,25 @@ const fetchSocietiesForVC = async () => {
         }
       );
 
-        console.log("Event request status updated successfully:", response.data);
-        
-        // Refresh the event requests list and stats
-        await fetchAllEventRequests();
-        await fetchEventRequestStats();
-        
-        // Close modal
-        setIsEventStatusModalOpen(false);
-        setSelectedEventRequest(null);
-        setSelectedEventStatus(0);
-        setEventStatusNote("");
-      
+      console.log("Event request status updated successfully:", response.data);
+
+      // Refresh the event requests list and stats
+      await fetchAllEventRequests();
+      await fetchEventRequestStats();
+
+      // Close modal
+      setIsEventStatusModalOpen(false);
+      setSelectedEventRequest(null);
+      setSelectedEventStatus(0);
+      setEventStatusNote("");
+
       // Show success toast
       toast({
         title: "Success",
         description: "Event request status updated successfully!",
         variant: "default",
       });
-      
+
     } catch (err: any) {
       console.error("Error updating event request status:", err);
       toast({
@@ -419,9 +507,12 @@ const fetchSocietiesForVC = async () => {
     fetchStatuses();
   }, []);
 
-  // Fetch event requests when tab is active or filter changes
+  // Fetch data when tab is active or filter changes
   useEffect(() => {
-    if (activeTab === "event-requests") {
+    if (activeTab === "overview") {
+      fetchSocietiesForVC();
+      setSocietiesCurrentPage(1); // Reset to first page when switching tabs
+    } else if (activeTab === "event-requests") {
       fetchAllEventRequests();
       fetchEventRequestStats();
     } else if (activeTab === "event-reports") {
@@ -434,13 +525,13 @@ const fetchSocietiesForVC = async () => {
     try {
       setLoadingEventReports(true);
       setError("");
-  
+
       const token = localStorage.getItem("token");
-  
+
       if (!token) {
         throw new Error("No authentication token found");
       }
-  
+
       const response = await axios.get(
         `${import.meta.env.VITE_API_URL}/admin/event-reports`,
         {
@@ -449,7 +540,7 @@ const fetchSocietiesForVC = async () => {
           },
         }
       );
-  
+
       console.log("Event reports fetched:", response.data);
       setEventReports(response.data.data || []);
     } catch (err: any) {
@@ -465,7 +556,7 @@ const fetchSocietiesForVC = async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem("token");
-      
+
       const response = await axios.get(`${import.meta.env.VITE_API_URL}/admin/event-reports/${reportId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -499,12 +590,12 @@ const fetchSocietiesForVC = async () => {
                 <Crown className="h-6 w-6 mr-2" />
                 Vice Chancellor Dashboard
               </h1>
-             {/* <p className="text-white/80">Final Review - Societies Approved by Registrar</p> */}
+              {/* <p className="text-white/80">Final Review - Societies Approved by Registrar</p> */}
             </div>
             <div className="flex items-center space-x-3">
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 className="text-white border-white hover:bg-white/20 bg-transparent"
                 onClick={handleLogout}
               >
@@ -575,19 +666,18 @@ const fetchSocietiesForVC = async () => {
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="mb-6">
-              {/* Societies tab hidden as per latest requirements */}
-              {/* <TabsTrigger value="overview">Societies</TabsTrigger> */}
+              <TabsTrigger value="overview">Societies</TabsTrigger>
               <TabsTrigger value="event-requests">Event Requests</TabsTrigger>
               <TabsTrigger value="event-reports">Event Reports</TabsTrigger>
             </TabsList>
 
-            {/* Societies Tab (kept for reference but not reachable from UI) */}
+            {/* Societies Tab */}
             <TabsContent value="overview">
               {/* Actions */}
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-semibold text-university-navy">Societies Ready for Approval</h2>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={fetchSocietiesForVC}
                   disabled={loading}
                 >
@@ -603,147 +693,153 @@ const fetchSocietiesForVC = async () => {
               )}
 
               {/* Societies List */}
-          {loading && societies.length === 0 ? (
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-university-navy mx-auto mb-4"></div>
-              <p className="text-muted-foreground">Loading societies...</p>
-            </div>
-          ) : societies.length > 0 ? (
-            <>
-            <div className="grid gap-6">
-              {societies.slice((societiesCurrentPage - 1) * itemsPerPage, societiesCurrentPage * itemsPerPage).map((society) => (
-                <Card key={society.society_id} className="p-6 shadow-card border-l-4 border-l-university-gold">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start space-x-4 flex-1">
-                      <div className="w-16 h-16 bg-university-navy/10 rounded-lg flex items-center justify-center">
-                        {society.society_logo ? (
-                          <img 
-                            src={`${import.meta.env.VITE_API_URL}/${society.society_logo}`}
-                            alt={society.name}
-                            className="w-12 h-12 rounded-lg object-cover"
-                          />
-                        ) : (
-                          <Building className="h-8 w-8 text-university-navy" />
-                        )}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center mb-2">
-                          <h3 className="text-xl font-semibold text-university-navy mr-3">{society.name}</h3>
-                          <Badge variant="default" className="mr-2 bg-blue-100 text-blue-800">
-                            {society.status_name}
-                          </Badge>
-                          <Badge variant="outline">{society.category}</Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground mb-2">
-                          📍 {society.location} • 👨‍🏫 {society.advisor}
-                        </p>
-                        <p className="text-sm text-muted-foreground mb-2">
-                          📧 {society.student_info.firstName} {society.student_info.lastName} ({society.student_info.rollNo})
-                        </p>
-                        <p className="text-sm text-muted-foreground mb-3">
-                          {society.description.length > 150 
-                            ? `${society.description.substring(0, 150)}...` 
-                            : society.description
-                          }
-                        </p>
-                        <div className="flex items-center text-xs text-muted-foreground">
-                          <Clock className="h-3 w-3 mr-1" />
-                          Registrar Approved: {new Date(society.updated_at).toLocaleDateString()}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex space-x-2 ml-4">
-                      {/* Only show Review button for Approved by Registrar (status 6) - VC's pending items */}
-                      {society.status_id === 6 ? (
-                        <Button 
-                          size="sm" 
-                          variant="university"
-                          onClick={() => handleReviewClick(society)}
-                          disabled={loading}
-                        >
-                          <Eye className="h-3 w-3 mr-1" />
-                         Review
-                        </Button>
-                      ) : (
-                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                          Tracked: {society.status_name}
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-            
-            {/* Pagination for Societies */}
-            {societies.length > itemsPerPage && (
-              <div className="flex items-center justify-between mt-6">
-                <div className="text-sm text-muted-foreground">
-                  Showing {(societiesCurrentPage - 1) * itemsPerPage + 1} to {Math.min(societiesCurrentPage * itemsPerPage, societies.length)} of {societies.length} societies
+              {loading && societies.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-university-navy mx-auto mb-4"></div>
+                  <p className="text-muted-foreground">Loading societies...</p>
                 </div>
-                <Pagination>
-                  <PaginationContent>
-                    <PaginationItem>
-                      <PaginationPrevious 
-                        onClick={() => setSocietiesCurrentPage(prev => Math.max(1, prev - 1))}
-                        className={societiesCurrentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                      />
-                    </PaginationItem>
-                    {Array.from({ length: Math.ceil(societies.length / itemsPerPage) }, (_, i) => i + 1)
-                      .filter(page => {
-                        return page === 1 || 
-                               page === Math.ceil(societies.length / itemsPerPage) ||
-                               (page >= societiesCurrentPage - 1 && page <= societiesCurrentPage + 1);
-                      })
-                      .map((page, idx, array) => {
-                        const prevPage = array[idx - 1];
-                        const showEllipsisBefore = prevPage && page - prevPage > 1;
-                        
-                        return (
-                          <React.Fragment key={page}>
-                            {showEllipsisBefore && (
-                              <PaginationItem>
-                                <PaginationEllipsis />
-                              </PaginationItem>
-                            )}
-                            <PaginationItem>
-                              <PaginationLink
-                                onClick={() => setSocietiesCurrentPage(page)}
-                                isActive={societiesCurrentPage === page}
-                                className="cursor-pointer"
-                              >
-                                {page}
-                              </PaginationLink>
-                            </PaginationItem>
-                          </React.Fragment>
-                        );
-                      })}
-                    <PaginationItem>
-                      <PaginationNext 
-                        onClick={() => setSocietiesCurrentPage(prev => Math.min(Math.ceil(societies.length / itemsPerPage), prev + 1))}
-                        className={societiesCurrentPage >= Math.ceil(societies.length / itemsPerPage) ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                      />
-                    </PaginationItem>
-                  </PaginationContent>
-                </Pagination>
-              </div>
-            )}
-            </>
-          ) : (
-            <div className="text-center py-12">
-              <Crown className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-              <h3 className="text-lg font-medium mb-2">No Pending Approvals</h3>
-              <p className="text-muted-foreground">There are no societies waiting for Vice Chancellor approval.</p>
-            </div>
-          )}
+              ) : societies.length > 0 ? (
+                <>
+                  <div className="grid gap-6">
+                    {societies.slice((societiesCurrentPage - 1) * itemsPerPage, societiesCurrentPage * itemsPerPage).map((society) => (
+                      <Card key={society.society_id} className="p-6 shadow-card border-l-4 border-l-university-gold">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-start space-x-4 flex-1">
+                            <div className="w-16 h-16 bg-university-navy/10 rounded-lg flex items-center justify-center">
+                              {society.society_logo ? (
+                                <img
+                                  src={`${import.meta.env.VITE_API_URL}/${society.society_logo}`}
+                                  alt={society.name}
+                                  className="w-12 h-12 rounded-lg object-cover"
+                                />
+                              ) : (
+                                <Building className="h-8 w-8 text-university-navy" />
+                              )}
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex items-center mb-2">
+                                <h3 className="text-xl font-semibold text-university-navy mr-3">{society.name}</h3>
+                                <Badge variant="default" className="mr-2 bg-blue-100 text-blue-800">
+                                  {society.status_name}
+                                </Badge>
+                                <Badge variant="outline">{society.category}</Badge>
+                              </div>
+                              <p className="text-sm text-muted-foreground mb-2">
+                                📍 {society.location} • 👨‍🏫 {society.advisor}
+                              </p>
+                              {society.student_info && (
+                                <p className="text-sm text-muted-foreground mb-2">
+                                  📧 {society.student_info.firstName} {society.student_info.lastName} ({society.student_info.rollNo})
+                                </p>
+                              )}
+                              <p className="text-sm text-muted-foreground mb-3">
+                                {society.description.length > 150
+                                  ? `${society.description.substring(0, 150)}...`
+                                  : society.description
+                                }
+                              </p>
+                              <div className="flex items-center text-xs text-muted-foreground">
+                                <Clock className="h-3 w-3 mr-1" />
+                                Updated: {new Date(society.updated_at || society.created_at).toLocaleDateString()}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-start gap-2 ml-4">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onClick={() => handleViewDetails(society)}
+                                  disabled={loadingDetails}
+                                >
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View Details
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+
+                  {/* Pagination for Societies */}
+                  {societies.length > itemsPerPage && (
+                    <div className="flex items-center justify-between mt-6">
+                      <div className="text-sm text-muted-foreground">
+                        Showing {(societiesCurrentPage - 1) * itemsPerPage + 1} to {Math.min(societiesCurrentPage * itemsPerPage, societies.length)} of {societies.length} societies
+                      </div>
+                      <Pagination>
+                        <PaginationContent>
+                          <PaginationItem>
+                            <PaginationPrevious
+                              onClick={() => setSocietiesCurrentPage(prev => Math.max(1, prev - 1))}
+                              className={societiesCurrentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                            />
+                          </PaginationItem>
+                          {Array.from({ length: Math.ceil(societies.length / itemsPerPage) }, (_, i) => i + 1)
+                            .filter(page => {
+                              return page === 1 ||
+                                page === Math.ceil(societies.length / itemsPerPage) ||
+                                (page >= societiesCurrentPage - 1 && page <= societiesCurrentPage + 1);
+                            })
+                            .map((page, idx, array) => {
+                              const prevPage = array[idx - 1];
+                              const showEllipsisBefore = prevPage && page - prevPage > 1;
+
+                              return (
+                                <React.Fragment key={page}>
+                                  {showEllipsisBefore && (
+                                    <PaginationItem>
+                                      <PaginationEllipsis />
+                                    </PaginationItem>
+                                  )}
+                                  <PaginationItem>
+                                    <PaginationLink
+                                      onClick={() => setSocietiesCurrentPage(page)}
+                                      isActive={societiesCurrentPage === page}
+                                      className="cursor-pointer"
+                                    >
+                                      {page}
+                                    </PaginationLink>
+                                  </PaginationItem>
+                                </React.Fragment>
+                              );
+                            })}
+                          <PaginationItem>
+                            <PaginationNext
+                              onClick={() => setSocietiesCurrentPage(prev => Math.min(Math.ceil(societies.length / itemsPerPage), prev + 1))}
+                              className={societiesCurrentPage >= Math.ceil(societies.length / itemsPerPage) ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                            />
+                          </PaginationItem>
+                        </PaginationContent>
+                      </Pagination>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-center py-12">
+                  <Crown className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <h3 className="text-lg font-medium mb-2">No Pending Approvals</h3>
+                  <p className="text-muted-foreground">There are no societies waiting for Vice Chancellor approval.</p>
+                </div>
+              )}
             </TabsContent>
 
             {/* Event Requests Tab */}
             <TabsContent value="event-requests">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-semibold text-university-navy">Event Requests</h2>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={fetchAllEventRequests}
                   disabled={loadingEventRequests}
                 >
@@ -802,137 +898,131 @@ const fetchSocietiesForVC = async () => {
                 </div>
               ) : eventRequests.length > 0 ? (
                 <>
-                <div className="grid gap-4">
-                  {eventRequests.slice((eventRequestsCurrentPage - 1) * itemsPerPage, eventRequestsCurrentPage * itemsPerPage).map((request) => (
-                    <Card key={request.req_id} className="p-4 shadow-card">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center mb-2 flex-wrap gap-2">
-                            <h3 className="text-lg font-semibold text-university-navy">{request.title}</h3>
-                            {request.status_name && (
-                              <Badge variant={request.status_id === 2 ? "default" : request.status_id === 3 ? "destructive" : "secondary"}>
-                                {request.status_name}
-                              </Badge>
-                            )}
-                            {request.society_name && (
-                              <Badge variant="outline">{request.society_name}</Badge>
-                            )}
-                          </div>
-                          <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                            {request.description}
-                          </p>
-                          <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mb-2">
-                            <span>📅 {new Date(request.event_date).toLocaleDateString()}</span>
-                            <span>🕐 {request.event_time ? formatTimeToAMPM(request.event_time) : request.time_from ? formatTimeToAMPM(request.time_from) : "N/A"}</span>
-                            <span>📍 {request.venue}</span>
-                            {request.firstName && request.lastName && (
-                              <span>👤 {request.firstName} {request.lastName}</span>
-                            )}
-                          </div>
-                          {request.note && (
-                            <div className="bg-blue-50 border-l-4 border-blue-200 p-2 mt-2 rounded">
-                              <p className="text-xs font-medium text-blue-900 mb-1">Note:</p>
-                              <p className="text-xs text-blue-800">{request.note}</p>
+                  <div className="grid gap-4">
+                    {eventRequests.slice((eventRequestsCurrentPage - 1) * itemsPerPage, eventRequestsCurrentPage * itemsPerPage).map((request) => (
+                      <Card key={request.req_id} className="p-4 shadow-card">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center mb-2 flex-wrap gap-2">
+                              <h3 className="text-lg font-semibold text-university-navy">{request.title}</h3>
+                              {request.status_name && (
+                                <Badge variant={request.status_id === 2 ? "default" : request.status_id === 3 ? "destructive" : "secondary"}>
+                                  {request.status_name}
+                                </Badge>
+                              )}
+                              {request.society_name && (
+                                <Badge variant="outline">{request.society_name}</Badge>
+                              )}
                             </div>
-                          )}
-                          <div className="flex items-center text-xs text-muted-foreground mt-2">
-                            <Clock className="h-3 w-3 mr-1" />
-                            Created: {new Date(request.created_at).toLocaleString()}
+                            <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                              {request.description}
+                            </p>
+                            <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mb-2">
+                              <span>📅 {new Date(request.event_date).toLocaleDateString()}</span>
+                              <span>🕐 {request.event_time ? formatTimeToAMPM(request.event_time) : request.time_from ? formatTimeToAMPM(request.time_from) : "N/A"}</span>
+                              <span>📍 {request.venue}</span>
+                              {request.firstName && request.lastName && (
+                                <span>👤 {request.firstName} {request.lastName}</span>
+                              )}
+                            </div>
+                            {request.note && (
+                              <div className="bg-blue-50 border-l-4 border-blue-200 p-2 mt-2 rounded">
+                                <p className="text-xs font-medium text-blue-900 mb-1">Note:</p>
+                                <p className="text-xs text-blue-800">{request.note}</p>
+                              </div>
+                            )}
+                            <div className="flex items-center text-xs text-muted-foreground mt-2">
+                              <Clock className="h-3 w-3 mr-1" />
+                              Created: {new Date(request.created_at).toLocaleString()}
+                            </div>
+                          </div>
+                          <div className="flex items-start gap-2 ml-4">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onClick={() => handleViewEventRequest(request.req_id)}
+                                  disabled={loadingEventRequests}
+                                >
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View Details
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => handleChangeEventStatus(request)}
+                                  disabled={loadingEventRequests}
+                                >
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Update Status
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </div>
-                        <div className="flex flex-col space-y-2 ml-4">
-                          <Button 
-                            size="sm" 
-                            variant="university"
-                            onClick={() => handleViewEventRequest(request.req_id)}
-                            disabled={loading}
-                          >
-                            <Eye className="h-3 w-3 mr-1" />
-                            View Details
-                          </Button>
-                          {/* Show Update Status button for status 6 (pending for VC), show status badge for others */}
-                          {request.status_id === 6 ? (
-                            <Button 
-                              size="sm" 
-                              variant="outline"
-                              onClick={() => handleChangeEventStatus(request)}
-                              disabled={loading}
-                            >
-                              <Edit className="h-3 w-3 mr-1" />
-                              Update Status
-                            </Button>
-                          ) : request.status_id === 8 ? (
-                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-center">
-                              Approved: {request.status_name}
-                            </Badge>
-                          ) : request.status_id === 7 || request.status_id === 9 ? (
-                            <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 text-center">
-                              Rejected: {request.status_name}
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-center">
-                              {request.status_name}
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-                
-                {/* Pagination for Event Requests */}
-                {eventRequests.length > itemsPerPage && (
-                  <div className="flex items-center justify-between mt-6">
-                    <div className="text-sm text-muted-foreground">
-                      Showing {(eventRequestsCurrentPage - 1) * itemsPerPage + 1} to {Math.min(eventRequestsCurrentPage * itemsPerPage, eventRequests.length)} of {eventRequests.length} event requests
-                    </div>
-                    <Pagination>
-                      <PaginationContent>
-                        <PaginationItem>
-                          <PaginationPrevious 
-                            onClick={() => setEventRequestsCurrentPage(prev => Math.max(1, prev - 1))}
-                            className={eventRequestsCurrentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                          />
-                        </PaginationItem>
-                        {Array.from({ length: Math.ceil(eventRequests.length / itemsPerPage) }, (_, i) => i + 1)
-                          .filter(page => {
-                            return page === 1 || 
-                                   page === Math.ceil(eventRequests.length / itemsPerPage) ||
-                                   (page >= eventRequestsCurrentPage - 1 && page <= eventRequestsCurrentPage + 1);
-                          })
-                          .map((page, idx, array) => {
-                            const prevPage = array[idx - 1];
-                            const showEllipsisBefore = prevPage && page - prevPage > 1;
-                            
-                            return (
-                              <React.Fragment key={page}>
-                                {showEllipsisBefore && (
-                                  <PaginationItem>
-                                    <PaginationEllipsis />
-                                  </PaginationItem>
-                                )}
-                                <PaginationItem>
-                                  <PaginationLink
-                                    onClick={() => setEventRequestsCurrentPage(page)}
-                                    isActive={eventRequestsCurrentPage === page}
-                                    className="cursor-pointer"
-                                  >
-                                    {page}
-                                  </PaginationLink>
-                                </PaginationItem>
-                              </React.Fragment>
-                            );
-                          })}
-                        <PaginationItem>
-                          <PaginationNext 
-                            onClick={() => setEventRequestsCurrentPage(prev => Math.min(Math.ceil(eventRequests.length / itemsPerPage), prev + 1))}
-                            className={eventRequestsCurrentPage >= Math.ceil(eventRequests.length / itemsPerPage) ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                          />
-                        </PaginationItem>
-                      </PaginationContent>
-                    </Pagination>
+                      </Card>
+                    ))}
                   </div>
-                )}
+
+                  {/* Pagination for Event Requests */}
+                  {eventRequests.length > itemsPerPage && (
+                    <div className="flex items-center justify-between mt-6">
+                      <div className="text-sm text-muted-foreground">
+                        Showing {(eventRequestsCurrentPage - 1) * itemsPerPage + 1} to {Math.min(eventRequestsCurrentPage * itemsPerPage, eventRequests.length)} of {eventRequests.length} event requests
+                      </div>
+                      <Pagination>
+                        <PaginationContent>
+                          <PaginationItem>
+                            <PaginationPrevious
+                              onClick={() => setEventRequestsCurrentPage(prev => Math.max(1, prev - 1))}
+                              className={eventRequestsCurrentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                            />
+                          </PaginationItem>
+                          {Array.from({ length: Math.ceil(eventRequests.length / itemsPerPage) }, (_, i) => i + 1)
+                            .filter(page => {
+                              return page === 1 ||
+                                page === Math.ceil(eventRequests.length / itemsPerPage) ||
+                                (page >= eventRequestsCurrentPage - 1 && page <= eventRequestsCurrentPage + 1);
+                            })
+                            .map((page, idx, array) => {
+                              const prevPage = array[idx - 1];
+                              const showEllipsisBefore = prevPage && page - prevPage > 1;
+
+                              return (
+                                <React.Fragment key={page}>
+                                  {showEllipsisBefore && (
+                                    <PaginationItem>
+                                      <PaginationEllipsis />
+                                    </PaginationItem>
+                                  )}
+                                  <PaginationItem>
+                                    <PaginationLink
+                                      onClick={() => setEventRequestsCurrentPage(page)}
+                                      isActive={eventRequestsCurrentPage === page}
+                                      className="cursor-pointer"
+                                    >
+                                      {page}
+                                    </PaginationLink>
+                                  </PaginationItem>
+                                </React.Fragment>
+                              );
+                            })}
+                          <PaginationItem>
+                            <PaginationNext
+                              onClick={() => setEventRequestsCurrentPage(prev => Math.min(Math.ceil(eventRequests.length / itemsPerPage), prev + 1))}
+                              className={eventRequestsCurrentPage >= Math.ceil(eventRequests.length / itemsPerPage) ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                            />
+                          </PaginationItem>
+                        </PaginationContent>
+                      </Pagination>
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="text-center py-12">
@@ -949,8 +1039,8 @@ const fetchSocietiesForVC = async () => {
             <TabsContent value="event-reports">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-semibold text-university-navy">Event Reports</h2>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={fetchAllEventReports}
                   disabled={loadingEventReports}
                 >
@@ -976,7 +1066,7 @@ const fetchSocietiesForVC = async () => {
                               Report Submitted
                             </Badge>
                           </div>
-                          
+
                           {report.report_description && (
                             <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
                               {report.report_description}
@@ -1025,8 +1115,8 @@ const fetchSocietiesForVC = async () => {
                           </div>
                         </div>
                         <div className="flex flex-col space-y-2 ml-4">
-                          <Button 
-                            size="sm" 
+                          <Button
+                            size="sm"
                             variant="university"
                             onClick={() => handleViewReport(report.report_id)}
                             disabled={loading}
@@ -1034,8 +1124,8 @@ const fetchSocietiesForVC = async () => {
                             <Eye className="h-4 w-4 mr-2" />
                             View Report
                           </Button>
-                          <Button 
-                            size="sm" 
+                          <Button
+                            size="sm"
                             variant="outline"
                             onClick={() => {
                               window.open(`${import.meta.env.VITE_API_URL}/${report.report_file}`, '_blank');
@@ -1261,7 +1351,7 @@ const fetchSocietiesForVC = async () => {
                 <div className="flex items-start space-x-4">
                   <div className="w-20 h-20 bg-white/20 rounded-lg flex items-center justify-center">
                     {selectedSociety.society_logo ? (
-                      <img 
+                      <img
                         src={`${import.meta.env.VITE_API_URL}/${selectedSociety.society_logo}`}
                         alt={selectedSociety.name}
                         className="w-16 h-16 rounded-lg object-cover"
@@ -1374,12 +1464,12 @@ const fetchSocietiesForVC = async () => {
                     Achievements
                   </h3>
                   <div className="space-y-2">
-                  {selectedSociety.achievements.map((achievement: any) => (
-  <div key={achievement.achievement_id} className="flex items-start space-x-2">
-    <div className="w-2 h-2 bg-university-gold rounded-full mt-2"></div>
-    <span className="text-muted-foreground">{achievement.achievement}</span>
-  </div>
-))}
+                    {selectedSociety.achievements.map((achievement: any) => (
+                      <div key={achievement.achievement_id} className="flex items-start space-x-2">
+                        <div className="w-2 h-2 bg-university-gold rounded-full mt-2"></div>
+                        <span className="text-muted-foreground">{achievement.achievement}</span>
+                      </div>
+                    ))}
 
                   </div>
                 </Card>
@@ -1401,16 +1491,16 @@ const fetchSocietiesForVC = async () => {
                 <Button variant="outline" onClick={() => setIsModalOpen(false)} disabled={actionLoading}>
                   Cancel
                 </Button>
-                <Button 
-                  variant="destructive" 
+                <Button
+                  variant="destructive"
                   onClick={() => handleAction('reject')}
                   disabled={actionLoading}
                 >
                   <XCircle className="h-4 w-4 mr-2" />
                   {actionLoading ? "Processing..." : "Rejection"}
                 </Button>
-                <Button 
-                  variant="university" 
+                <Button
+                  variant="university"
                   onClick={() => handleAction('approve')}
                   disabled={actionLoading}
                   className="bg-green-600 hover:bg-green-700"
@@ -1489,11 +1579,11 @@ const fetchSocietiesForVC = async () => {
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Date From:</span>
                       <span className="font-medium">
-                        {selectedEventRequest.date_from 
+                        {selectedEventRequest.date_from
                           ? new Date(selectedEventRequest.date_from).toLocaleDateString()
-                          : selectedEventRequest.event_date 
-                          ? new Date(selectedEventRequest.event_date).toLocaleDateString()
-                          : "Not specified"}
+                          : selectedEventRequest.event_date
+                            ? new Date(selectedEventRequest.event_date).toLocaleDateString()
+                            : "Not specified"}
                       </span>
                     </div>
                     {selectedEventRequest.date_to && (
@@ -1505,11 +1595,11 @@ const fetchSocietiesForVC = async () => {
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Time From:</span>
                       <span className="font-medium">
-                        {selectedEventRequest.time_from 
+                        {selectedEventRequest.time_from
                           ? formatTimeToAMPM(selectedEventRequest.time_from)
-                          : selectedEventRequest.event_time 
-                          ? formatTimeToAMPM(selectedEventRequest.event_time)
-                          : "Not specified"}
+                          : selectedEventRequest.event_time
+                            ? formatTimeToAMPM(selectedEventRequest.event_time)
+                            : "Not specified"}
                       </span>
                     </div>
                     {selectedEventRequest.time_to && (
@@ -1538,10 +1628,10 @@ const fetchSocietiesForVC = async () => {
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Sponsor Amount:</span>
                         <span className="font-medium text-green-600">
-                          {typeof selectedEventRequest.sponsor_amount === 'string' 
+                          {typeof selectedEventRequest.sponsor_amount === 'string'
                             ? (selectedEventRequest.sponsor_amount.startsWith('PKR') || selectedEventRequest.sponsor_amount.startsWith('$')
-                                ? selectedEventRequest.sponsor_amount.replace(/^\$/, 'PKR ')
-                                : `PKR ${selectedEventRequest.sponsor_amount}`)
+                              ? selectedEventRequest.sponsor_amount.replace(/^\$/, 'PKR ')
+                              : `PKR ${selectedEventRequest.sponsor_amount}`)
                             : `PKR ${selectedEventRequest.sponsor_amount}`}
                         </span>
                       </div>
@@ -1579,19 +1669,19 @@ const fetchSocietiesForVC = async () => {
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Name:</span>
                       <span className="font-medium">
-                        {selectedEventRequest.advisor_name || 
-                         (selectedEventRequest.firstName && selectedEventRequest.lastName
-                          ? `${selectedEventRequest.firstName} ${selectedEventRequest.lastName}`
-                          : selectedEventRequest.president_name || "Not available")}
+                        {selectedEventRequest.advisor_name ||
+                          (selectedEventRequest.firstName && selectedEventRequest.lastName
+                            ? `${selectedEventRequest.firstName} ${selectedEventRequest.lastName}`
+                            : selectedEventRequest.president_name || "Not available")}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Email:</span>
                       <span className="font-medium">
-                        {selectedEventRequest.advisor_email || 
-                         selectedEventRequest.president_email || 
-                         selectedEventRequest.email || 
-                         "Not provided"}
+                        {selectedEventRequest.advisor_email ||
+                          selectedEventRequest.president_email ||
+                          selectedEventRequest.email ||
+                          "Not provided"}
                       </span>
                     </div>
                     {selectedEventRequest.advisor_phone && (
@@ -1635,54 +1725,54 @@ const fetchSocietiesForVC = async () => {
               {/* Participants: Students */}
               {Array.isArray(selectedEventRequest.student_participants) &&
                 selectedEventRequest.student_participants.length > 0 && (
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-3 text-university-navy">Student Participants</h3>
-                  <div className="space-y-2 text-sm">
-                    {selectedEventRequest.student_participants.map((s: any, idx: number) => (
-                      <div
-                        key={idx}
-                        className="flex flex-wrap justify-between border-b last:border-0 pb-2 last:pb-0"
-                      >
-                        <span className="font-medium">
-                          {s.academic_program || "Program not specified"}
-                        </span>
-                        <span className="text-muted-foreground">
-                          {s.semester && `Semester: ${s.semester} • `}
-                          {typeof s.no_of_students === "number" && s.no_of_students > 0
-                            ? `${s.no_of_students} students`
-                            : "Count not specified"}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              )}
+                  <Card className="p-4">
+                    <h3 className="font-semibold mb-3 text-university-navy">Student Participants</h3>
+                    <div className="space-y-2 text-sm">
+                      {selectedEventRequest.student_participants.map((s: any, idx: number) => (
+                        <div
+                          key={idx}
+                          className="flex flex-wrap justify-between border-b last:border-0 pb-2 last:pb-0"
+                        >
+                          <span className="font-medium">
+                            {s.academic_program || "Program not specified"}
+                          </span>
+                          <span className="text-muted-foreground">
+                            {s.semester && `Semester: ${s.semester} • `}
+                            {typeof s.no_of_students === "number" && s.no_of_students > 0
+                              ? `${s.no_of_students} students`
+                              : "Count not specified"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
 
               {/* Participants: Staff */}
               {Array.isArray(selectedEventRequest.staff_participants) &&
                 selectedEventRequest.staff_participants.length > 0 && (
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-3 text-university-navy">Staff Participants</h3>
-                  <div className="space-y-2 text-sm">
-                    {selectedEventRequest.staff_participants.map((s: any, idx: number) => (
-                      <div
-                        key={idx}
-                        className="flex flex-wrap justify-between border-b last:border-0 pb-2 last:pb-0"
-                      >
-                        <span className="font-medium">
-                          {s.department || "Department not specified"}
-                        </span>
-                        <span className="text-muted-foreground">
-                          {s.gazetted || "Category not specified"} •{" "}
-                          {typeof s.no_of_staff === "number" && s.no_of_staff > 0
-                            ? `${s.no_of_staff} staff`
-                            : "Count not specified"}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              )}
+                  <Card className="p-4">
+                    <h3 className="font-semibold mb-3 text-university-navy">Staff Participants</h3>
+                    <div className="space-y-2 text-sm">
+                      {selectedEventRequest.staff_participants.map((s: any, idx: number) => (
+                        <div
+                          key={idx}
+                          className="flex flex-wrap justify-between border-b last:border-0 pb-2 last:pb-0"
+                        >
+                          <span className="font-medium">
+                            {s.department || "Department not specified"}
+                          </span>
+                          <span className="text-muted-foreground">
+                            {s.gazetted || "Category not specified"} •{" "}
+                            {typeof s.no_of_staff === "number" && s.no_of_staff > 0
+                              ? `${s.no_of_staff} staff`
+                              : "Count not specified"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
 
               {/* Management Requirements */}
               {selectedEventRequest.management_requirements && (
@@ -1761,137 +1851,137 @@ const fetchSocietiesForVC = async () => {
               {/* Transport Requests */}
               {Array.isArray(selectedEventRequest.transport_requests) &&
                 selectedEventRequest.transport_requests.length > 0 && (
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-3 text-university-navy">Transport Requests</h3>
-                  <div className="space-y-2 text-sm">
-                    {selectedEventRequest.transport_requests.map((t: any, idx: number) => (
-                      <div
-                        key={idx}
-                        className="border rounded p-2 flex flex-wrap justify-between gap-2"
-                      >
-                        <div>
-                          <p className="font-medium">{t.vehicle_type || "Vehicle not specified"}</p>
-                          <p className="text-muted-foreground">
-                            {t.purpose || "Purpose not specified"}
-                          </p>
+                  <Card className="p-4">
+                    <h3 className="font-semibold mb-3 text-university-navy">Transport Requests</h3>
+                    <div className="space-y-2 text-sm">
+                      {selectedEventRequest.transport_requests.map((t: any, idx: number) => (
+                        <div
+                          key={idx}
+                          className="border rounded p-2 flex flex-wrap justify-between gap-2"
+                        >
+                          <div>
+                            <p className="font-medium">{t.vehicle_type || "Vehicle not specified"}</p>
+                            <p className="text-muted-foreground">
+                              {t.purpose || "Purpose not specified"}
+                            </p>
+                          </div>
+                          <div className="text-right text-xs text-muted-foreground">
+                            {t.date && <div>📅 {new Date(t.date).toLocaleDateString()}</div>}
+                            {t.time && <div>🕐 {t.time}</div>}
+                            {t.destination && <div>📍 {t.destination}</div>}
+                            {typeof t.no_of_persons === "number" && t.no_of_persons > 0 && (
+                              <div>👥 {t.no_of_persons} persons</div>
+                            )}
+                          </div>
                         </div>
-                        <div className="text-right text-xs text-muted-foreground">
-                          {t.date && <div>📅 {new Date(t.date).toLocaleDateString()}</div>}
-                          {t.time && <div>🕐 {t.time}</div>}
-                          {t.destination && <div>📍 {t.destination}</div>}
-                          {typeof t.no_of_persons === "number" && t.no_of_persons > 0 && (
-                            <div>👥 {t.no_of_persons} persons</div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              )}
+                      ))}
+                    </div>
+                  </Card>
+                )}
 
               {/* Documents */}
               {Array.isArray(selectedEventRequest.documents) &&
                 selectedEventRequest.documents.length > 0 && (
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-3 text-university-navy">Attached Documents</h3>
-                  <div className="space-y-2 text-sm">
-                    {selectedEventRequest.documents.map((doc: any) => (
-                      <div
-                        key={doc.doc_id}
-                        className="flex items-center justify-between border-b last:border-0 pb-2 last:pb-0"
-                      >
-                        <span>
-                          <span className="font-medium capitalize">{doc.doc_type}</span>
-                          {" – "}
-                          {doc.file_path.split("/").pop()}
-                        </span>
-                        <a
-                          href={`${import.meta.env.VITE_API_URL}${doc.file_path}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-blue-600 hover:underline"
+                  <Card className="p-4">
+                    <h3 className="font-semibold mb-3 text-university-navy">Attached Documents</h3>
+                    <div className="space-y-2 text-sm">
+                      {selectedEventRequest.documents.map((doc: any) => (
+                        <div
+                          key={doc.doc_id}
+                          className="flex items-center justify-between border-b last:border-0 pb-2 last:pb-0"
                         >
-                          View
-                        </a>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              )}
+                          <span>
+                            <span className="font-medium capitalize">{doc.doc_type}</span>
+                            {" – "}
+                            {doc.file_path.split("/").pop()}
+                          </span>
+                          <a
+                            href={`${import.meta.env.VITE_API_URL}${doc.file_path}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-blue-600 hover:underline"
+                          >
+                            View
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
 
               {/* Admin Notes from History - Grouped by Role */}
               {Array.isArray(selectedEventRequest.status_history) &&
                 selectedEventRequest.status_history.length > 0 && (
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-4 text-university-navy">Admin Notes & Status History</h3>
-                  <div className="space-y-6">
-                    {/* Group notes by role */}
-                    {(() => {
-                      const notesByRole: { [key: string]: any[] } = {};
-                      selectedEventRequest.status_history
-                        .filter((h: any) => h.note && h.note.trim() !== "")
-                        .forEach((history: any) => {
-                          const role = history.role || history.role_display_name || history.role_name || "Admin";
-                          if (!notesByRole[role]) {
-                            notesByRole[role] = [];
-                          }
-                          notesByRole[role].push(history);
+                  <Card className="p-4">
+                    <h3 className="font-semibold mb-4 text-university-navy">Admin Notes & Status History</h3>
+                    <div className="space-y-6">
+                      {/* Group notes by role */}
+                      {(() => {
+                        const notesByRole: { [key: string]: any[] } = {};
+                        selectedEventRequest.status_history
+                          .filter((h: any) => h.note && h.note.trim() !== "")
+                          .forEach((history: any) => {
+                            const role = history.role || history.role_display_name || history.role_name || "Admin";
+                            if (!notesByRole[role]) {
+                              notesByRole[role] = [];
+                            }
+                            notesByRole[role].push(history);
+                          });
+
+                        const roleOrder = ["Board Secretary", "Board President", "Registrar", "VC", "Transport Office", "Protocol Office"];
+                        const sortedRoles = Object.keys(notesByRole).sort((a, b) => {
+                          const aIndex = roleOrder.indexOf(a);
+                          const bIndex = roleOrder.indexOf(b);
+                          if (aIndex === -1 && bIndex === -1) return a.localeCompare(b);
+                          if (aIndex === -1) return 1;
+                          if (bIndex === -1) return -1;
+                          return aIndex - bIndex;
                         });
 
-                      const roleOrder = ["Board Secretary", "Board President", "Registrar", "VC", "Transport Office", "Protocol Office"];
-                      const sortedRoles = Object.keys(notesByRole).sort((a, b) => {
-                        const aIndex = roleOrder.indexOf(a);
-                        const bIndex = roleOrder.indexOf(b);
-                        if (aIndex === -1 && bIndex === -1) return a.localeCompare(b);
-                        if (aIndex === -1) return 1;
-                        if (bIndex === -1) return -1;
-                        return aIndex - bIndex;
-                      });
+                        if (sortedRoles.length === 0) {
+                          return <p className="text-sm text-muted-foreground italic">No admin notes yet.</p>;
+                        }
 
-                      if (sortedRoles.length === 0) {
-                        return <p className="text-sm text-muted-foreground italic">No admin notes yet.</p>;
-                      }
-
-                      return sortedRoles.map((role) => (
-                        <div key={role} className="space-y-3">
-                          <h4 className="font-semibold text-sm text-university-navy border-b pb-2">
-                            {role} Notes
-                          </h4>
-                          {notesByRole[role].map((history: any, idx: number) => (
-                            <div
-                              key={history.history_id || idx}
-                              className="border-l-4 border-blue-500 pl-4 py-2 bg-blue-50 rounded-r"
-                            >
-                              <div className="flex items-start justify-between mb-2">
-                                <div>
-                                  <p className="text-xs text-muted-foreground">
-                                    {history.firstName && history.lastName
-                                      ? `${history.firstName} ${history.lastName}`
-                                      : "Unknown"}
-                                    {history.status_name && ` • ${history.status_name}`}
-                                  </p>
+                        return sortedRoles.map((role) => (
+                          <div key={role} className="space-y-3">
+                            <h4 className="font-semibold text-sm text-university-navy border-b pb-2">
+                              {role} Notes
+                            </h4>
+                            {notesByRole[role].map((history: any, idx: number) => (
+                              <div
+                                key={history.history_id || idx}
+                                className="border-l-4 border-blue-500 pl-4 py-2 bg-blue-50 rounded-r"
+                              >
+                                <div className="flex items-start justify-between mb-2">
+                                  <div>
+                                    <p className="text-xs text-muted-foreground">
+                                      {history.firstName && history.lastName
+                                        ? `${history.firstName} ${history.lastName}`
+                                        : role}
+                                      {history.status_name && ` • ${history.status_name}`}
+                                    </p>
+                                  </div>
+                                  <span className="text-xs text-muted-foreground">
+                                    {new Date(history.changed_at).toLocaleString()}
+                                  </span>
                                 </div>
-                                <span className="text-xs text-muted-foreground">
-                                  {new Date(history.changed_at).toLocaleString()}
-                                </span>
+                                <p className="text-sm text-gray-700 mt-1">{history.note}</p>
                               </div>
-                              <p className="text-sm text-gray-700 mt-1">{history.note}</p>
-                            </div>
-                          ))}
-                        </div>
-                      ));
-                    })()}
-                  </div>
-                </Card>
-              )}
+                            ))}
+                          </div>
+                        ));
+                      })()}
+                    </div>
+                  </Card>
+                )}
 
               {/* Action Buttons */}
               <div className="flex justify-end space-x-3 pt-4 border-t">
                 <Button variant="outline" onClick={() => setIsEventRequestModalOpen(false)}>
                   Close
                 </Button>
-                <Button 
-                  variant="university" 
+                <Button
+                  variant="university"
                   onClick={() => {
                     setIsEventRequestModalOpen(false);
                     handleChangeEventStatus(selectedEventRequest);
@@ -1927,8 +2017,8 @@ const fetchSocietiesForVC = async () => {
 
               <div>
                 <label className="text-sm font-medium mb-2 block">Select New Status</label>
-                <Select 
-                  value={selectedEventStatus.toString()} 
+                <Select
+                  value={selectedEventStatus.toString()}
                   onValueChange={(value) => setSelectedEventStatus(parseInt(value))}
                 >
                   <SelectTrigger>
@@ -1963,14 +2053,272 @@ const fetchSocietiesForVC = async () => {
                 <Button variant="outline" onClick={() => setIsEventStatusModalOpen(false)} disabled={actionLoading}>
                   Cancel
                 </Button>
-                <Button 
-                  variant="university" 
+                <Button
+                  variant="university"
                   onClick={handleUpdateEventStatus}
                   disabled={actionLoading || selectedEventStatus === selectedEventRequest.status_id}
                 >
                   {actionLoading ? "Updating..." : "Update Status"}
                 </Button>
               </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Society Detail Modal */}
+      <Dialog open={isDetailModalOpen} onOpenChange={setIsDetailModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Society Details</DialogTitle>
+            <DialogDescription>
+              Complete information about the society
+            </DialogDescription>
+          </DialogHeader>
+
+          {loadingDetails ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-university-navy"></div>
+            </div>
+          ) : selectedSocietyDetail ? (
+            <div className="space-y-6">
+              {/* Header Section with Cover Photo */}
+              {selectedSocietyDetail.cover_photo && (
+                <div className="relative h-48 rounded-lg overflow-hidden">
+                  <img
+                    src={`${import.meta.env.VITE_API_URL}/${selectedSocietyDetail.cover_photo}`}
+                    alt={selectedSocietyDetail.name}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Society Basic Info */}
+              <Card className="p-6">
+                <div className="flex items-start gap-4 mb-4">
+                  {selectedSocietyDetail.society_logo && (
+                    <img
+                      src={`${import.meta.env.VITE_API_URL}/${selectedSocietyDetail.society_logo}`}
+                      alt={selectedSocietyDetail.name}
+                      className="w-20 h-20 rounded-lg object-cover border-2 border-university-gold"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  )}
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <h2 className="text-2xl font-bold text-university-navy">{selectedSocietyDetail.name}</h2>
+                      <Badge variant="secondary">{selectedSocietyDetail.status_name}</Badge>
+                      <Badge variant="outline">{selectedSocietyDetail.category}</Badge>
+                    </div>
+                    <p className="text-muted-foreground mb-2">
+                      <MapPin className="h-4 w-4 inline mr-1" />
+                      {selectedSocietyDetail.location}
+                    </p>
+                    <div className="flex items-center text-sm text-muted-foreground">
+                      <Clock className="h-4 w-4 mr-1" />
+                      Created: {new Date(selectedSocietyDetail.created_at || '').toLocaleDateString()}
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Description */}
+              <Card className="p-6">
+                <h3 className="font-semibold mb-3 text-university-navy flex items-center">
+                  <FileText className="h-5 w-5 mr-2" />
+                  Description
+                </h3>
+                <p className="text-muted-foreground leading-relaxed">{selectedSocietyDetail.description}</p>
+              </Card>
+
+              {/* Purpose */}
+              <Card className="p-6">
+                <h3 className="font-semibold mb-3 text-university-navy flex items-center">
+                  <FileText className="h-5 w-5 mr-2" />
+                  Purpose
+                </h3>
+                <p className="text-muted-foreground leading-relaxed">{selectedSocietyDetail.purpose}</p>
+              </Card>
+
+              {/* Advisor Information */}
+              {(selectedSocietyDetail.advisor_info || advisorInfo || selectedSocietyDetail.advisor) && (
+                <Card className="p-6 border-l-4 border-l-blue-500">
+                  <h3 className="font-semibold mb-3 text-university-navy flex items-center">
+                    <Users className="h-5 w-5 mr-2" />
+                    Advisor Information
+                  </h3>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Name:</span>
+                        <span className="font-medium">
+                          {selectedSocietyDetail.advisor_info?.name || advisorInfo?.name || selectedSocietyDetail.advisor || "N/A"}
+                        </span>
+                      </div>
+                      {(selectedSocietyDetail.advisor_info?.email || advisorInfo?.email) && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Email:</span>
+                          <span className="font-medium">
+                            {selectedSocietyDetail.advisor_info?.email || advisorInfo?.email}
+                          </span>
+                        </div>
+                      )}
+                      {(selectedSocietyDetail.advisor_info?.phone || advisorInfo?.phone) && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Phone:</span>
+                          <span className="font-medium">
+                            {selectedSocietyDetail.advisor_info?.phone || advisorInfo?.phone}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="space-y-2 text-sm">
+                      {(selectedSocietyDetail.advisor_info?.faculty_id || advisorInfo?.faculty_id) && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Faculty ID:</span>
+                          <span className="font-medium">
+                            {selectedSocietyDetail.advisor_info?.faculty_id || advisorInfo?.faculty_id}
+                          </span>
+                        </div>
+                      )}
+                      {(selectedSocietyDetail.advisor_info?.dept || advisorInfo?.dept) && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Department:</span>
+                          <span className="font-medium">
+                            {selectedSocietyDetail.advisor_info?.dept || advisorInfo?.dept}
+                          </span>
+                        </div>
+                      )}
+                      {(selectedSocietyDetail.advisor_info?.cnic || advisorInfo?.cnic) && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">CNIC:</span>
+                          <span className="font-medium">
+                            {selectedSocietyDetail.advisor_info?.cnic || advisorInfo?.cnic}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              )}
+
+              {/* Student Information */}
+              {selectedSocietyDetail.student_info && (
+                <Card className="p-6">
+                  <h3 className="font-semibold mb-3 text-university-navy">Submitted By (Student)</h3>
+                  <div className="grid md:grid-cols-2 gap-4 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Name:</span>
+                      <span className="font-medium">
+                        {selectedSocietyDetail.student_info.firstName} {selectedSocietyDetail.student_info.lastName}
+                      </span>
+                    </div>
+                    {selectedSocietyDetail.student_info.email && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Email:</span>
+                        <span className="font-medium">{selectedSocietyDetail.student_info.email}</span>
+                      </div>
+                    )}
+                    {selectedSocietyDetail.student_info.rollNo && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Roll Number:</span>
+                        <span className="font-medium">{selectedSocietyDetail.student_info.rollNo}</span>
+                      </div>
+                    )}
+                    {selectedSocietyDetail.student_info.university && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">University:</span>
+                        <span className="font-medium">{selectedSocietyDetail.student_info.university}</span>
+                      </div>
+                    )}
+                    {selectedSocietyDetail.student_info.major && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Major:</span>
+                        <span className="font-medium">{selectedSocietyDetail.student_info.major}</span>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              )}
+
+              {/* Achievements */}
+              {selectedSocietyDetail.achievements && Array.isArray(selectedSocietyDetail.achievements) && selectedSocietyDetail.achievements.length > 0 && (
+                <Card className="p-6">
+                  <h3 className="font-semibold mb-3 text-university-navy flex items-center">
+                    <Award className="h-5 w-5 mr-2" />
+                    Achievements
+                  </h3>
+                  <div className="space-y-2">
+                    {selectedSocietyDetail.achievements.map((achievement: any, index: number) => (
+                      <div key={index} className="flex items-start space-x-2">
+                        <div className="w-2 h-2 bg-university-gold rounded-full mt-2"></div>
+                        <span className="text-muted-foreground">
+                          {achievement.achievement || "Untitled Achievement"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
+
+              {/* Events */}
+              {selectedSocietyDetail.events && Array.isArray(selectedSocietyDetail.events) && selectedSocietyDetail.events.length > 0 && (
+                <Card className="p-6">
+                  <h3 className="font-semibold mb-3 text-university-navy flex items-center">
+                    <Calendar className="h-5 w-5 mr-2" />
+                    Events
+                  </h3>
+                  <div className="space-y-2">
+                    {selectedSocietyDetail.events.map((event: any, index: number) => (
+                      <div key={index} className="flex items-start space-x-2">
+                        <div className="w-2 h-2 bg-university-gold rounded-full mt-2"></div>
+                        <div className="flex-1">
+                          <span className="text-muted-foreground font-medium">{event.title || event.event_name || "Untitled Event"}</span>
+                          {event.event_date && (
+                            <span className="text-xs text-muted-foreground ml-2">
+                              ({new Date(event.event_date).toLocaleDateString()})
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
+
+              {/* Status History */}
+              {selectedSocietyDetail.status_history && Array.isArray(selectedSocietyDetail.status_history) && selectedSocietyDetail.status_history.length > 0 && (
+                <Card className="p-6">
+                  <h3 className="font-semibold mb-3 text-university-navy flex items-center">
+                    <Clock className="h-5 w-5 mr-2" />
+                    Status History
+                  </h3>
+                  <div className="space-y-3">
+                    {selectedSocietyDetail.status_history.map((history: any, index: number) => (
+                      <div key={index} className="border-l-4 border-blue-500 pl-4 py-2 bg-blue-50 rounded-r">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-medium text-sm">{history.status_name || "Status Change"}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(history.changed_at).toLocaleString()}
+                          </span>
+                        </div>
+                        {history.note && (
+                          <p className="text-sm text-muted-foreground mt-1">{history.note}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">No society details available</p>
             </div>
           )}
         </DialogContent>
