@@ -59,6 +59,7 @@ type GuestRow = {
   guest_name: string;
   description: string;
   profile_document: File | null;
+  profile_document_path?: string | null; // Path to existing uploaded profile document
 };
 
 type ManagementRequirements = {
@@ -722,6 +723,22 @@ const GuestRowComponent = ({ guest, index, onUpdate }: {
               </Button>
             </div>
           )}
+          {/* Show existing profile document if it exists (when editing) */}
+          {!guest.profile_document && guest.profile_document_path && (
+            <div className="flex items-center justify-between text-sm mt-1 p-1 bg-blue-50 rounded border border-blue-200">
+              <span className="truncate text-blue-800">
+                Existing: {guest.profile_document_path.split('/').pop()}
+              </span>
+              <a
+                href={`${import.meta.env.VITE_API_URL}${guest.profile_document_path}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:underline font-medium text-xs"
+              >
+                View
+              </a>
+            </div>
+          )}
         </div>
       </div>
       <div>
@@ -1027,6 +1044,7 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
     time_from: "",
     time_to: "",
     venue_id: "",
+    custom_venue_name: "",
     collaborating_org: "",
     sponsor_name: "",
     sponsor_amount: "",
@@ -1040,6 +1058,7 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
   const [occupiedSlots, setOccupiedSlots] = useState<Array<{ slot_id: number; time_from: string; time_to: string; status_name: string }>>([]);
   const [loadingVenues, setLoadingVenues] = useState(false);
   const [loadingSlots, setLoadingSlots] = useState(false);
+  const [previouslySelectedSlotId, setPreviouslySelectedSlotId] = useState<number | null>(null);
 
   const genId = () =>
     typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
@@ -1146,7 +1165,8 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
             date_to: data.date_to ? new Date(data.date_to).toISOString().split('T')[0] : "",
             time_from: data.time_from || "",
             time_to: data.time_to || "",
-            venue_id: data.venue_id ? String(data.venue_id) : "",
+            venue_id: data.venue_id ? String(data.venue_id) : (data.custom_venue_name ? "4" : ""),
+            custom_venue_name: data.custom_venue_name || "",
             collaborating_org: data.collaborating_org || "",
             sponsor_name: data.sponsor_name || "",
             sponsor_amount: data.sponsor_amount || "",
@@ -1154,6 +1174,11 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
             coordinator_contact: data.coordinator_contact || "",
             media_coverage: data.media_coverage || "",
           });
+
+          // Store previously selected slot_id if it exists
+          if (data.slot_id) {
+            setPreviouslySelectedSlotId(data.slot_id);
+          }
 
           // Populate student participants
           if (data.student_participants && Array.isArray(data.student_participants) && data.student_participants.length > 0) {
@@ -1214,6 +1239,7 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
               guest_name: g.guest_name || "",
               description: g.description || "",
               profile_document: null, // Files can't be loaded, user can re-upload if needed
+              profile_document_path: g.profile_document_path || null, // Store path to show existing document info
             })));
           }
 
@@ -1243,10 +1269,10 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
     loadEventRequestData();
   }, [reqId]);
 
-  // Fetch occupied slots when venue and date are selected
+  // Fetch occupied slots when venue and date are selected (skip for "Other" venue)
   useEffect(() => {
     const fetchOccupiedSlots = async () => {
-      if (!main.venue_id || !main.date_from) {
+      if (!main.venue_id || !main.date_from || main.venue_id === "4") {
         setOccupiedSlots([]);
         setTimeSlotError("");
         return;
@@ -1676,7 +1702,12 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
   };
 
   const handleVenueChange = (venueId: string) => {
-    setMain((prev) => ({ ...prev, venue_id: venueId }));
+    setMain((prev) => ({ 
+      ...prev, 
+      venue_id: venueId,
+      // Clear custom_venue_name when switching away from "Other"
+      custom_venue_name: venueId === "4" ? prev.custom_venue_name : ""
+    }));
   };
 
   /* =====================================================================================
@@ -1907,11 +1938,28 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
     if (!main.venue_id) {
       console.error("Validation failed: Venue is required");
       toast.error("Venue is required");
+      setFieldErrors((prev) => ({
+        ...prev,
+        venue_id: "Venue is required"
+      }));
       return false;
     }
 
-    // Check if selected time slot is occupied
-    if (main.time_from && main.time_to) {
+    // Validate custom venue name when "Other" (venue_id = 4) is selected
+    if (main.venue_id === "4") {
+      if (!main.custom_venue_name || !main.custom_venue_name.trim()) {
+        console.error("Validation failed: Custom venue name is required when 'Other' is selected");
+        toast.error("Custom venue name is required");
+        setFieldErrors((prev) => ({
+          ...prev,
+          custom_venue_name: "Custom venue name is required"
+        }));
+        return false;
+      }
+    }
+
+    // Check if selected time slot is occupied (skip for "Other" venue)
+    if (main.time_from && main.time_to && main.venue_id !== "4") {
       if (isTimeSlotOccupied(main.time_from, main.time_to)) {
         console.error("Validation failed: Time slot overlaps with occupied slot");
         toast.error("The selected time slot overlaps with an occupied slot. Please choose a different time.");
@@ -2156,6 +2204,7 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
             time_from: "",
             time_to: "",
             venue_id: "",
+            custom_venue_name: "",
             collaborating_org: "",
             sponsor_name: "",
             sponsor_amount: "",
@@ -2452,8 +2501,34 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
                 )}
               </div>
 
-              {/* Display occupied slots */}
-              {main.venue_id && main.date_from && (
+              {/* Custom Venue Name Input - Show when "Other" (venue_id = 4) is selected */}
+              {main.venue_id === "4" && (
+                <div>
+                  <Label>Custom Venue Name *</Label>
+                  <Input
+                    value={main.custom_venue_name}
+                    onChange={(e) => {
+                      setMain((prev) => ({ ...prev, custom_venue_name: e.target.value }));
+                      // Clear error when user starts typing
+                      if (fieldErrors.custom_venue_name) {
+                        setFieldErrors((prev) => {
+                          const updated = { ...prev };
+                          delete updated.custom_venue_name;
+                          return updated;
+                        });
+                      }
+                    }}
+                    placeholder="Enter custom venue name"
+                    className={fieldErrors.custom_venue_name ? 'border-red-500' : ''}
+                  />
+                  {fieldErrors.custom_venue_name && (
+                    <p className="text-sm text-red-600 mt-1">{fieldErrors.custom_venue_name}</p>
+                  )}
+                </div>
+              )}
+
+              {/* Display occupied slots - Hide when "Other" venue is selected */}
+              {main.venue_id && main.venue_id !== "4" && main.date_from && (
                 <div className="border rounded p-3 bg-gray-50">
                   <Label className="text-sm font-semibold mb-2 block">
                     Occupied slots for {main.date_from}
@@ -2462,20 +2537,42 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
                     <p className="text-sm text-gray-500">Loading slots...</p>
                   ) : occupiedSlots.length > 0 ? (
                     <div className="space-y-1">
-                      {occupiedSlots.map((slot) => (
-                        <div
-                          key={slot.slot_id}
-                          className="text-sm p-2 bg-red-50 border border-red-200 rounded"
-                        >
-                          <span className="font-medium">
-                            {formatTimeToAMPM(slot.time_from)} - {slot.time_to ? formatTimeToAMPM(slot.time_to) : "N/A"}
-                          </span>
-                          <span className="ml-2 text-red-600">({slot.status_name})</span>
-                        </div>
-                      ))}
+                      {occupiedSlots.map((slot) => {
+                        const isPreviouslySelected = previouslySelectedSlotId === slot.slot_id;
+                        return (
+                          <div
+                            key={slot.slot_id}
+                            className={`text-sm p-2 rounded ${
+                              isPreviouslySelected
+                                ? "bg-blue-50 border-2 border-blue-500"
+                                : "bg-red-50 border border-red-200"
+                            }`}
+                          >
+                            <span className="font-medium">
+                              {formatTimeToAMPM(slot.time_from)} - {slot.time_to ? formatTimeToAMPM(slot.time_to) : "N/A"}
+                            </span>
+                            <span className={`ml-2 ${isPreviouslySelected ? "text-blue-600" : "text-red-600"}`}>
+                              ({slot.status_name})
+                            </span>
+                            {isPreviouslySelected && (
+                              <span className="ml-2 text-xs font-semibold text-blue-700">
+                                ← Previously Selected
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   ) : (
                     <p className="text-sm text-green-600">No occupied slots for this date</p>
+                  )}
+                  {previouslySelectedSlotId && main.time_from && main.time_to && (
+                    <div className="mt-3 p-2 bg-blue-50 border border-blue-300 rounded">
+                      <p className="text-sm text-blue-800">
+                        <span className="font-semibold">Your previously selected slot:</span>{" "}
+                        {formatTimeToAMPM(main.time_from)} - {formatTimeToAMPM(main.time_to)}
+                      </p>
+                    </div>
                   )}
                 </div>
               )}

@@ -47,7 +47,9 @@ import {
   ChevronRight,
   Crown,
   Trash2,
-  MoreVertical
+  MoreVertical,
+  Archive,
+  ArchiveRestore
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -107,11 +109,19 @@ const SocietyDashboard = () => {
 
   // Cabinet management state
   const [cabinetMembers, setCabinetMembers] = useState<any[]>([]);
+  const [archivedCabinetMembers, setArchivedCabinetMembers] = useState<any[]>([]);
   const [loadingCabinet, setLoadingCabinet] = useState(false);
   const [isCabinetModalOpen, setIsCabinetModalOpen] = useState(false);
+  const [cabinetYearFilter, setCabinetYearFilter] = useState<string>("all");
+  const [showArchivedCabinet, setShowArchivedCabinet] = useState(false);
 
   const [editingCabinetMember, setEditingCabinetMember] = useState<any | null>(null);
-  const [cabinetFormData, setCabinetFormData] = useState({ name: "", designation: "" });
+  const [cabinetFormData, setCabinetFormData] = useState({ 
+    name: "", 
+    designation: "", 
+    tenure_start: new Date().getFullYear().toString(), 
+    tenure_end: (new Date().getFullYear() + 1).toString() 
+  });
   const [viewingRequestDetails, setViewingRequestDetails] = useState<any | null>(null);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<number | null>(null);
@@ -250,7 +260,7 @@ const SocietyDashboard = () => {
           fetchSocietyPosts(societyData.society_id);
           fetchSocietyEvents(societyData.society_id);
           // Fetch cabinet members
-          fetchCabinetMembers(societyData.society_id);
+          fetchCabinetMembers(societyData.society_id, cabinetYearFilter, showArchivedCabinet);
         }
       } else {
         console.error("Failed to fetch society data:", response.data.message);
@@ -553,16 +563,21 @@ const SocietyDashboard = () => {
   };
 
   // Fetch cabinet members
-  const fetchCabinetMembers = async (societyId: number) => {
+  const fetchCabinetMembers = async (societyId: number, year?: string, showArchived?: boolean) => {
     try {
       const API_URL = import.meta.env.VITE_API_URL;
       setLoadingCabinet(true);
       const token = localStorage.getItem("token");
       if (!token) return;
 
-      const response = await axios.post(
+      // Fetch active (non-archived) members
+      const activeResponse = await axios.post(
         `${API_URL}/society/cabinet/list`,
-        { society_id: societyId },
+        { 
+          society_id: societyId,
+          year: year && year !== "all" ? parseInt(year) : undefined,
+          show_archived: false
+        },
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -570,8 +585,26 @@ const SocietyDashboard = () => {
         }
       );
 
-      if (response.data.success) {
-        setCabinetMembers(response.data.data || []);
+      // Fetch archived members
+      const archivedResponse = await axios.post(
+        `${API_URL}/society/cabinet/list`,
+        { 
+          society_id: societyId,
+          year: year && year !== "all" ? parseInt(year) : undefined,
+          show_archived: true
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (activeResponse.data.success) {
+        setCabinetMembers(activeResponse.data.data || []);
+      }
+      if (archivedResponse.data.success) {
+        setArchivedCabinetMembers(archivedResponse.data.data || []);
       }
     } catch (error) {
       console.error("Error fetching cabinet members:", error);
@@ -583,8 +616,13 @@ const SocietyDashboard = () => {
 
   // Add or update cabinet member
   const handleSaveCabinetMember = async () => {
-    if (!cabinetFormData.name.trim() || !cabinetFormData.designation.trim()) {
+    if (!cabinetFormData.name.trim() || !cabinetFormData.designation.trim() || !cabinetFormData.tenure_start || !cabinetFormData.tenure_end) {
       toast.error("Please fill in all fields");
+      return;
+    }
+
+    if (parseInt(cabinetFormData.tenure_start) > parseInt(cabinetFormData.tenure_end)) {
+      toast.error("Tenure start year must be less than or equal to tenure end year");
       return;
     }
 
@@ -604,7 +642,9 @@ const SocietyDashboard = () => {
           {
             id: editingCabinetMember.id,
             name: cabinetFormData.name.trim(),
-            designation: cabinetFormData.designation.trim()
+            designation: cabinetFormData.designation.trim(),
+            tenure_start: parseInt(cabinetFormData.tenure_start),
+            tenure_end: parseInt(cabinetFormData.tenure_end)
           },
           {
             headers: {
@@ -617,8 +657,8 @@ const SocietyDashboard = () => {
           toast.success("Cabinet member updated successfully");
           setIsCabinetModalOpen(false);
           setEditingCabinetMember(null);
-          setCabinetFormData({ name: "", designation: "" });
-          fetchCabinetMembers(societyInfo.society_id);
+          setCabinetFormData({ name: "", designation: "", tenure_start: new Date().getFullYear().toString(), tenure_end: (new Date().getFullYear() + 1).toString() });
+          fetchCabinetMembers(societyInfo.society_id, cabinetYearFilter, showArchivedCabinet);
         } else {
           toast.error(response.data.message || "Failed to update cabinet member");
         }
@@ -629,7 +669,9 @@ const SocietyDashboard = () => {
           {
             society_id: societyInfo.society_id,
             name: cabinetFormData.name.trim(),
-            designation: cabinetFormData.designation.trim()
+            designation: cabinetFormData.designation.trim(),
+            tenure_start: parseInt(cabinetFormData.tenure_start),
+            tenure_end: parseInt(cabinetFormData.tenure_end)
           },
           {
             headers: {
@@ -641,8 +683,8 @@ const SocietyDashboard = () => {
         if (response.data.success) {
           toast.success("Cabinet member added successfully");
           setIsCabinetModalOpen(false);
-          setCabinetFormData({ name: "", designation: "" });
-          fetchCabinetMembers(societyInfo.society_id);
+          setCabinetFormData({ name: "", designation: "", tenure_start: new Date().getFullYear().toString(), tenure_end: (new Date().getFullYear() + 1).toString() });
+          fetchCabinetMembers(societyInfo.society_id, cabinetYearFilter, showArchivedCabinet);
         } else {
           toast.error(response.data.message || "Failed to add cabinet member");
         }
@@ -650,6 +692,36 @@ const SocietyDashboard = () => {
     } catch (error: any) {
       console.error("Error saving cabinet member:", error);
       toast.error(error.response?.data?.message || "Failed to save cabinet member");
+    }
+  };
+
+  // Archive/Unarchive cabinet member
+  const handleArchiveCabinetMember = async (id: number, isArchived: boolean) => {
+    try {
+      const API_URL = import.meta.env.VITE_API_URL;
+      const token = localStorage.getItem("token");
+
+      const response = await axios.post(
+        `${API_URL}/society/cabinet/archive`,
+        { id, is_archived: !isArchived },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.data.success) {
+        toast.success(`Cabinet member ${!isArchived ? 'archived' : 'unarchived'} successfully`);
+        if (societyInfo?.society_id) {
+          fetchCabinetMembers(societyInfo.society_id, cabinetYearFilter, showArchivedCabinet);
+        }
+      } else {
+        toast.error(response.data.message || `Failed to ${!isArchived ? 'archive' : 'unarchive'} cabinet member`);
+      }
+    } catch (error: any) {
+      console.error("Error archiving/unarchiving cabinet member:", error);
+      toast.error(error.response?.data?.message || `Failed to ${!isArchived ? 'archive' : 'unarchive'} cabinet member`);
     }
   };
 
@@ -678,12 +750,12 @@ const SocietyDashboard = () => {
         }
       );
 
-      if (response.data.success) {
-        toast.success("Cabinet member deactivated successfully");
-        if (societyInfo?.society_id) {
-          fetchCabinetMembers(societyInfo.society_id);
+        if (response.data.success) {
+          toast.success("Cabinet member deactivated successfully");
+          if (societyInfo?.society_id) {
+            fetchCabinetMembers(societyInfo.society_id, cabinetYearFilter, showArchivedCabinet);
+          }
         }
-      }
     } catch (error: any) {
       console.error("Error deactivating cabinet member:", error);
       toast.error(error.response?.data?.message || "Failed to deactivate cabinet member");
@@ -2582,19 +2654,63 @@ const SocietyDashboard = () => {
           {/* Society Details Tab - Only for Advisors */}
           {isAdvisor() && activeTab === "cabinet" && (
             <div className="space-y-6">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <h2 className="text-xl md:text-2xl font-semibold text-university-navy">Cabinet Management</h2>
-                <Button
-                  variant="university"
-                  onClick={() => {
-                    setEditingCabinetMember(null);
-                    setCabinetFormData({ name: "", designation: "" });
-                    setIsCabinetModalOpen(true);
-                  }}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Cabinet Member
-                </Button>
+                <div className="flex flex-wrap items-center gap-3">
+                  {/* Year Filter */}
+                  <Select value={cabinetYearFilter} onValueChange={(value) => {
+                    setCabinetYearFilter(value);
+                    if (societyInfo?.society_id) {
+                      fetchCabinetMembers(societyInfo.society_id, value, showArchivedCabinet);
+                    }
+                  }}>
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue placeholder="Filter by year" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Years</SelectItem>
+                      {Array.from({ length: 10 }, (_, i) => {
+                        const year = new Date().getFullYear() - 5 + i;
+                        return (
+                          <SelectItem key={year} value={year.toString()}>
+                            {year}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                  
+                  {/* Archive Toggle */}
+                  <Button
+                    variant={showArchivedCabinet ? "default" : "outline"}
+                    onClick={() => {
+                      const newShowArchived = !showArchivedCabinet;
+                      setShowArchivedCabinet(newShowArchived);
+                      if (societyInfo?.society_id) {
+                        fetchCabinetMembers(societyInfo.society_id, cabinetYearFilter, newShowArchived);
+                      }
+                    }}
+                  >
+                    {showArchivedCabinet ? "Show Active" : "Show Archived"}
+                  </Button>
+                  
+                  <Button
+                    variant="university"
+                    onClick={() => {
+                      setEditingCabinetMember(null);
+                      setCabinetFormData({ 
+                        name: "", 
+                        designation: "", 
+                        tenure_start: new Date().getFullYear().toString(), 
+                        tenure_end: (new Date().getFullYear() + 1).toString() 
+                      });
+                      setIsCabinetModalOpen(true);
+                    }}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Cabinet Member
+                  </Button>
+                </div>
               </div>
 
               {loadingCabinet ? (
@@ -2602,73 +2718,105 @@ const SocietyDashboard = () => {
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-university-navy mx-auto mb-4"></div>
                   <p className="text-muted-foreground">Loading cabinet members...</p>
                 </div>
-              ) : cabinetMembers.length === 0 ? (
+              ) : (showArchivedCabinet ? archivedCabinetMembers : cabinetMembers).length === 0 ? (
                 <Card className="p-8 text-center shadow-card">
                   <Crown className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="font-semibold text-university-navy mb-2">No Cabinet Members</h3>
+                  <h3 className="font-semibold text-university-navy mb-2">
+                    {showArchivedCabinet ? "No Archived Cabinet Members" : "No Cabinet Members"}
+                  </h3>
                   <p className="text-muted-foreground mb-4">
-                    Start building your cabinet by adding members.
+                    {showArchivedCabinet 
+                      ? "No archived cabinet members found for the selected year."
+                      : "Start building your cabinet by adding members."}
                   </p>
-                  <Button
-                    variant="university"
-                    onClick={() => {
-                      setEditingCabinetMember(null);
-                      setCabinetFormData({ name: "", designation: "" });
-                      setIsCabinetModalOpen(true);
-                    }}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add First Member
-                  </Button>
+                  {!showArchivedCabinet && (
+                    <Button
+                      variant="university"
+                      onClick={() => {
+                        setEditingCabinetMember(null);
+                        setCabinetFormData({ 
+                          name: "", 
+                          designation: "", 
+                          tenure_start: new Date().getFullYear().toString(), 
+                          tenure_end: (new Date().getFullYear() + 1).toString() 
+                        });
+                        setIsCabinetModalOpen(true);
+                      }}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add First Member
+                    </Button>
+                  )}
                 </Card>
               ) : (
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {cabinetMembers.map((member) => (
-                    <Card key={member.id} className="p-6 shadow-card hover:shadow-lg transition-shadow">
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-12 h-12 bg-university-navy/10 rounded-full flex items-center justify-center">
-                            <Crown className="h-6 w-6 text-university-navy" />
+                <>
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {(showArchivedCabinet ? archivedCabinetMembers : cabinetMembers).map((member) => (
+                      <Card key={member.id} className={`p-6 shadow-card hover:shadow-lg transition-shadow ${member.is_archived ? 'opacity-75 border-2 border-gray-300' : ''}`}>
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex items-center space-x-3 flex-1">
+                            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${member.is_archived ? 'bg-gray-200' : 'bg-university-navy/10'}`}>
+                              <Crown className={`h-6 w-6 ${member.is_archived ? 'text-gray-500' : 'text-university-navy'}`} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-semibold text-university-navy truncate">{member.name}</h3>
+                              <p className="text-sm text-muted-foreground truncate">{member.designation}</p>
+                              {member.tenure_start && member.tenure_end && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Tenure: {member.tenure_start} - {member.tenure_end}
+                                </p>
+                              )}
+                            </div>
                           </div>
-                          <div>
-                            <h3 className="font-semibold text-university-navy">{member.name}</h3>
-                            <p className="text-sm text-muted-foreground">{member.designation}</p>
+                          {member.is_archived && (
+                            <Badge variant="secondary" className="ml-2">Archived</Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between pt-4 border-t">
+                          <div className="text-xs text-muted-foreground">
+                            <Clock className="h-3 w-3 inline mr-1" />
+                            Added {new Date(member.created_at).toLocaleDateString()}
+                          </div>
+                          <div className="flex space-x-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setEditingCabinetMember(member);
+                                setCabinetFormData({
+                                  name: member.name,
+                                  designation: member.designation,
+                                  tenure_start: member.tenure_start?.toString() || new Date().getFullYear().toString(),
+                                  tenure_end: member.tenure_end?.toString() || (new Date().getFullYear() + 1).toString()
+                                });
+                                setIsCabinetModalOpen(true);
+                              }}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleArchiveCabinetMember(member.id, member.is_archived === 1)}
+                              className={member.is_archived ? "text-green-600 hover:text-green-700 hover:bg-green-50" : "text-orange-600 hover:text-orange-700 hover:bg-orange-50"}
+                              title={member.is_archived ? "Unarchive" : "Archive"}
+                            >
+                              {member.is_archived ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeactivateCabinetMember(member.id)}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </div>
                         </div>
-                      </div>
-                      <div className="flex items-center justify-between pt-4 border-t">
-                        <div className="text-xs text-muted-foreground">
-                          <Clock className="h-3 w-3 inline mr-1" />
-                          Added {new Date(member.created_at).toLocaleDateString()}
-                        </div>
-                        <div className="flex space-x-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setEditingCabinetMember(member);
-                              setCabinetFormData({
-                                name: member.name,
-                                designation: member.designation
-                              });
-                              setIsCabinetModalOpen(true);
-                            }}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeactivateCabinetMember(member.id)}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
+                      </Card>
+                    ))}
+                  </div>
+                </>
               )}
 
               {/* Add/Edit Cabinet Member Modal */}
@@ -2703,13 +2851,44 @@ const SocietyDashboard = () => {
                         onChange={(e) => setCabinetFormData({ ...cabinetFormData, designation: e.target.value })}
                       />
                     </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="cabinet-tenure-start">Tenure Start Year</Label>
+                        <Input
+                          id="cabinet-tenure-start"
+                          type="number"
+                          placeholder="e.g., 2024"
+                          value={cabinetFormData.tenure_start}
+                          onChange={(e) => setCabinetFormData({ ...cabinetFormData, tenure_start: e.target.value })}
+                          min="2000"
+                          max="2100"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="cabinet-tenure-end">Tenure End Year</Label>
+                        <Input
+                          id="cabinet-tenure-end"
+                          type="number"
+                          placeholder="e.g., 2025"
+                          value={cabinetFormData.tenure_end}
+                          onChange={(e) => setCabinetFormData({ ...cabinetFormData, tenure_end: e.target.value })}
+                          min="2000"
+                          max="2100"
+                        />
+                      </div>
+                    </div>
                     <div className="flex justify-end space-x-2 pt-4">
                       <Button
                         variant="outline"
                         onClick={() => {
                           setIsCabinetModalOpen(false);
                           setEditingCabinetMember(null);
-                          setCabinetFormData({ name: "", designation: "" });
+                          setCabinetFormData({ 
+                            name: "", 
+                            designation: "", 
+                            tenure_start: new Date().getFullYear().toString(), 
+                            tenure_end: (new Date().getFullYear() + 1).toString() 
+                          });
                         }}
                       >
                         Cancel
@@ -2717,7 +2896,7 @@ const SocietyDashboard = () => {
                       <Button
                         variant="university"
                         onClick={handleSaveCabinetMember}
-                        disabled={!cabinetFormData.name.trim() || !cabinetFormData.designation.trim()}
+                        disabled={!cabinetFormData.name.trim() || !cabinetFormData.designation.trim() || !cabinetFormData.tenure_start || !cabinetFormData.tenure_end}
                       >
                         {editingCabinetMember ? "Update" : "Add"} Member
                       </Button>

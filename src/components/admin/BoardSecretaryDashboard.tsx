@@ -1417,6 +1417,17 @@ const BoardSecretaryDashboard = () => {
                                 <p className="text-xs text-blue-800">{request.note}</p>
                               </div>
                             )}
+                            {request.cancelled_reason && (
+                              <div className="bg-red-50 border-l-4 border-red-200 p-2 mt-2 rounded">
+                                <p className="text-xs font-medium text-red-900 mb-1">Cancellation Reason:</p>
+                                <p className="text-xs text-red-800">{request.cancelled_reason}</p>
+                                {request.cancelled_at && (
+                                  <p className="text-xs text-red-600 mt-1">
+                                    Cancelled on: {new Date(request.cancelled_at).toLocaleString()}
+                                  </p>
+                                )}
+                              </div>
+                            )}
                             <div className="flex items-center text-xs text-muted-foreground mt-2">
                               <Clock className="h-3 w-3 mr-1" />
                               Created: {new Date(request.created_at).toLocaleString()}

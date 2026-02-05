@@ -1006,6 +1006,33 @@ const BoardPresidentDashboard = () => {
 
           {selectedEventRequest && (
             <div className="space-y-6 overflow-y-auto h-full">
+              {/* Cancellation Notice */}
+              {selectedEventRequest.cancelled_reason && (
+                <Card className="p-4 shadow-sm border-l-4 border-l-red-500 bg-red-50">
+                  <div className="flex items-start gap-3">
+                    <XCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <h3 className="font-semibold mb-2 text-red-900 flex items-center gap-2">
+                        Event Request Cancelled
+                      </h3>
+                      <div className="space-y-2">
+                        <div>
+                          <p className="text-sm font-medium text-red-800 mb-1">Cancellation Reason:</p>
+                          <p className="text-sm text-red-700 bg-white/50 p-3 rounded border border-red-200">
+                            {selectedEventRequest.cancelled_reason}
+                          </p>
+                        </div>
+                        {selectedEventRequest.cancelled_at && (
+                          <p className="text-xs text-red-600">
+                            Cancelled on: {new Date(selectedEventRequest.cancelled_at).toLocaleString()}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              )}
+
               {/* Header Section */}
               <div className="gradient-primary text-white p-6 rounded-lg">
                 <div className="flex items-start space-x-4">

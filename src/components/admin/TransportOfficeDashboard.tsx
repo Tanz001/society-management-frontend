@@ -57,8 +57,8 @@ const TransportOfficeDashboard = () => {
   // Get status badge variant
   const getStatusVariant = (statusId) => {
     if ([1].includes(statusId)) return "secondary"; // Pending
-    if ([2, 4, 6, 8, 11, 13, 15].includes(statusId)) return "default"; // Approved statuses
-    if ([3, 5, 7, 9, 12, 14].includes(statusId)) return "destructive"; // Rejected statuses
+    if ([2, 4, 6, 8, 10, 11, 13, 15].includes(statusId)) return "default"; // Approved statuses
+    if ([3, 5, 7, 9, 12, 14, 16].includes(statusId)) return "destructive"; // Rejected statuses
     return "outline";
   };
 

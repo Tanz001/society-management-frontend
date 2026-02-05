@@ -3,7 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Calendar, Clock, MapPin, User, FileText, RefreshCw, History, CheckCircle, XCircle, Eye, Pencil, Lightbulb } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Textarea } from "@/components/ui/textarea";
+import { Calendar, Clock, MapPin, User, FileText, RefreshCw, History, CheckCircle, XCircle, Eye, Pencil, Lightbulb, X, MoreVertical } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import toast from "react-hot-toast";
@@ -35,6 +37,8 @@ interface EventRequest {
   slot_time_from?: string;
   slot_time_to?: string;
   slot_request_id?: number;
+  cancelled_reason?: string;
+  cancelled_at?: string;
 }
 
 interface EventRequestsListProps {
@@ -70,6 +74,9 @@ const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
   const [suggestedSlots, setSuggestedSlots] = useState<any[]>([]);
   const [loadingSuggestedSlots, setLoadingSuggestedSlots] = useState(false);
   const [isSuggestedSlotsModalOpen, setIsSuggestedSlotsModalOpen] = useState(false);
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelling, setCancelling] = useState(false);
 
   const fetchEventRequests = async () => {
     if (!societyId) return;
@@ -208,6 +215,57 @@ const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
   // Handle edit request
   const handleEditRequest = (reqId: number) => {
     navigate(`/dashboard/society/event-request/edit/${reqId}`);
+  };
+
+  // Handle cancel request
+  const handleCancelRequest = (request: EventRequest) => {
+    setSelectedRequest(request);
+    setCancelReason("");
+    setIsCancelModalOpen(true);
+  };
+
+  // Submit cancel request
+  const submitCancelRequest = async () => {
+    if (!selectedRequest || !cancelReason.trim()) {
+      toast.error("Please provide a cancellation reason");
+      return;
+    }
+
+    try {
+      setCancelling(true);
+      const API_URL = import.meta.env.VITE_API_URL;
+      const token = localStorage.getItem("token");
+      if (!token) {
+        toast.error("Authentication required");
+        return;
+      }
+
+      const response = await axios.post(
+        `${API_URL}/society/event-request/cancel`,
+        {
+          req_id: selectedRequest.req_id,
+          cancelled_reason: cancelReason.trim()
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.data.success) {
+        toast.success("Event request cancelled successfully");
+        setIsCancelModalOpen(false);
+        setCancelReason("");
+        setSelectedRequest(null);
+        fetchEventRequests();
+      }
+    } catch (error: any) {
+      console.error("Error cancelling event request:", error);
+      toast.error(error.response?.data?.message || "Failed to cancel event request");
+    } finally {
+      setCancelling(false);
+    }
   };
 
 
@@ -360,6 +418,18 @@ const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
                 </div>
               )}
 
+              {request.cancelled_reason && (
+                <div className="bg-red-50 border-l-4 border-red-200 p-3 mb-4 rounded">
+                  <p className="text-sm font-medium text-red-900 mb-1">Cancellation Reason:</p>
+                  <p className="text-sm text-red-800">{request.cancelled_reason}</p>
+                  {request.cancelled_at && (
+                    <p className="text-xs text-red-600 mt-1">
+                      Cancelled on: {new Date(request.cancelled_at).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+              )}
+
               <div className="flex items-center justify-between pt-4 border-t">
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <span>Submitted: {new Date(request.created_at).toLocaleString()}</span>
@@ -368,42 +438,84 @@ const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  {canEdit(request) && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleEditRequest(request.req_id)}
-                    >
-                      <Pencil className="h-4 w-4 mr-2" />
-                      Edit Request
-                    </Button>
+                  {!request.cancelled_reason && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {canEdit(request) && (
+                          <DropdownMenuItem
+                            onClick={() => handleEditRequest(request.req_id)}
+                          >
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Edit Request
+                          </DropdownMenuItem>
+                        )}
+                        {request.slot_request_id && (
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setSelectedRequest(request);
+                              fetchSuggestedSlots(request.slot_request_id);
+                            }}
+                            disabled={loadingSuggestedSlots}
+                          >
+                            <Lightbulb className="h-4 w-4 mr-2" />
+                            View Suggested Slots
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setSelectedRequest(request);
+                            fetchStatusHistory(request.req_id);
+                          }}
+                          disabled={loadingHistory}
+                        >
+                          <History className="h-4 w-4 mr-2" />
+                          View Status History
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleCancelRequest(request)}
+                          className="text-red-600"
+                        >
+                          <X className="h-4 w-4 mr-2" />
+                          Cancel Request
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   )}
-                  {request.slot_request_id && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setSelectedRequest(request);
-                        fetchSuggestedSlots(request.slot_request_id);
-                      }}
-                      disabled={loadingSuggestedSlots}
-                    >
-                      <Lightbulb className="h-4 w-4 mr-2" />
-                      View Suggested Slots
-                    </Button>
+                  {request.cancelled_reason && (
+                    <>
+                      {request.slot_request_id && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedRequest(request);
+                            fetchSuggestedSlots(request.slot_request_id);
+                          }}
+                          disabled={loadingSuggestedSlots}
+                        >
+                          <Lightbulb className="h-4 w-4 mr-2" />
+                          View Suggested Slots
+                        </Button>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedRequest(request);
+                          fetchStatusHistory(request.req_id);
+                        }}
+                        disabled={loadingHistory}
+                      >
+                        <History className="h-4 w-4 mr-2" />
+                        View Status History
+                      </Button>
+                    </>
                   )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setSelectedRequest(request);
-                      fetchStatusHistory(request.req_id);
-                    }}
-                    disabled={loadingHistory}
-                  >
-                    <History className="h-4 w-4 mr-2" />
-                    View Status History
-                  </Button>
                 </div>
               </div>
             </Card>
@@ -687,6 +799,71 @@ const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
               </p>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel Request Modal */}
+      <Dialog open={isCancelModalOpen} onOpenChange={setIsCancelModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-university-navy">
+              Cancel Event Request
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to cancel this event request? Please provide a reason for cancellation.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label htmlFor="cancelReason" className="text-sm font-medium">
+                Cancellation Reason <span className="text-red-500">*</span>
+              </label>
+              <Textarea
+                id="cancelReason"
+                placeholder="Please provide a reason for cancelling this event request..."
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                rows={4}
+                className="resize-none"
+              />
+            </div>
+            {selectedRequest && (
+              <div className="bg-gray-50 p-3 rounded">
+                <p className="text-sm font-medium mb-1">Event Request:</p>
+                <p className="text-sm text-muted-foreground">{selectedRequest.title}</p>
+              </div>
+            )}
+          </div>
+          <div className="flex justify-end space-x-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsCancelModalOpen(false);
+                setCancelReason("");
+                setSelectedRequest(null);
+              }}
+              disabled={cancelling}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={submitCancelRequest}
+              disabled={cancelling || !cancelReason.trim()}
+              variant="destructive"
+            >
+              {cancelling ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Cancelling...
+                </>
+              ) : (
+                <>
+                  <X className="h-4 w-4 mr-2" />
+                  Cancel Request
+                </>
+              )}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
