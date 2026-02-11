@@ -30,7 +30,8 @@ import {
   MoreVertical,
   Pencil,
   User,
-  Users
+  Users,
+  Lock
 } from "lucide-react";
 import {
   Pagination,
@@ -45,12 +46,14 @@ import EventRequestDetailModal from "@/components/admin/EventRequestDetailModal"
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useToast } from "@/components/ui/use-toast";
+import ChangePasswordDialog from "@/components/auth/ChangePasswordDialog";
 
 const ProtocolOfficeDashboard = () => {
   const { toast } = useToast();
   const [eventRequests, setEventRequests] = useState([]);
   const [selectedEventRequest, setSelectedEventRequest] = useState(null);
   const [isEventRequestModalOpen, setIsEventRequestModalOpen] = useState(false);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [isSlotStatusModalOpen, setIsSlotStatusModalOpen] = useState(false);
   const [isSuggestSlotModalOpen, setIsSuggestSlotModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -479,6 +482,15 @@ const ProtocolOfficeDashboard = () => {
               <p className="text-white/80">View All Event Protocol Requests</p>
             </div>
             <div className="flex items-center space-x-3">
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-white border-white hover:bg-white/20 bg-transparent flex items-center gap-2"
+                onClick={() => setIsPasswordModalOpen(true)}
+              >
+                <Lock className="h-4 w-4" />
+                Change Password
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
@@ -983,7 +995,6 @@ const ProtocolOfficeDashboard = () => {
         onClose={() => setIsEventRequestModalOpen(false)}
         eventRequest={selectedEventRequest}
       />
-
       {/* Slot Status Update Modal */}
       <Dialog open={isSlotStatusModalOpen} onOpenChange={setIsSlotStatusModalOpen}>
         <DialogContent>
@@ -1141,6 +1152,10 @@ const ProtocolOfficeDashboard = () => {
           )}
         </DialogContent>
       </Dialog>
+      <ChangePasswordDialog
+        isOpen={isPasswordModalOpen}
+        onOpenChange={setIsPasswordModalOpen}
+      />
     </div>
   );
 };

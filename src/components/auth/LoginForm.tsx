@@ -104,10 +104,11 @@ const LoginForm = () => {
         navigate("/dashboard/admin/registrar");
         return;
       }
-      if (roleNames.includes("transport_office")) {
+      if (roleNames.includes("transport") || roleNames.includes("transport_office")) {
         navigate("/dashboard/admin/transport-office");
         return;
       }
+
       if (roleNames.includes("protocol_office")) {
         navigate("/dashboard/admin/protocol-office");
         return;

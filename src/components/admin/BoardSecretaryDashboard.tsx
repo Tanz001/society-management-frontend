@@ -42,7 +42,8 @@ import {
   Upload,
   Image as ImageIcon,
   MoreVertical,
-  Search
+  Search,
+  Lock
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -59,6 +60,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import ChangePasswordDialog from "@/components/auth/ChangePasswordDialog";
 
 interface Society {
   society_id: number;
@@ -122,6 +124,7 @@ const BoardSecretaryDashboard = () => {
   const [loadingEventRequests, setLoadingEventRequests] = useState(false);
   const [selectedEventRequest, setSelectedEventRequest] = useState<any | null>(null);
   const [isEventRequestModalOpen, setIsEventRequestModalOpen] = useState(false);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [isEventStatusModalOpen, setIsEventStatusModalOpen] = useState(false);
   const [eventStatusNote, setEventStatusNote] = useState("");
   const [selectedEventStatus, setSelectedEventStatus] = useState<number>(0);
@@ -1013,6 +1016,15 @@ const BoardSecretaryDashboard = () => {
               <p className="text-white/80">Manage Society Applications and Event Requests</p>
             </div>
             <div className="flex items-center space-x-3">
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-white border-white hover:bg-white/20 bg-transparent flex items-center gap-2"
+                onClick={() => setIsPasswordModalOpen(true)}
+              >
+                <Lock className="h-4 w-4" />
+                Change Password
+              </Button>
               <Button
                 variant="outline"
                 size="sm"

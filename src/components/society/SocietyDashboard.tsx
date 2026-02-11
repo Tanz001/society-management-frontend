@@ -750,12 +750,12 @@ const SocietyDashboard = () => {
         }
       );
 
-        if (response.data.success) {
-          toast.success("Cabinet member deactivated successfully");
-          if (societyInfo?.society_id) {
+      if (response.data.success) {
+        toast.success("Cabinet member deactivated successfully");
+        if (societyInfo?.society_id) {
             fetchCabinetMembers(societyInfo.society_id, cabinetYearFilter, showArchivedCabinet);
-          }
         }
+      }
     } catch (error: any) {
       console.error("Error deactivating cabinet member:", error);
       toast.error(error.response?.data?.message || "Failed to deactivate cabinet member");
@@ -2694,22 +2694,22 @@ const SocietyDashboard = () => {
                     {showArchivedCabinet ? "Show Active" : "Show Archived"}
                   </Button>
                   
-                  <Button
-                    variant="university"
-                    onClick={() => {
-                      setEditingCabinetMember(null);
+                <Button
+                  variant="university"
+                  onClick={() => {
+                    setEditingCabinetMember(null);
                       setCabinetFormData({ 
                         name: "", 
                         designation: "", 
                         tenure_start: new Date().getFullYear().toString(), 
                         tenure_end: (new Date().getFullYear() + 1).toString() 
                       });
-                      setIsCabinetModalOpen(true);
-                    }}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Cabinet Member
-                  </Button>
+                    setIsCabinetModalOpen(true);
+                  }}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Cabinet Member
+                </Button>
                 </div>
               </div>
 
@@ -2730,34 +2730,34 @@ const SocietyDashboard = () => {
                       : "Start building your cabinet by adding members."}
                   </p>
                   {!showArchivedCabinet && (
-                    <Button
-                      variant="university"
-                      onClick={() => {
-                        setEditingCabinetMember(null);
+                  <Button
+                    variant="university"
+                    onClick={() => {
+                      setEditingCabinetMember(null);
                         setCabinetFormData({ 
                           name: "", 
                           designation: "", 
                           tenure_start: new Date().getFullYear().toString(), 
                           tenure_end: (new Date().getFullYear() + 1).toString() 
                         });
-                        setIsCabinetModalOpen(true);
-                      }}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add First Member
-                    </Button>
+                      setIsCabinetModalOpen(true);
+                    }}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add First Member
+                  </Button>
                   )}
                 </Card>
               ) : (
                 <>
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {(showArchivedCabinet ? archivedCabinetMembers : cabinetMembers).map((member) => (
                       <Card key={member.id} className={`p-6 shadow-card hover:shadow-lg transition-shadow ${member.is_archived ? 'opacity-75 border-2 border-gray-300' : ''}`}>
-                        <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-start justify-between mb-4">
                           <div className="flex items-center space-x-3 flex-1">
                             <div className={`w-12 h-12 rounded-full flex items-center justify-center ${member.is_archived ? 'bg-gray-200' : 'bg-university-navy/10'}`}>
                               <Crown className={`h-6 w-6 ${member.is_archived ? 'text-gray-500' : 'text-university-navy'}`} />
-                            </div>
+                          </div>
                             <div className="flex-1 min-w-0">
                               <h3 className="font-semibold text-university-navy truncate">{member.name}</h3>
                               <p className="text-sm text-muted-foreground truncate">{member.designation}</p>
@@ -2766,34 +2766,34 @@ const SocietyDashboard = () => {
                                   Tenure: {member.tenure_start} - {member.tenure_end}
                                 </p>
                               )}
-                            </div>
                           </div>
+                        </div>
                           {member.is_archived && (
                             <Badge variant="secondary" className="ml-2">Archived</Badge>
                           )}
+                      </div>
+                      <div className="flex items-center justify-between pt-4 border-t">
+                        <div className="text-xs text-muted-foreground">
+                          <Clock className="h-3 w-3 inline mr-1" />
+                          Added {new Date(member.created_at).toLocaleDateString()}
                         </div>
-                        <div className="flex items-center justify-between pt-4 border-t">
-                          <div className="text-xs text-muted-foreground">
-                            <Clock className="h-3 w-3 inline mr-1" />
-                            Added {new Date(member.created_at).toLocaleDateString()}
-                          </div>
-                          <div className="flex space-x-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                setEditingCabinetMember(member);
-                                setCabinetFormData({
-                                  name: member.name,
+                        <div className="flex space-x-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setEditingCabinetMember(member);
+                              setCabinetFormData({
+                                name: member.name,
                                   designation: member.designation,
                                   tenure_start: member.tenure_start?.toString() || new Date().getFullYear().toString(),
                                   tenure_end: member.tenure_end?.toString() || (new Date().getFullYear() + 1).toString()
-                                });
-                                setIsCabinetModalOpen(true);
-                              }}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
+                              });
+                              setIsCabinetModalOpen(true);
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
                             <Button
                               variant="ghost"
                               size="sm"
@@ -2803,19 +2803,19 @@ const SocietyDashboard = () => {
                             >
                               {member.is_archived ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
                             </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeactivateCabinetMember(member.id)}
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeactivateCabinetMember(member.id)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
-                      </Card>
-                    ))}
-                  </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
                 </>
               )}
 

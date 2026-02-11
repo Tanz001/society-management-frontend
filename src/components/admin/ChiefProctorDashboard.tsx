@@ -20,7 +20,8 @@ import {
     Shield,
     Filter,
     MoreVertical,
-    User
+    User,
+    Lock
 } from "lucide-react";
 import {
     Pagination,
@@ -35,12 +36,14 @@ import axios from "axios";
 import { useToast } from "@/components/ui/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import EventRequestDetailModal from "@/components/admin/EventRequestDetailModal";
+import ChangePasswordDialog from "@/components/auth/ChangePasswordDialog";
 
 const ChiefProctorDashboard = () => {
     const { toast } = useToast();
     const [eventRequests, setEventRequests] = useState([]);
     const [selectedEventRequest, setSelectedEventRequest] = useState(null);
     const [isEventRequestModalOpen, setIsEventRequestModalOpen] = useState(false);
+    const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const navigate = useNavigate();
@@ -239,6 +242,15 @@ const ChiefProctorDashboard = () => {
                             <p className="text-white/80">View Approved Event Requests</p>
                         </div>
                         <div className="flex items-center space-x-3">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-white border-white hover:bg-white/20 bg-transparent flex items-center gap-2"
+                                onClick={() => setIsPasswordModalOpen(true)}
+                            >
+                                <Lock className="h-4 w-4" />
+                                Change Password
+                            </Button>
                             <Button
                                 variant="outline"
                                 size="sm"
@@ -468,6 +480,10 @@ const ChiefProctorDashboard = () => {
                 eventRequest={selectedEventRequest}
             />
 
+            <ChangePasswordDialog
+                isOpen={isPasswordModalOpen}
+                onOpenChange={setIsPasswordModalOpen}
+            />
         </div>
     );
 };

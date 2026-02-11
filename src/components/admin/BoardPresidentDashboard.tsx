@@ -27,11 +27,14 @@ import {
   Award,
   Edit,
   MapPin,
-  MoreVertical
+  MoreVertical,
+  Lock
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useToast } from "@/components/ui/use-toast";
+import ChangePasswordDialog from "@/components/auth/ChangePasswordDialog";
+import EventRequestDetailModal from "@/components/admin/EventRequestDetailModal";
 
 interface Society {
   society_id: number;
@@ -54,6 +57,16 @@ interface Society {
     lastName: string;
     email: string;
     rollNo: string;
+    university?: string;
+    major?: string;
+  };
+  advisor_info?: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    designation: string;
+    department: string;
+    phone: string;
   };
   achievements?: any[];
   events?: any[];
@@ -84,6 +97,7 @@ const BoardPresidentDashboard = () => {
   const [selectedEventRequest, setSelectedEventRequest] = useState<any | null>(null);
   const [isEventRequestModalOpen, setIsEventRequestModalOpen] = useState(false);
   const [isEventStatusModalOpen, setIsEventStatusModalOpen] = useState(false);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [eventStatusNote, setEventStatusNote] = useState("");
   const [selectedEventStatus, setSelectedEventStatus] = useState<number>(0);
   const [eventRequestStats, setEventRequestStats] = useState({
@@ -95,39 +109,6 @@ const BoardPresidentDashboard = () => {
   const [statsLoading, setStatsLoading] = useState(false);
   const [eventRequestFilter, setEventRequestFilter] = useState<string>("all"); // all, pending, approved, rejected
 
-  // Get advisor info (priority) or submitted by info (fallback)
-  const getRequesterName = (request?: any) => {
-    if (!request) return "Not available";
-    // Priority: Advisor name
-    if (request.advisor_name) return request.advisor_name;
-    // Fallback: Student name
-    const name = `${request.firstName || ""} ${request.lastName || ""}`.trim();
-    if (name) return name;
-    if (request.president_name) return request.president_name;
-    if (request.submitted_by_name) return request.submitted_by_name;
-    return "Not available";
-  };
-
-  const getRequesterEmail = (request?: any) => {
-    if (!request) return "Not provided";
-    // Priority: Advisor email
-    if (request.advisor_email) return request.advisor_email;
-    // Fallback: Student email
-    return request.email || request.president_email || request.submitted_by_email || "Not provided";
-  };
-
-  const getRequesterPhone = (request?: any) => {
-    if (!request) return null;
-    // Priority: Advisor phone
-    if (request.advisor_phone) return request.advisor_phone;
-    return null;
-  };
-
-  const getRequesterRoll = (request?: any) => {
-    if (!request) return null;
-    // Only show roll number for students, not advisors
-    return request.rollNo || request.RollNO || request.student_rollno || request.submitted_by_rollno || null;
-  };
 
   // Get current user info
   const getCurrentUser = () => {
@@ -467,6 +448,15 @@ const BoardPresidentDashboard = () => {
               <p className="text-white/80">Review Pending Society Applications</p>
             </div>
             <div className="flex items-center space-x-3">
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-white border-white hover:bg-white/20 bg-transparent flex items-center gap-2"
+                onClick={() => setIsPasswordModalOpen(true)}
+              >
+                <Lock className="h-4 w-4" />
+                Change Password
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
@@ -995,312 +985,25 @@ const BoardPresidentDashboard = () => {
       </Dialog>
 
       {/* Event Request Detail Modal */}
-      <Dialog open={isEventRequestModalOpen} onOpenChange={setIsEventRequestModalOpen}>
-        <DialogContent className="max-w-4xl h-[95vh] overflow-hidden">
-          <DialogHeader>
-            <DialogTitle>Event Request Details</DialogTitle>
-            <DialogDescription>
-              Complete information about the event request
-            </DialogDescription>
-          </DialogHeader>
-
-          {selectedEventRequest && (
-            <div className="space-y-6 overflow-y-auto h-full">
-              {/* Cancellation Notice */}
-              {selectedEventRequest.cancelled_reason && (
-                <Card className="p-4 shadow-sm border-l-4 border-l-red-500 bg-red-50">
-                  <div className="flex items-start gap-3">
-                    <XCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                      <h3 className="font-semibold mb-2 text-red-900 flex items-center gap-2">
-                        Event Request Cancelled
-                      </h3>
-                      <div className="space-y-2">
-                        <div>
-                          <p className="text-sm font-medium text-red-800 mb-1">Cancellation Reason:</p>
-                          <p className="text-sm text-red-700 bg-white/50 p-3 rounded border border-red-200">
-                            {selectedEventRequest.cancelled_reason}
-                          </p>
-                        </div>
-                        {selectedEventRequest.cancelled_at && (
-                          <p className="text-xs text-red-600">
-                            Cancelled on: {new Date(selectedEventRequest.cancelled_at).toLocaleString()}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              )}
-
-              {/* Header Section */}
-              <div className="gradient-primary text-white p-6 rounded-lg">
-                <div className="flex items-start space-x-4">
-                  <div className="w-20 h-20 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <Calendar className="h-12 w-12 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center mb-2 flex-wrap gap-2">
-                      <Badge variant="secondary" className="bg-white/20 text-white">
-                        {selectedEventRequest.status_name}
-                      </Badge>
-                      {selectedEventRequest.society_name && (
-                        <Badge variant="outline" className="text-white border-white">
-                          {selectedEventRequest.society_name}
-                        </Badge>
-                      )}
-                    </div>
-                    <h2 className="text-2xl font-bold mb-2">{selectedEventRequest.title}</h2>
-                    <p className="text-white/90 mb-4">{selectedEventRequest.description}</p>
-                    <div className="flex items-center flex-wrap gap-4 text-sm">
-                      <div className="flex items-center space-x-1">
-                        <Calendar className="h-4 w-4" />
-                        <span>{new Date(selectedEventRequest.event_date).toLocaleDateString()}</span>
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        <Clock className="h-4 w-4" />
-                        <span>{selectedEventRequest.event_time}</span>
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        <MapPin className="h-4 w-4" />
-                        <span>{selectedEventRequest.venue}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Details Grid */}
-              <div className="grid md:grid-cols-2 gap-4">
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-3 text-university-navy">Event Information</h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Event Name:</span>
-                      <span className="font-medium">{selectedEventRequest.event_name || selectedEventRequest.title}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Event Type:</span>
-                      <span className="font-medium">{selectedEventRequest.event_type || "Not specified"}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Date From:</span>
-                      <span className="font-medium">
-                        {selectedEventRequest.date_from
-                          ? new Date(selectedEventRequest.date_from).toLocaleDateString()
-                          : selectedEventRequest.event_date
-                            ? new Date(selectedEventRequest.event_date).toLocaleDateString()
-                            : "Not specified"}
-                      </span>
-                    </div>
-                    {selectedEventRequest.date_to && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Date To:</span>
-                        <span className="font-medium">{new Date(selectedEventRequest.date_to).toLocaleDateString()}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Time From:</span>
-                      <span className="font-medium">{selectedEventRequest.time_from || selectedEventRequest.event_time || "Not specified"}</span>
-                    </div>
-                    {selectedEventRequest.time_to && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Time To:</span>
-                        <span className="font-medium">{selectedEventRequest.time_to}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Venue:</span>
-                      <span className="font-medium">{selectedEventRequest.venue || "Not specified"}</span>
-                    </div>
-                    {selectedEventRequest.collaborating_org && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Collaborating Org:</span>
-                        <span className="font-medium">{selectedEventRequest.collaborating_org}</span>
-                      </div>
-                    )}
-                    {selectedEventRequest.sponsor_name && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Sponsor:</span>
-                        <span className="font-medium">{selectedEventRequest.sponsor_name}</span>
-                      </div>
-                    )}
-                    {selectedEventRequest.sponsor_amount && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Sponsor Amount:</span>
-                        <span className="font-medium text-green-600">
-                          {typeof selectedEventRequest.sponsor_amount === 'string'
-                            ? (selectedEventRequest.sponsor_amount.startsWith('PKR') || selectedEventRequest.sponsor_amount.startsWith('$')
-                              ? selectedEventRequest.sponsor_amount.replace(/^\$/, 'PKR ')
-                              : `PKR ${selectedEventRequest.sponsor_amount}`)
-                            : `PKR ${selectedEventRequest.sponsor_amount}`}
-                        </span>
-                      </div>
-                    )}
-                    {selectedEventRequest.coordinator_name && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Coordinator:</span>
-                        <span className="font-medium">{selectedEventRequest.coordinator_name}</span>
-                      </div>
-                    )}
-                    {selectedEventRequest.coordinator_contact && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Coordinator Contact:</span>
-                        <span className="font-medium">{selectedEventRequest.coordinator_contact}</span>
-                      </div>
-                    )}
-                    {selectedEventRequest.media_coverage && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Media Coverage:</span>
-                        <span className="font-medium">{selectedEventRequest.media_coverage}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Status:</span>
-                      <span className="font-medium">{selectedEventRequest.status_name}</span>
-                    </div>
-                  </div>
-                </Card>
-
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-3 text-university-navy">
-                    {selectedEventRequest?.advisor_name ? "Advisor Information" : "Submitted By"}
-                  </h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Name:</span>
-                      <span className="font-medium">
-                        {getRequesterName(selectedEventRequest)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Email:</span>
-                      <span className="font-medium">{getRequesterEmail(selectedEventRequest)}</span>
-                    </div>
-                    {getRequesterPhone(selectedEventRequest) && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Phone:</span>
-                        <span className="font-medium">{getRequesterPhone(selectedEventRequest)}</span>
-                      </div>
-                    )}
-                    {getRequesterRoll(selectedEventRequest) && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Roll No:</span>
-                        <span className="font-medium">{getRequesterRoll(selectedEventRequest)}</span>
-                      </div>
-                    )}
-                    {selectedEventRequest.society_name && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Society:</span>
-                        <span className="font-medium">{selectedEventRequest.society_name}</span>
-                      </div>
-                    )}
-                  </div>
-                </Card>
-              </div>
-
-              {/* Description / Media Coverage */}
-              {(selectedEventRequest.description || selectedEventRequest.media_coverage) && (
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-3 text-university-navy">Event Description / Media Coverage</h3>
-                  {selectedEventRequest.description && (
-                    <p className="text-muted-foreground leading-relaxed mb-3">{selectedEventRequest.description}</p>
-                  )}
-                  {selectedEventRequest.media_coverage && (
-                    <div>
-                      <p className="font-medium text-sm mb-1">Media Coverage:</p>
-                      <p className="text-muted-foreground leading-relaxed">{selectedEventRequest.media_coverage}</p>
-                    </div>
-                  )}
-                </Card>
-              )}
-
-              {/* Admin Notes from History - Grouped by Role */}
-              {Array.isArray(selectedEventRequest.status_history) &&
-                selectedEventRequest.status_history.length > 0 && (
-                  <Card className="p-4">
-                    <h3 className="font-semibold mb-4 text-university-navy">Admin Notes & Status History</h3>
-                    <div className="space-y-6">
-                      {/* Group notes by role */}
-                      {(() => {
-                        const notesByRole: { [key: string]: any[] } = {};
-                        selectedEventRequest.status_history
-                          .filter((h: any) => h.note && h.note.trim() !== "")
-                          .forEach((history: any) => {
-                            const role = history.role || history.role_display_name || history.role_name || "Admin";
-                            if (!notesByRole[role]) {
-                              notesByRole[role] = [];
-                            }
-                            notesByRole[role].push(history);
-                          });
-
-                        const roleOrder = ["Board Secretary", "Board President", "Registrar", "VC", "Transport Office", "Protocol Office"];
-                        const sortedRoles = Object.keys(notesByRole).sort((a, b) => {
-                          const aIndex = roleOrder.indexOf(a);
-                          const bIndex = roleOrder.indexOf(b);
-                          if (aIndex === -1 && bIndex === -1) return a.localeCompare(b);
-                          if (aIndex === -1) return 1;
-                          if (bIndex === -1) return -1;
-                          return aIndex - bIndex;
-                        });
-
-                        if (sortedRoles.length === 0) {
-                          return <p className="text-sm text-muted-foreground italic">No admin notes yet.</p>;
-                        }
-
-                        return sortedRoles.map((role) => (
-                          <div key={role} className="space-y-3">
-                            <h4 className="font-semibold text-sm text-university-navy border-b pb-2">
-                              {role} Notes
-                            </h4>
-                            {notesByRole[role].map((history: any, idx: number) => (
-                              <div
-                                key={history.history_id || idx}
-                                className="border-l-4 border-blue-500 pl-4 py-2 bg-blue-50 rounded-r"
-                              >
-                                <div className="flex items-start justify-between mb-2">
-                                  <div>
-                                    <p className="text-xs text-muted-foreground">
-                                      {history.firstName && history.lastName
-                                        ? `${history.firstName} ${history.lastName}`
-                                        : role}
-                                      {history.status_name && ` • ${history.status_name}`}
-                                    </p>
-                                  </div>
-                                  <span className="text-xs text-muted-foreground">
-                                    {new Date(history.changed_at).toLocaleString()}
-                                  </span>
-                                </div>
-                                <p className="text-sm text-gray-700 mt-1">{history.note}</p>
-                              </div>
-                            ))}
-                          </div>
-                        ));
-                      })()}
-                    </div>
-                  </Card>
-                )}
-
-              {/* Action Buttons */}
-              <div className="flex justify-end space-x-3 pt-4 border-t">
-                <Button variant="outline" onClick={() => setIsEventRequestModalOpen(false)}>
-                  Close
-                </Button>
-                <Button
-                  variant="university"
-                  onClick={() => {
-                    setIsEventRequestModalOpen(false);
-                    handleChangeEventStatus(selectedEventRequest);
-                  }}
-                >
-                  <Edit className="h-4 w-4 mr-2" />
-                  Update Status
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <EventRequestDetailModal
+        isOpen={isEventRequestModalOpen}
+        onClose={() => setIsEventRequestModalOpen(false)}
+        eventRequest={selectedEventRequest}
+        variant="detailed"
+        isLoading={loading}
+        actionContent={
+          <Button
+            variant="university"
+            onClick={() => {
+              setIsEventRequestModalOpen(false);
+              handleChangeEventStatus(selectedEventRequest);
+            }}
+          >
+            <Edit className="h-4 w-4 mr-2" />
+            Update Status
+          </Button>
+        }
+      />
 
       {/* Event Request Status Change Modal */}
       <Dialog open={isEventStatusModalOpen} onOpenChange={setIsEventStatusModalOpen}>
@@ -1371,6 +1074,10 @@ const BoardPresidentDashboard = () => {
           )}
         </DialogContent>
       </Dialog>
+      <ChangePasswordDialog
+        isOpen={isPasswordModalOpen}
+        onOpenChange={setIsPasswordModalOpen}
+      />
     </div>
   );
 };

@@ -2540,17 +2540,17 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
                       {occupiedSlots.map((slot) => {
                         const isPreviouslySelected = previouslySelectedSlotId === slot.slot_id;
                         return (
-                          <div
-                            key={slot.slot_id}
+                        <div
+                          key={slot.slot_id}
                             className={`text-sm p-2 rounded ${
                               isPreviouslySelected
                                 ? "bg-blue-50 border-2 border-blue-500"
                                 : "bg-red-50 border border-red-200"
                             }`}
-                          >
-                            <span className="font-medium">
-                              {formatTimeToAMPM(slot.time_from)} - {slot.time_to ? formatTimeToAMPM(slot.time_to) : "N/A"}
-                            </span>
+                        >
+                          <span className="font-medium">
+                            {formatTimeToAMPM(slot.time_from)} - {slot.time_to ? formatTimeToAMPM(slot.time_to) : "N/A"}
+                          </span>
                             <span className={`ml-2 ${isPreviouslySelected ? "text-blue-600" : "text-red-600"}`}>
                               ({slot.status_name})
                             </span>
@@ -2559,7 +2559,7 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
                                 ← Previously Selected
                               </span>
                             )}
-                          </div>
+                        </div>
                         );
                       })}
                     </div>

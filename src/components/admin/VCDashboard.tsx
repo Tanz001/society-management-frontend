@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {
@@ -28,12 +29,15 @@ import {
   Edit,
   MapPin,
   Download,
-  MoreVertical
+  MoreVertical,
+  Lock,
+  Search
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useToast } from "@/components/ui/use-toast";
 import { formatTimeToAMPM } from "@/lib/utils";
+import ChangePasswordDialog from "@/components/auth/ChangePasswordDialog";
 import {
   Pagination,
   PaginationContent,
@@ -65,6 +69,20 @@ interface Society {
     lastName: string;
     email: string;
     rollNo: string;
+    university?: string;
+    major?: string;
+  };
+  advisor_info?: {
+    firstName?: string;
+    lastName?: string;
+    name?: string;
+    email?: string;
+    designation?: string;
+    department?: string;
+    dept?: string;
+    phone?: string;
+    faculty_id?: string;
+    cnic?: string;
   };
   achievements?: any[];
   events?: any[];
@@ -97,6 +115,7 @@ const VCDashboard = () => {
   const [isEventStatusModalOpen, setIsEventStatusModalOpen] = useState(false);
   const [eventStatusNote, setEventStatusNote] = useState("");
   const [selectedEventStatus, setSelectedEventStatus] = useState<number>(0);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [eventRequestStats, setEventRequestStats] = useState({
     total: 0,
     pending: 0,
@@ -120,6 +139,9 @@ const VCDashboard = () => {
   const [societiesCurrentPage, setSocietiesCurrentPage] = useState(1);
   const [eventRequestsCurrentPage, setEventRequestsCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+  
+  // Search state
+  const [searchTerm, setSearchTerm] = useState("");
 
   // Get current user info
   const getCurrentUser = () => {
@@ -155,12 +177,14 @@ const VCDashboard = () => {
       console.log("Societies for VC - Success:", response.data.success);
       console.log("Societies for VC - Count:", response.data.count || response.data.societies?.length || 0);
       console.log("Societies for VC - Data:", response.data.societies);
-      
+
       if (response.data && response.data.success) {
-        const societiesList = response.data.societies || [];
+        let societiesList = response.data.societies || [];
+        // Arrange societies alphabetically
+        societiesList = societiesList.sort((a: any, b: any) => a.name.localeCompare(b.name));
         console.log("Setting societies:", societiesList.length);
         setSocieties(societiesList);
-        
+
         if (societiesList.length === 0) {
           console.warn("No societies found with status_id IN (6, 8, 10, 11)");
         }
@@ -596,6 +620,15 @@ const VCDashboard = () => {
               <Button
                 variant="outline"
                 size="sm"
+                className="text-white border-white hover:bg-white/20 bg-transparent flex items-center gap-2"
+                onClick={() => setIsPasswordModalOpen(true)}
+              >
+                <Lock className="h-4 w-4" />
+                Change Password
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 className="text-white border-white hover:bg-white/20 bg-transparent"
                 onClick={handleLogout}
               >
@@ -675,7 +708,7 @@ const VCDashboard = () => {
             <TabsContent value="overview">
               {/* Actions */}
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-semibold text-university-navy">Societies Ready for Approval</h2>
+                <h2 className="text-2xl font-semibold text-university-navy">All Societies</h2>
                 <Button
                   variant="outline"
                   onClick={fetchSocietiesForVC}
@@ -685,6 +718,21 @@ const VCDashboard = () => {
                 </Button>
               </div>
 
+              {/* Search Input */}
+              <div className="relative mb-6">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Search societies by name, category, location, advisor, or description..."
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setSocietiesCurrentPage(1); // Reset to first page when searching
+                  }}
+                  className="pl-10"
+                />
+              </div>
+
               {/* Error Display */}
               {error && (
                 <Card className="p-4 border-red-200 bg-red-50 mb-6">
@@ -692,17 +740,43 @@ const VCDashboard = () => {
                 </Card>
               )}
 
-              {/* Societies List */}
-              {loading && societies.length === 0 ? (
-                <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-university-navy mx-auto mb-4"></div>
-                  <p className="text-muted-foreground">Loading societies...</p>
-                </div>
-              ) : societies.length > 0 ? (
-                <>
-                  <div className="grid gap-6">
-                    {societies.slice((societiesCurrentPage - 1) * itemsPerPage, societiesCurrentPage * itemsPerPage).map((society) => (
-                      <Card key={society.society_id} className="p-6 shadow-card border-l-4 border-l-university-gold">
+              {/* Filtered Societies */}
+              {(() => {
+                // Filter societies based on search term
+                const filteredSocieties = societies.filter((society) => {
+                  if (!searchTerm.trim()) return true;
+                  const query = searchTerm.toLowerCase();
+                  return (
+                    society.name?.toLowerCase().includes(query) ||
+                    society.category?.toLowerCase().includes(query) ||
+                    society.location?.toLowerCase().includes(query) ||
+                    society.advisor?.toLowerCase().includes(query) ||
+                    society.description?.toLowerCase().includes(query) ||
+                    society.status_name?.toLowerCase().includes(query)
+                  );
+                });
+
+                return (
+                  <>
+                    {loading && societies.length === 0 ? (
+                      <div className="text-center py-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-university-navy mx-auto mb-4"></div>
+                        <p className="text-muted-foreground">Loading societies...</p>
+                      </div>
+                    ) : filteredSocieties.length > 0 ? (
+                      <>
+                        {searchTerm && (
+                          <div className="mb-4 text-sm text-muted-foreground">
+                            Found {filteredSocieties.length} society(ies) matching "{searchTerm}"
+                          </div>
+                        )}
+                        <div className="grid gap-6">
+                          {filteredSocieties.slice((societiesCurrentPage - 1) * itemsPerPage, societiesCurrentPage * itemsPerPage).map((society) => (
+                      <Card
+                        key={society.society_id}
+                        className="p-6 shadow-card border-l-4 border-l-university-gold cursor-pointer hover:bg-slate-50 transition-colors"
+                        onClick={() => handleViewDetails(society)}
+                      >
                         <div className="flex items-start justify-between">
                           <div className="flex items-start space-x-4 flex-1">
                             <div className="w-16 h-16 bg-university-navy/10 rounded-lg flex items-center justify-center">
@@ -719,9 +793,11 @@ const VCDashboard = () => {
                             <div className="flex-1">
                               <div className="flex items-center mb-2">
                                 <h3 className="text-xl font-semibold text-university-navy mr-3">{society.name}</h3>
-                                <Badge variant="default" className="mr-2 bg-blue-100 text-blue-800">
-                                  {society.status_name}
-                                </Badge>
+                                {society.status_id !== 2 && !society.status_name.toLowerCase().includes('approved') && (
+                                  <Badge variant="default" className="mr-2 bg-blue-100 text-blue-800">
+                                    {society.status_name}
+                                  </Badge>
+                                )}
                                 <Badge variant="outline">{society.category}</Badge>
                               </div>
                               <p className="text-sm text-muted-foreground mb-2">
@@ -744,94 +820,90 @@ const VCDashboard = () => {
                               </div>
                             </div>
                           </div>
-                          <div className="flex items-start gap-2 ml-4">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 w-8 p-0"
-                                >
-                                  <MoreVertical className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem
-                                  onClick={() => handleViewDetails(society)}
-                                  disabled={loadingDetails}
-                                >
-                                  <Eye className="h-4 w-4 mr-2" />
-                                  View Details
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
                         </div>
                       </Card>
                     ))}
                   </div>
 
-                  {/* Pagination for Societies */}
-                  {societies.length > itemsPerPage && (
-                    <div className="flex items-center justify-between mt-6">
-                      <div className="text-sm text-muted-foreground">
-                        Showing {(societiesCurrentPage - 1) * itemsPerPage + 1} to {Math.min(societiesCurrentPage * itemsPerPage, societies.length)} of {societies.length} societies
-                      </div>
-                      <Pagination>
-                        <PaginationContent>
-                          <PaginationItem>
-                            <PaginationPrevious
-                              onClick={() => setSocietiesCurrentPage(prev => Math.max(1, prev - 1))}
-                              className={societiesCurrentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                            />
-                          </PaginationItem>
-                          {Array.from({ length: Math.ceil(societies.length / itemsPerPage) }, (_, i) => i + 1)
-                            .filter(page => {
-                              return page === 1 ||
-                                page === Math.ceil(societies.length / itemsPerPage) ||
-                                (page >= societiesCurrentPage - 1 && page <= societiesCurrentPage + 1);
-                            })
-                            .map((page, idx, array) => {
-                              const prevPage = array[idx - 1];
-                              const showEllipsisBefore = prevPage && page - prevPage > 1;
+                        {/* Pagination for Societies */}
+                        {filteredSocieties.length > itemsPerPage && (
+                          <div className="flex items-center justify-between mt-6">
+                            <div className="text-sm text-muted-foreground">
+                              Showing {(societiesCurrentPage - 1) * itemsPerPage + 1} to {Math.min(societiesCurrentPage * itemsPerPage, filteredSocieties.length)} of {filteredSocieties.length} societies
+                            </div>
+                            <Pagination>
+                              <PaginationContent>
+                                <PaginationItem>
+                                  <PaginationPrevious
+                                    onClick={() => setSocietiesCurrentPage(prev => Math.max(1, prev - 1))}
+                                    className={societiesCurrentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                                  />
+                                </PaginationItem>
+                                {Array.from({ length: Math.ceil(filteredSocieties.length / itemsPerPage) }, (_, i) => i + 1)
+                                  .filter(page => {
+                                    return page === 1 ||
+                                      page === Math.ceil(filteredSocieties.length / itemsPerPage) ||
+                                      (page >= societiesCurrentPage - 1 && page <= societiesCurrentPage + 1);
+                                  })
+                                  .map((page, idx, array) => {
+                                    const prevPage = array[idx - 1];
+                                    const showEllipsisBefore = prevPage && page - prevPage > 1;
 
-                              return (
-                                <React.Fragment key={page}>
-                                  {showEllipsisBefore && (
-                                    <PaginationItem>
-                                      <PaginationEllipsis />
-                                    </PaginationItem>
-                                  )}
-                                  <PaginationItem>
-                                    <PaginationLink
-                                      onClick={() => setSocietiesCurrentPage(page)}
-                                      isActive={societiesCurrentPage === page}
-                                      className="cursor-pointer"
-                                    >
-                                      {page}
-                                    </PaginationLink>
-                                  </PaginationItem>
-                                </React.Fragment>
-                              );
-                            })}
-                          <PaginationItem>
-                            <PaginationNext
-                              onClick={() => setSocietiesCurrentPage(prev => Math.min(Math.ceil(societies.length / itemsPerPage), prev + 1))}
-                              className={societiesCurrentPage >= Math.ceil(societies.length / itemsPerPage) ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                            />
-                          </PaginationItem>
-                        </PaginationContent>
-                      </Pagination>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="text-center py-12">
-                  <Crown className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                  <h3 className="text-lg font-medium mb-2">No Pending Approvals</h3>
-                  <p className="text-muted-foreground">There are no societies waiting for Vice Chancellor approval.</p>
-                </div>
-              )}
+                                    return (
+                                      <React.Fragment key={page}>
+                                        {showEllipsisBefore && (
+                                          <PaginationItem>
+                                            <PaginationEllipsis />
+                                          </PaginationItem>
+                                        )}
+                                        <PaginationItem>
+                                          <PaginationLink
+                                            onClick={() => setSocietiesCurrentPage(page)}
+                                            isActive={societiesCurrentPage === page}
+                                            className="cursor-pointer"
+                                          >
+                                            {page}
+                                          </PaginationLink>
+                                        </PaginationItem>
+                                      </React.Fragment>
+                                    );
+                                  })}
+                                <PaginationItem>
+                                  <PaginationNext
+                                    onClick={() => setSocietiesCurrentPage(prev => Math.min(Math.ceil(filteredSocieties.length / itemsPerPage), prev + 1))}
+                                    className={societiesCurrentPage >= Math.ceil(filteredSocieties.length / itemsPerPage) ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                                  />
+                                </PaginationItem>
+                              </PaginationContent>
+                            </Pagination>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <Card className="p-6 text-center">
+                        <Building className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                        <h3 className="text-lg font-medium mb-2">
+                          {searchTerm ? "No Societies Found" : "No Pending Approvals"}
+                        </h3>
+                        <p className="text-muted-foreground">
+                          {searchTerm
+                            ? `No societies found matching "${searchTerm}". Try a different search term.`
+                            : "There are no societies waiting for Vice Chancellor approval."}
+                        </p>
+                        {searchTerm && (
+                          <Button
+                            variant="outline"
+                            className="mt-4"
+                            onClick={() => setSearchTerm("")}
+                          >
+                            Clear Search
+                          </Button>
+                        )}
+                      </Card>
+                    )}
+                  </>
+                );
+              })()}
             </TabsContent>
 
             {/* Event Requests Tab */}
@@ -1346,18 +1418,32 @@ const VCDashboard = () => {
 
           {selectedSociety && (
             <div className="space-y-6 overflow-y-auto h-full">
+              {/* Cover Photo */}
+              {selectedSociety.cover_photo && (
+                <div className="relative h-48 rounded-lg overflow-hidden shrink-0">
+                  <img
+                    src={`${import.meta.env.VITE_API_URL}/${selectedSociety.cover_photo}`}
+                    alt={selectedSociety.name}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
+                </div>
+              )}
+
               {/* Hero Section */}
               <div className="gradient-primary text-white p-6 rounded-lg">
                 <div className="flex items-start space-x-4">
-                  <div className="w-20 h-20 bg-white/20 rounded-lg flex items-center justify-center">
+                  <div className="w-20 h-20 bg-white rounded-lg flex items-center justify-center overflow-hidden shrink-0 shadow-lg">
                     {selectedSociety.society_logo ? (
                       <img
                         src={`${import.meta.env.VITE_API_URL}/${selectedSociety.society_logo}`}
                         alt={selectedSociety.name}
-                        className="w-16 h-16 rounded-lg object-cover"
+                        className="w-full h-full object-cover"
                       />
                     ) : (
-                      <Building className="h-10 w-10 text-white" />
+                      <Building className="h-10 w-10 text-university-navy" />
                     )}
                   </div>
                   <div className="flex-1">
@@ -1365,9 +1451,11 @@ const VCDashboard = () => {
                       <Badge variant="secondary" className="bg-white/20 text-white mr-2">
                         {selectedSociety.category}
                       </Badge>
-                      <Badge variant="outline" className="text-white border-white bg-blue-600">
-                        {selectedSociety.status_name}
-                      </Badge>
+                      {selectedSociety.status_id !== 2 && !selectedSociety.status_name.toLowerCase().includes('approved') && (
+                        <Badge variant="outline" className="text-white border-white bg-blue-600">
+                          {selectedSociety.status_name}
+                        </Badge>
+                      )}
                     </div>
                     <h2 className="text-2xl font-bold mb-2">{selectedSociety.name}</h2>
                     <p className="text-white/90 mb-4">{selectedSociety.description}</p>
@@ -2109,11 +2197,11 @@ const VCDashboard = () => {
             </div>
           ) : selectedSocietyDetail ? (
             <div className="space-y-6">
-              {/* Header Section with Cover Photo */}
-              {selectedSocietyDetail.cover_photo && (
-                <div className="relative h-48 rounded-lg overflow-hidden">
+              {/* Header Section with Cover Photo - At the very top */}
+              {(selectedSocietyDetail.cover_photo || selectedSocietyDetail.cover_image_path) && (
+                <div className="relative h-48 rounded-lg overflow-hidden -mt-2">
                   <img
-                    src={`${import.meta.env.VITE_API_URL}/${selectedSocietyDetail.cover_photo}`}
+                    src={`${import.meta.env.VITE_API_URL}/${selectedSocietyDetail.cover_photo || selectedSocietyDetail.cover_image_path}`}
                     alt={selectedSocietyDetail.name}
                     className="w-full h-full object-cover"
                     onError={(e) => {
@@ -2126,11 +2214,11 @@ const VCDashboard = () => {
               {/* Society Basic Info */}
               <Card className="p-6">
                 <div className="flex items-start gap-4 mb-4">
-                  {selectedSocietyDetail.society_logo && (
+                  {(selectedSocietyDetail.society_logo || selectedSocietyDetail.logo_path) && (
                     <img
-                      src={`${import.meta.env.VITE_API_URL}/${selectedSocietyDetail.society_logo}`}
+                      src={`${import.meta.env.VITE_API_URL}/${selectedSocietyDetail.society_logo || selectedSocietyDetail.logo_path}`}
                       alt={selectedSocietyDetail.name}
-                      className="w-20 h-20 rounded-lg object-cover border-2 border-university-gold"
+                      className="w-24 h-24 rounded-lg object-cover border-2 border-university-gold shadow-md flex-shrink-0"
                       onError={(e) => {
                         e.currentTarget.style.display = 'none';
                       }}
@@ -2139,7 +2227,11 @@ const VCDashboard = () => {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
                       <h2 className="text-2xl font-bold text-university-navy">{selectedSocietyDetail.name}</h2>
-                      <Badge variant="secondary">{selectedSocietyDetail.status_name}</Badge>
+                      {/* Hide status badge if it contains 'Approved' */}
+                      {selectedSocietyDetail.status_name && 
+                       !selectedSocietyDetail.status_name.toLowerCase().includes('approved') && (
+                        <Badge variant="secondary">{selectedSocietyDetail.status_name}</Badge>
+                      )}
                       <Badge variant="outline">{selectedSocietyDetail.category}</Badge>
                     </div>
                     <p className="text-muted-foreground mb-2">
@@ -2184,7 +2276,10 @@ const VCDashboard = () => {
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Name:</span>
                         <span className="font-medium">
-                          {selectedSocietyDetail.advisor_info?.name || advisorInfo?.name || selectedSocietyDetail.advisor || "N/A"}
+                          {(selectedSocietyDetail.advisor_info as any)?.name ||
+                            ((selectedSocietyDetail.advisor_info as any)?.firstName ? `${(selectedSocietyDetail.advisor_info as any).firstName} ${(selectedSocietyDetail.advisor_info as any).lastName}` : "") ||
+                            advisorInfo?.name ||
+                            selectedSocietyDetail.advisor || "N/A"}
                         </span>
                       </div>
                       {(selectedSocietyDetail.advisor_info?.email || advisorInfo?.email) && (
@@ -2205,27 +2300,27 @@ const VCDashboard = () => {
                       )}
                     </div>
                     <div className="space-y-2 text-sm">
-                      {(selectedSocietyDetail.advisor_info?.faculty_id || advisorInfo?.faculty_id) && (
+                      {((selectedSocietyDetail.advisor_info as any)?.faculty_id || advisorInfo?.faculty_id) && (
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Faculty ID:</span>
                           <span className="font-medium">
-                            {selectedSocietyDetail.advisor_info?.faculty_id || advisorInfo?.faculty_id}
+                            {(selectedSocietyDetail.advisor_info as any)?.faculty_id || advisorInfo?.faculty_id}
                           </span>
                         </div>
                       )}
-                      {(selectedSocietyDetail.advisor_info?.dept || advisorInfo?.dept) && (
+                      {((selectedSocietyDetail.advisor_info as any)?.dept || (selectedSocietyDetail.advisor_info as any)?.department || advisorInfo?.dept) && (
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Department:</span>
                           <span className="font-medium">
-                            {selectedSocietyDetail.advisor_info?.dept || advisorInfo?.dept}
+                            {(selectedSocietyDetail.advisor_info as any)?.dept || (selectedSocietyDetail.advisor_info as any)?.department || advisorInfo?.dept}
                           </span>
                         </div>
                       )}
-                      {(selectedSocietyDetail.advisor_info?.cnic || advisorInfo?.cnic) && (
+                      {((selectedSocietyDetail.advisor_info as any)?.cnic || advisorInfo?.cnic) && (
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">CNIC:</span>
                           <span className="font-medium">
-                            {selectedSocietyDetail.advisor_info?.cnic || advisorInfo?.cnic}
+                            {(selectedSocietyDetail.advisor_info as any)?.cnic || advisorInfo?.cnic}
                           </span>
                         </div>
                       )}
@@ -2318,15 +2413,22 @@ const VCDashboard = () => {
                 </Card>
               )}
 
-              {/* Status History */}
-              {selectedSocietyDetail.status_history && Array.isArray(selectedSocietyDetail.status_history) && selectedSocietyDetail.status_history.length > 0 && (
+              {/* Status History - Filter out 'Approved' statuses */}
+              {selectedSocietyDetail.status_history && Array.isArray(selectedSocietyDetail.status_history) && 
+               selectedSocietyDetail.status_history.filter((h: any) => 
+                 h.status_name && !h.status_name.toLowerCase().includes('approved')
+               ).length > 0 && (
                 <Card className="p-6">
                   <h3 className="font-semibold mb-3 text-university-navy flex items-center">
                     <Clock className="h-5 w-5 mr-2" />
                     Status History
                   </h3>
                   <div className="space-y-3">
-                    {selectedSocietyDetail.status_history.map((history: any, index: number) => (
+                    {selectedSocietyDetail.status_history
+                      .filter((history: any) => 
+                        history.status_name && !history.status_name.toLowerCase().includes('approved')
+                      )
+                      .map((history: any, index: number) => (
                       <div key={index} className="border-l-4 border-blue-500 pl-4 py-2 bg-blue-50 rounded-r">
                         <div className="flex items-center justify-between mb-1">
                           <span className="font-medium text-sm">{history.status_name || "Status Change"}</span>
@@ -2350,6 +2452,10 @@ const VCDashboard = () => {
           )}
         </DialogContent>
       </Dialog>
+      <ChangePasswordDialog
+        isOpen={isPasswordModalOpen}
+        onOpenChange={setIsPasswordModalOpen}
+      />
     </div>
   );
 };

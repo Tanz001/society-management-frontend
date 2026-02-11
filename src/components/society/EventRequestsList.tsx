@@ -446,12 +446,12 @@ const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        {canEdit(request) && (
+                  {canEdit(request) && (
                           <DropdownMenuItem
-                            onClick={() => handleEditRequest(request.req_id)}
-                          >
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Edit Request
+                      onClick={() => handleEditRequest(request.req_id)}
+                    >
+                      <Pencil className="h-4 w-4 mr-2" />
+                      Edit Request
                           </DropdownMenuItem>
                         )}
                         {request.slot_request_id && (
@@ -488,32 +488,32 @@ const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
                   )}
                   {request.cancelled_reason && (
                     <>
-                      {request.slot_request_id && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedRequest(request);
-                            fetchSuggestedSlots(request.slot_request_id);
-                          }}
-                          disabled={loadingSuggestedSlots}
-                        >
-                          <Lightbulb className="h-4 w-4 mr-2" />
-                          View Suggested Slots
-                        </Button>
-                      )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedRequest(request);
-                          fetchStatusHistory(request.req_id);
-                        }}
-                        disabled={loadingHistory}
-                      >
-                        <History className="h-4 w-4 mr-2" />
-                        View Status History
-                      </Button>
+                  {request.slot_request_id && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedRequest(request);
+                        fetchSuggestedSlots(request.slot_request_id);
+                      }}
+                      disabled={loadingSuggestedSlots}
+                    >
+                      <Lightbulb className="h-4 w-4 mr-2" />
+                      View Suggested Slots
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedRequest(request);
+                      fetchStatusHistory(request.req_id);
+                    }}
+                    disabled={loadingHistory}
+                  >
+                    <History className="h-4 w-4 mr-2" />
+                    View Status History
+                  </Button>
                     </>
                   )}
                 </div>

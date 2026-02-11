@@ -31,7 +31,8 @@ import {
   TrendingUp,
   Edit,
   MapPin,
-  MoreVertical
+  MoreVertical,
+  Lock
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -46,6 +47,7 @@ import {
 } from "@/components/ui/pagination";
 import { useToast } from "@/components/ui/use-toast";
 import { formatTimeToAMPM } from "@/lib/utils";
+import ChangePasswordDialog from "@/components/auth/ChangePasswordDialog";
 
 interface Society {
   society_id: number;
@@ -69,6 +71,16 @@ interface Society {
     lastName: string;
     email: string;
     rollNo: string;
+    university?: string;
+    major?: string;
+  };
+  advisor_info?: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    designation: string;
+    department: string;
+    phone: string;
   };
   achievements?: any[];
   events?: any[];
@@ -108,6 +120,7 @@ const RegistrarDashboard = () => {
   const [isEventStatusModalOpen, setIsEventStatusModalOpen] = useState(false);
   const [eventStatusNote, setEventStatusNote] = useState("");
   const [selectedEventStatus, setSelectedEventStatus] = useState<number>(0);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [eventRequestStats, setEventRequestStats] = useState({
     total: 0,
     pending: 0,
@@ -563,6 +576,15 @@ const RegistrarDashboard = () => {
               <p className="text-white/80">Complete Society Management System</p>
             </div>
             <div className="flex items-center space-x-3">
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-white border-white hover:bg-white/20 bg-transparent flex items-center gap-2"
+                onClick={() => setIsPasswordModalOpen(true)}
+              >
+                <Lock className="h-4 w-4" />
+                Change Password
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
@@ -2092,6 +2114,10 @@ const RegistrarDashboard = () => {
           )}
         </DialogContent>
       </Dialog>
+      <ChangePasswordDialog
+        isOpen={isPasswordModalOpen}
+        onOpenChange={setIsPasswordModalOpen}
+      />
     </div>
   );
 };

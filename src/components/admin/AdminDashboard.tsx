@@ -32,7 +32,9 @@ import {
   FileText,
   Edit,
   Clock,
-  MoreVertical
+  MoreVertical,
+  Lock,
+  Search
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -57,6 +59,8 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import ChangePasswordDialog from "@/components/auth/ChangePasswordDialog";
+import EventRequestDetailModal from "@/components/admin/EventRequestDetailModal";
 
 const AdminDashboard = () => {
   const { toast } = useToast();
@@ -82,9 +86,11 @@ const AdminDashboard = () => {
   const [error, setError] = useState(null);
   const [selectedEventRequest, setSelectedEventRequest] = useState<any>(null);
   const [isEventRequestDetailModalOpen, setIsEventRequestDetailModalOpen] = useState(false);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [loadingEventRequestDetails, setLoadingEventRequestDetails] = useState(false);
   const [societyFilter, setSocietyFilter] = useState("all"); // all, active, pending, rejected
   const [eventRequestFilter, setEventRequestFilter] = useState<string>("all"); // all, pending, approved, rejected
+  const [societySearchTerm, setSocietySearchTerm] = useState(""); // Search term for societies
   const [eventRequestStats, setEventRequestStats] = useState({
     total: 0,
     pending: 0,
@@ -155,13 +161,28 @@ const AdminDashboard = () => {
     society.status === 'under_review'
   );
 
-  // Filter societies based on selected filter
+  // Filter societies based on selected filter and search term
   const filteredSocieties = allSocieties.filter(society => {
-    if (societyFilter === "all") return true;
-    if (societyFilter === "active") return society.status_name === 'Approved by VC' || society.status === 'active';
-    if (societyFilter === "pending") return society.status_id === 1 || society.status === 'pending' || society.status === 'under_review';
-    if (societyFilter === "rejected") return society.status_name?.includes('Rejected') || society.status === 'rejected';
-    return true;
+    // Apply status filter
+    let matchesFilter = true;
+    if (societyFilter === "all") matchesFilter = true;
+    else if (societyFilter === "active") matchesFilter = society.status_name === 'Approved by VC' || society.status === 'active';
+    else if (societyFilter === "pending") matchesFilter = society.status_id === 1 || society.status === 'pending' || society.status === 'under_review';
+    else if (societyFilter === "rejected") matchesFilter = society.status_name?.includes('Rejected') || society.status === 'rejected';
+    
+    // Apply search filter
+    if (!matchesFilter) return false;
+    if (!societySearchTerm.trim()) return true;
+    
+    const query = societySearchTerm.toLowerCase();
+    return (
+      society.name?.toLowerCase().includes(query) ||
+      society.category?.toLowerCase().includes(query) ||
+      society.location?.toLowerCase().includes(query) ||
+      society.advisor?.toLowerCase().includes(query) ||
+      society.description?.toLowerCase().includes(query) ||
+      society.status_name?.toLowerCase().includes(query)
+    );
   });
 
   // Paginated societies (fallback to filteredSocieties if pagination not needed)
@@ -824,6 +845,15 @@ const AdminDashboard = () => {
               <p className="text-white/80">Complete University Societies Management System</p>
             </div>
             <div className="flex items-center space-x-3">
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-white border-white hover:bg-white/20 bg-transparent flex items-center gap-2"
+                onClick={() => setIsPasswordModalOpen(true)}
+              >
+                <Lock className="h-4 w-4" />
+                Change Password
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
@@ -1816,12 +1846,46 @@ const AdminDashboard = () => {
                 </Card>
               )}
 
+              {/* Search Input */}
+              <div className="relative mb-6">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Search societies by name, category, location, advisor, or description..."
+                  value={societySearchTerm}
+                  onChange={(e) => {
+                    setSocietySearchTerm(e.target.value);
+                    setSocietiesCurrentPage(1); // Reset to first page when searching
+                  }}
+                  className="pl-10"
+                />
+              </div>
+
               {/* Societies List */}
-              {filteredSocieties.length > 0 && (
+              {filteredSocieties.length > 0 ? (
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-university-navy">
-                    All Societies ({filteredSocieties.length})
-                  </h3>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-university-navy">
+                      All Societies ({filteredSocieties.length})
+                    </h3>
+                    {societySearchTerm && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSocietySearchTerm("");
+                          setSocietiesCurrentPage(1);
+                        }}
+                      >
+                        Clear Search
+                      </Button>
+                    )}
+                  </div>
+                  {societySearchTerm && (
+                    <div className="text-sm text-muted-foreground">
+                      Found {filteredSocieties.length} society(ies) matching "{societySearchTerm}"
+                    </div>
+                  )}
                   <div className="grid gap-4">
                     {filteredSocieties.map((society: any) => (
                       <Card key={society.society_id} className="p-4 shadow-card hover:shadow-lg transition-shadow">
@@ -1861,6 +1925,33 @@ const AdminDashboard = () => {
                     ))}
                   </div>
                 </div>
+              ) : (
+                <Card className="p-6 text-center">
+                  <Building className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-medium mb-2">
+                    {societySearchTerm || societyFilter !== "all" ? "No Societies Found" : "No Societies Available"}
+                  </h3>
+                  <p className="text-muted-foreground">
+                    {societySearchTerm
+                      ? `No societies found matching "${societySearchTerm}". Try a different search term.`
+                      : societyFilter !== "all"
+                      ? `No societies found with the selected filter.`
+                      : "No societies have been registered yet."}
+                  </p>
+                  {(societySearchTerm || societyFilter !== "all") && (
+                    <Button
+                      variant="outline"
+                      className="mt-4"
+                      onClick={() => {
+                        setSocietySearchTerm("");
+                        setSocietyFilter("all");
+                        setSocietiesCurrentPage(1);
+                      }}
+                    >
+                      Clear Filters
+                    </Button>
+                  )}
+                </Card>
               )}
 
               {/* Loading State */}
@@ -2445,444 +2536,13 @@ const AdminDashboard = () => {
       </Dialog>
 
       {/* Event Request Detail Modal */}
-      <Dialog open={isEventRequestDetailModalOpen} onOpenChange={setIsEventRequestDetailModalOpen}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Event Request Details</DialogTitle>
-            <DialogDescription>
-              Complete information about the event request including all notes and documents
-            </DialogDescription>
-          </DialogHeader>
-          {loadingEventRequestDetails ? (
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-university-navy mx-auto mb-4"></div>
-              <p className="text-muted-foreground">Loading event request details...</p>
-            </div>
-          ) : selectedEventRequest ? (
-            <div className="space-y-4">
-              {/* Cancellation Notice */}
-              {selectedEventRequest.cancelled_reason && (
-                <Card className="p-4 shadow-sm border-l-4 border-l-red-500 bg-red-50">
-                  <div className="flex items-start gap-3">
-                    <XCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                      <h3 className="font-semibold mb-2 text-red-900 flex items-center gap-2">
-                        Event Request Cancelled
-                      </h3>
-                      <div className="space-y-2">
-                        <div>
-                          <p className="text-sm font-medium text-red-800 mb-1">Cancellation Reason:</p>
-                          <p className="text-sm text-red-700 bg-white/50 p-3 rounded border border-red-200">
-                            {selectedEventRequest.cancelled_reason}
-                          </p>
-                        </div>
-                        {selectedEventRequest.cancelled_at && (
-                          <p className="text-xs text-red-600">
-                            Cancelled on: {new Date(selectedEventRequest.cancelled_at).toLocaleString()}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              )}
-
-              {/* Basic Information */}
-              <div className="grid md:grid-cols-2 gap-4">
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-3 text-university-navy">Event Information</h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Event Name:</span>
-                      <span className="font-medium">{selectedEventRequest.title || selectedEventRequest.event_name || "Not specified"}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Event Type:</span>
-                      <span className="font-medium">{selectedEventRequest.event_type || "Not specified"}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Date From:</span>
-                      <span className="font-medium">{selectedEventRequest.event_date || selectedEventRequest.date_from ? new Date(selectedEventRequest.event_date || selectedEventRequest.date_from).toLocaleDateString() : "TBD"}</span>
-                    </div>
-                    {selectedEventRequest.date_to && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Date To:</span>
-                        <span className="font-medium">{new Date(selectedEventRequest.date_to).toLocaleDateString()}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Time From:</span>
-                      <span className="font-medium">{selectedEventRequest.event_time || selectedEventRequest.time_from || "TBD"}</span>
-                    </div>
-                    {selectedEventRequest.time_to && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Time To:</span>
-                        <span className="font-medium">{selectedEventRequest.time_to}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Venue:</span>
-                      <span className="font-medium">{selectedEventRequest.venue || "Not specified"}</span>
-                    </div>
-                    {selectedEventRequest.collaborating_org && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Collaborating Org:</span>
-                        <span className="font-medium">{selectedEventRequest.collaborating_org}</span>
-                      </div>
-                    )}
-                    {selectedEventRequest.sponsor_name && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Sponsor:</span>
-                        <span className="font-medium">{selectedEventRequest.sponsor_name}</span>
-                      </div>
-                    )}
-                    {selectedEventRequest.sponsor_amount && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Sponsor Amount:</span>
-                        <span className="font-medium text-green-600">
-                          {typeof selectedEventRequest.sponsor_amount === 'string'
-                            ? (selectedEventRequest.sponsor_amount.startsWith('PKR') || selectedEventRequest.sponsor_amount.startsWith('$')
-                              ? selectedEventRequest.sponsor_amount.replace(/^\$/, 'PKR ')
-                              : `PKR ${selectedEventRequest.sponsor_amount}`)
-                            : `PKR ${selectedEventRequest.sponsor_amount}`}
-                        </span>
-                      </div>
-                    )}
-                    {selectedEventRequest.coordinator_name && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Coordinator:</span>
-                        <span className="font-medium">{selectedEventRequest.coordinator_name}</span>
-                      </div>
-                    )}
-                    {selectedEventRequest.coordinator_contact && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Coordinator Contact:</span>
-                        <span className="font-medium">{selectedEventRequest.coordinator_contact}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Status:</span>
-                      <Badge variant={selectedEventRequest.status_id === 1 ? "secondary" : [2, 4, 6, 8, 11, 13, 15].includes(selectedEventRequest.status_id) ? "default" : "destructive"}>
-                        {selectedEventRequest.status_name || "Pending"}
-                      </Badge>
-                    </div>
-                  </div>
-                </Card>
-
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-3 text-university-navy">Submitted By</h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Name:</span>
-                      <span className="font-medium">
-                        {selectedEventRequest.firstName && selectedEventRequest.lastName
-                          ? `${selectedEventRequest.firstName} ${selectedEventRequest.lastName}`
-                          : selectedEventRequest.president_name || "Not available"}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Email:</span>
-                      <span className="font-medium">
-                        {selectedEventRequest.president_email || selectedEventRequest.email || "Not provided"}
-                      </span>
-                    </div>
-                    {(selectedEventRequest.rollNo || selectedEventRequest.RollNO) && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Roll No:</span>
-                        <span className="font-medium">{selectedEventRequest.rollNo || selectedEventRequest.RollNO}</span>
-                      </div>
-                    )}
-                    {selectedEventRequest.society_name && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Society:</span>
-                        <span className="font-medium">{selectedEventRequest.society_name}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Created At:</span>
-                      <span className="font-medium">{new Date(selectedEventRequest.created_at).toLocaleString()}</span>
-                    </div>
-                  </div>
-                </Card>
-              </div>
-
-              {/* Description / Media Coverage */}
-              {(selectedEventRequest.description || selectedEventRequest.media_coverage) && (
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-3 text-university-navy">Event Description / Media Coverage</h3>
-                  {selectedEventRequest.description && (
-                    <p className="text-muted-foreground leading-relaxed mb-3">{selectedEventRequest.description}</p>
-                  )}
-                  {selectedEventRequest.media_coverage && (
-                    <div>
-                      <p className="font-medium text-sm mb-1">Media Coverage:</p>
-                      <p className="text-muted-foreground leading-relaxed">{selectedEventRequest.media_coverage}</p>
-                    </div>
-                  )}
-                </Card>
-              )}
-
-              {/* Participants: Students */}
-              {Array.isArray(selectedEventRequest.student_participants) &&
-                selectedEventRequest.student_participants.length > 0 && (
-                  <Card className="p-4">
-                    <h3 className="font-semibold mb-3 text-university-navy">Student Participants</h3>
-                    <div className="space-y-2 text-sm">
-                      {selectedEventRequest.student_participants.map((s: any, idx: number) => (
-                        <div
-                          key={idx}
-                          className="flex flex-wrap justify-between border-b last:border-0 pb-2 last:pb-0"
-                        >
-                          <span className="font-medium">
-                            {s.academic_program || "Program not specified"}
-                          </span>
-                          <span className="text-muted-foreground">
-                            {s.semester && `Semester: ${s.semester} • `}
-                            {typeof s.no_of_students === "number" && s.no_of_students > 0
-                              ? `${s.no_of_students} students`
-                              : "Count not specified"}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </Card>
-                )}
-
-              {/* Participants: Staff */}
-              {Array.isArray(selectedEventRequest.staff_participants) &&
-                selectedEventRequest.staff_participants.length > 0 && (
-                  <Card className="p-4">
-                    <h3 className="font-semibold mb-3 text-university-navy">Staff Participants</h3>
-                    <div className="space-y-2 text-sm">
-                      {selectedEventRequest.staff_participants.map((s: any, idx: number) => (
-                        <div
-                          key={idx}
-                          className="flex flex-wrap justify-between border-b last:border-0 pb-2 last:pb-0"
-                        >
-                          <span className="font-medium">
-                            {s.department || "Department not specified"}
-                          </span>
-                          <span className="text-muted-foreground">
-                            {s.gazetted || "Category not specified"} •{" "}
-                            {typeof s.no_of_staff === "number" && s.no_of_staff > 0
-                              ? `${s.no_of_staff} staff`
-                              : "Count not specified"}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </Card>
-                )}
-
-              {/* Management Requirements */}
-              {selectedEventRequest.management_requirements && (
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-3 text-university-navy">Management Requirements</h3>
-                  <div className="grid md:grid-cols-2 gap-3 text-sm">
-                    <div className="space-y-1">
-                      <p>
-                        <span className="font-medium">Sound System:</span>{" "}
-                        {selectedEventRequest.management_requirements.sound_system ? "Yes" : "No"}
-                      </p>
-                      <p>
-                        <span className="font-medium">Recording:</span>{" "}
-                        {selectedEventRequest.management_requirements.recording ? "Yes" : "No"}
-                      </p>
-                      <p>
-                        <span className="font-medium">Bouquet:</span>{" "}
-                        {selectedEventRequest.management_requirements.bouquet ? "Yes" : "No"}
-                      </p>
-                      <p>
-                        <span className="font-medium">Souvenirs:</span>{" "}
-                        {selectedEventRequest.management_requirements.souvenirs ? "Yes" : "No"}
-                      </p>
-                      <p>
-                        <span className="font-medium">University Photographer:</span>{" "}
-                        {selectedEventRequest.management_requirements.university_photographer
-                          ? "Yes"
-                          : "No"}
-                      </p>
-                    </div>
-                    <div className="space-y-1">
-                      <p>
-                        <span className="font-medium">Special Arrangements:</span>{" "}
-                        {selectedEventRequest.management_requirements.special_arrangements
-                          ? "Yes"
-                          : "No"}
-                      </p>
-                      {selectedEventRequest.management_requirements.special_arrangements_detail && (
-                        <p className="text-muted-foreground">
-                          {selectedEventRequest.management_requirements.special_arrangements_detail}
-                        </p>
-                      )}
-                      <p>
-                        <span className="font-medium">Refreshments:</span>{" "}
-                        {selectedEventRequest.management_requirements.refreshment_required
-                          ? "Yes"
-                          : "No"}
-                      </p>
-                      {selectedEventRequest.management_requirements.refreshment_required && (
-                        <>
-                          {selectedEventRequest.management_requirements.refreshment_category && (
-                            <p className="text-muted-foreground">
-                              <span className="font-medium">Category:</span>{" "}
-                              {selectedEventRequest.management_requirements.refreshment_category}
-                            </p>
-                          )}
-                          {selectedEventRequest.management_requirements.refreshment_persons && (
-                            <p className="text-muted-foreground">
-                              <span className="font-medium">Persons:</span>{" "}
-                              {selectedEventRequest.management_requirements.refreshment_persons} persons
-                            </p>
-                          )}
-                        </>
-                      )}
-                      {selectedEventRequest.management_requirements.any_other && (
-                        <p className="text-muted-foreground">
-                          <span className="font-medium">Other:</span>{" "}
-                          {selectedEventRequest.management_requirements.any_other}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </Card>
-              )}
-
-              {/* Transport Requests */}
-              {Array.isArray(selectedEventRequest.transport_requests) &&
-                selectedEventRequest.transport_requests.length > 0 && (
-                  <Card className="p-4">
-                    <h3 className="font-semibold mb-3 text-university-navy">Transport Requests</h3>
-                    <div className="space-y-2 text-sm">
-                      {selectedEventRequest.transport_requests.map((t: any, idx: number) => (
-                        <div
-                          key={idx}
-                          className="border rounded p-2 flex flex-wrap justify-between gap-2"
-                        >
-                          <div>
-                            <p className="font-medium">{t.vehicle_type || "Vehicle not specified"}</p>
-                            <p className="text-muted-foreground">
-                              {t.purpose || "Purpose not specified"}
-                            </p>
-                          </div>
-                          <div className="text-right text-xs text-muted-foreground">
-                            {t.date && <div>📅 {new Date(t.date).toLocaleDateString()}</div>}
-                            {t.time && <div>🕐 {t.time}</div>}
-                            {t.destination && <div>📍 {t.destination}</div>}
-                            {typeof t.no_of_persons === "number" && t.no_of_persons > 0 && (
-                              <div>👥 {t.no_of_persons} persons</div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </Card>
-                )}
-
-              {/* Documents */}
-              {Array.isArray(selectedEventRequest.documents) &&
-                selectedEventRequest.documents.length > 0 && (
-                  <Card className="p-4">
-                    <h3 className="font-semibold mb-3 text-university-navy">Attached Documents</h3>
-                    <div className="space-y-2 text-sm">
-                      {selectedEventRequest.documents.map((doc: any) => (
-                        <div
-                          key={doc.doc_id}
-                          className="flex items-center justify-between border-b last:border-0 pb-2 last:pb-0"
-                        >
-                          <span>
-                            <span className="font-medium capitalize">{doc.doc_type}</span>
-                            {" – "}
-                            {doc.file_path.split("/").pop()}
-                          </span>
-                          <a
-                            href={`${import.meta.env.VITE_API_URL}${doc.file_path}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs text-blue-600 hover:underline"
-                          >
-                            View
-                          </a>
-                        </div>
-                      ))}
-                    </div>
-                  </Card>
-                )}
-
-              {/* Admin Notes from History - Grouped by Role */}
-              {Array.isArray(selectedEventRequest.status_history) &&
-                selectedEventRequest.status_history.length > 0 && (
-                  <Card className="p-4">
-                    <h3 className="font-semibold mb-4 text-university-navy">Admin Notes & Status History</h3>
-                    <div className="space-y-6">
-                      {/* Group notes by role */}
-                      {(() => {
-                        const notesByRole: { [key: string]: any[] } = {};
-                        selectedEventRequest.status_history
-                          .filter((h: any) => h.note && h.note.trim() !== "")
-                          .forEach((history: any) => {
-                            const role = history.role || history.role_display_name || history.role_name || "Admin";
-                            if (!notesByRole[role]) {
-                              notesByRole[role] = [];
-                            }
-                            notesByRole[role].push(history);
-                          });
-
-                        const roleOrder = ["Board Secretary", "Board President", "Registrar", "VC", "Transport Office", "Protocol Office"];
-                        const sortedRoles = Object.keys(notesByRole).sort((a, b) => {
-                          const aIndex = roleOrder.indexOf(a);
-                          const bIndex = roleOrder.indexOf(b);
-                          if (aIndex === -1 && bIndex === -1) return a.localeCompare(b);
-                          if (aIndex === -1) return 1;
-                          if (bIndex === -1) return -1;
-                          return aIndex - bIndex;
-                        });
-
-                        if (sortedRoles.length === 0) {
-                          return <p className="text-sm text-muted-foreground italic">No admin notes yet.</p>;
-                        }
-
-                        return sortedRoles.map((role) => (
-                          <div key={role} className="space-y-3">
-                            <h4 className="font-semibold text-sm text-university-navy border-b pb-2">
-                              {role} Notes
-                            </h4>
-                            {notesByRole[role].map((history: any, idx: number) => (
-                              <div
-                                key={history.history_id || idx}
-                                className="border-l-4 border-blue-500 pl-4 py-2 bg-blue-50 rounded-r"
-                              >
-                                <div className="flex items-start justify-between mb-2">
-                                  <div>
-                                    <p className="text-xs text-muted-foreground">
-                                      {history.firstName && history.lastName
-                                        ? `${history.firstName} ${history.lastName}`
-                                        : role}
-                                      {history.status_name && ` • ${history.status_name}`}
-                                    </p>
-                                  </div>
-                                  <span className="text-xs text-muted-foreground">
-                                    {new Date(history.changed_at).toLocaleString()}
-                                  </span>
-                                </div>
-                                <p className="text-sm text-gray-700 mt-1">{history.note}</p>
-                              </div>
-                            ))}
-                          </div>
-                        ));
-                      })()}
-                    </div>
-                  </Card>
-                )}
-            </div>
-          ) : null}
-          <div className="flex justify-end space-x-2 pt-4">
-            <Button variant="outline" onClick={() => setIsEventRequestDetailModalOpen(false)}>
-              Close
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <EventRequestDetailModal
+        isOpen={isEventRequestDetailModalOpen}
+        onClose={() => setIsEventRequestDetailModalOpen(false)}
+        eventRequest={selectedEventRequest}
+        variant="detailed"
+        isLoading={loadingEventRequestDetails}
+      />
 
       <ConfirmDialog
         open={confirmDialog.open}
@@ -2891,6 +2551,11 @@ const AdminDashboard = () => {
         description={confirmDialog.description}
         onConfirm={confirmDialog.onConfirm}
         variant={confirmDialog.variant}
+      />
+
+      <ChangePasswordDialog
+        isOpen={isPasswordModalOpen}
+        onOpenChange={setIsPasswordModalOpen}
       />
     </div>
   );
