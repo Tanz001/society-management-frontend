@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -28,11 +28,22 @@ import {
   Edit,
   MapPin,
   MoreVertical,
-  Lock
+  Lock,
+  Search
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useToast } from "@/components/ui/use-toast";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import { Input } from "@/components/ui/input";
 import ChangePasswordDialog from "@/components/auth/ChangePasswordDialog";
 import EventRequestDetailModal from "@/components/admin/EventRequestDetailModal";
 
@@ -108,7 +119,11 @@ const BoardPresidentDashboard = () => {
   });
   const [statsLoading, setStatsLoading] = useState(false);
   const [eventRequestFilter, setEventRequestFilter] = useState<string>("all"); // all, pending, approved, rejected
-
+  const [eventRequestSearch, setEventRequestSearch] = useState<string>("");
+  
+  // Pagination states
+  const [eventRequestsCurrentPage, setEventRequestsCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
 
   // Get current user info
   const getCurrentUser = () => {
@@ -177,8 +192,8 @@ const BoardPresidentDashboard = () => {
     }
   };
 
-  // Handle approve/reject action
-  const handleAction = async (action: 'approve' | 'reject') => {
+  // Handle approve/reject/revise action
+  const handleAction = async (action: 'approve' | 'reject' | 'revise') => {
     if (!selectedSociety) return;
 
     try {
@@ -209,7 +224,8 @@ const BoardPresidentDashboard = () => {
         }
       );
 
-      console.log(`Society ${action}d successfully:`, response.data);
+      const actionText = action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : 'requested revision for';
+      console.log(`Society ${actionText} successfully:`, response.data);
 
       // Refresh the societies list
       await fetchPendingSocieties();
@@ -222,15 +238,16 @@ const BoardPresidentDashboard = () => {
       // Show success toast
       toast({
         title: "Success",
-        description: `Society ${action}d successfully!`,
+        description: `Society ${actionText} successfully!`,
         variant: "default",
       });
 
     } catch (err: any) {
       console.error(`Error ${action}ing society:`, err);
+      const actionText = action === 'approve' ? 'approve' : action === 'reject' ? 'reject' : 'revise';
       toast({
         title: "Error",
-        description: err.response?.data?.message || err.message || `Failed to ${action} society`,
+        description: err.response?.data?.message || err.message || `Failed to ${actionText} society`,
         variant: "destructive",
       });
     } finally {
@@ -284,6 +301,7 @@ const BoardPresidentDashboard = () => {
 
       console.log("Event requests fetched:", response.data);
       setEventRequests(response.data.data || []);
+      setEventRequestsCurrentPage(1); // Reset to first page when data changes
     } catch (err: any) {
       console.error("Error fetching event requests:", err);
       setError(err.response?.data?.message || err.message || "Failed to fetch event requests");
@@ -370,8 +388,24 @@ const BoardPresidentDashboard = () => {
         return;
       }
 
-      // Board President can only approve (4) or reject (5) event requests
-      const action = selectedEventStatus === 4 ? 'approve' : 'reject';
+      // Board President can approve (4), reject (5), or revise (16) event requests
+      let action: 'approve' | 'reject' | 'revise';
+      if (selectedEventStatus === 4) {
+        action = 'approve';
+      } else if (selectedEventStatus === 5) {
+        action = 'reject';
+      } else if (selectedEventStatus === 16) {
+        action = 'revise';
+      } else {
+        toast({
+          title: "Error",
+          description: "Invalid status selected. Please select Approve (4), Reject (5), or Revise (16).",
+          variant: "destructive",
+        });
+        setActionLoading(false);
+        return;
+      }
+      
       const response = await axios.put(
         `${API_URL}/admin/board-president/event-requests/${selectedEventRequest.req_id}/review`,
         {
@@ -690,48 +724,62 @@ const BoardPresidentDashboard = () => {
                 </Button>
               </div>
 
-              {/* Filter Buttons */}
-              <div className="flex gap-2 mb-6">
-                <Button
-                  variant={eventRequestFilter === "all" ? "university" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setEventRequestFilter("all");
-                    fetchAllEventRequests();
-                  }}
-                >
-                  All
-                </Button>
-                <Button
-                  variant={eventRequestFilter === "pending" ? "university" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setEventRequestFilter("pending");
-                    fetchAllEventRequests();
-                  }}
-                >
-                  Pending
-                </Button>
-                <Button
-                  variant={eventRequestFilter === "approved" ? "university" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setEventRequestFilter("approved");
-                    fetchAllEventRequests();
-                  }}
-                >
-                  Approved
-                </Button>
-                <Button
-                  variant={eventRequestFilter === "rejected" ? "university" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setEventRequestFilter("rejected");
-                    fetchAllEventRequests();
-                  }}
-                >
-                  Rejected
-                </Button>
+              {/* Search and Filter */}
+              <div className="flex flex-col sm:flex-row gap-4 mb-6">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by event name, society, description..."
+                    value={eventRequestSearch}
+                    onChange={(e) => {
+                      setEventRequestSearch(e.target.value);
+                      setEventRequestsCurrentPage(1); // Reset to first page on search
+                    }}
+                    className="pl-10"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant={eventRequestFilter === "all" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setEventRequestFilter("all");
+                      fetchAllEventRequests();
+                    }}
+                  >
+                    All
+                  </Button>
+                  <Button
+                    variant={eventRequestFilter === "pending" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setEventRequestFilter("pending");
+                      fetchAllEventRequests();
+                    }}
+                  >
+                    Pending
+                  </Button>
+                  <Button
+                    variant={eventRequestFilter === "approved" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setEventRequestFilter("approved");
+                      fetchAllEventRequests();
+                    }}
+                  >
+                    Approved
+                  </Button>
+                  <Button
+                    variant={eventRequestFilter === "rejected" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setEventRequestFilter("rejected");
+                      fetchAllEventRequests();
+                    }}
+                  >
+                    Rejected
+                  </Button>
+                </div>
               </div>
 
               {loadingEventRequests && eventRequests.length === 0 ? (
@@ -739,9 +787,25 @@ const BoardPresidentDashboard = () => {
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-university-navy mx-auto mb-4"></div>
                   <p className="text-muted-foreground">Loading event requests...</p>
                 </div>
-              ) : eventRequests.length > 0 ? (
-                <div className="grid gap-4">
-                  {eventRequests.map((request) => (
+              ) : (() => {
+                // Filter event requests based on search term
+                const filteredRequests = eventRequests.filter((request: any) => {
+                  if (!eventRequestSearch.trim()) return true;
+                  const searchLower = eventRequestSearch.toLowerCase();
+                  return (
+                    (request.title || "").toLowerCase().includes(searchLower) ||
+                    (request.event_name || "").toLowerCase().includes(searchLower) ||
+                    (request.society_name || "").toLowerCase().includes(searchLower) ||
+                    (request.description || "").toLowerCase().includes(searchLower) ||
+                    (request.venue || "").toLowerCase().includes(searchLower) ||
+                    ((request.firstName || "") + " " + (request.lastName || "")).toLowerCase().includes(searchLower)
+                  );
+                });
+
+                return filteredRequests.length > 0 ? (
+                  <>
+                    <div className="grid gap-4">
+                      {filteredRequests.slice((eventRequestsCurrentPage - 1) * itemsPerPage, eventRequestsCurrentPage * itemsPerPage).map((request) => (
                     <Card key={request.req_id} className="p-4 shadow-card">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
@@ -809,17 +873,73 @@ const BoardPresidentDashboard = () => {
                         </div>
                       </div>
                     </Card>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                  <h3 className="text-lg font-medium mb-2">No Event Requests Found</h3>
-                  <p className="text-muted-foreground">
-                    No event requests have been submitted yet.
-                  </p>
-                </div>
-              )}
+                      ))}
+                    </div>
+
+                    {/* Pagination for Event Requests */}
+                    {filteredRequests.length > itemsPerPage && (
+                      <div className="flex items-center justify-between mt-6">
+                        <div className="text-sm text-muted-foreground">
+                          Showing {(eventRequestsCurrentPage - 1) * itemsPerPage + 1} to {Math.min(eventRequestsCurrentPage * itemsPerPage, filteredRequests.length)} of {filteredRequests.length} event requests
+                        </div>
+                        <Pagination>
+                          <PaginationContent>
+                            <PaginationItem>
+                              <PaginationPrevious
+                                onClick={() => setEventRequestsCurrentPage(prev => Math.max(1, prev - 1))}
+                                className={eventRequestsCurrentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                              />
+                            </PaginationItem>
+                            {Array.from({ length: Math.ceil(filteredRequests.length / itemsPerPage) }, (_, i) => i + 1)
+                              .filter(page => {
+                                return page === 1 ||
+                                  page === Math.ceil(filteredRequests.length / itemsPerPage) ||
+                                  (page >= eventRequestsCurrentPage - 1 && page <= eventRequestsCurrentPage + 1);
+                              })
+                              .map((page, idx, array) => {
+                                const prevPage = array[idx - 1];
+                                const showEllipsisBefore = prevPage && page - prevPage > 1;
+
+                                return (
+                                  <React.Fragment key={page}>
+                                    {showEllipsisBefore && (
+                                      <PaginationItem>
+                                        <PaginationEllipsis />
+                                      </PaginationItem>
+                                    )}
+                                    <PaginationItem>
+                                      <PaginationLink
+                                        onClick={() => setEventRequestsCurrentPage(page)}
+                                        isActive={eventRequestsCurrentPage === page}
+                                        className="cursor-pointer"
+                                      >
+                                        {page}
+                                      </PaginationLink>
+                                    </PaginationItem>
+                                  </React.Fragment>
+                                );
+                              })}
+                            <PaginationItem>
+                              <PaginationNext
+                                onClick={() => setEventRequestsCurrentPage(prev => Math.min(Math.ceil(filteredRequests.length / itemsPerPage), prev + 1))}
+                                className={eventRequestsCurrentPage >= Math.ceil(filteredRequests.length / itemsPerPage) ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                              />
+                            </PaginationItem>
+                          </PaginationContent>
+                        </Pagination>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-center py-12">
+                    <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                    <h3 className="text-lg font-medium mb-2">No Event Requests Found</h3>
+                    <p className="text-muted-foreground">
+                      {eventRequestSearch ? `No event requests match "${eventRequestSearch}"` : "No event requests have been submitted yet."}
+                    </p>
+                  </div>
+                );
+              })()}
             </TabsContent>
 
             <TabsContent value="event-reports">
@@ -969,6 +1089,15 @@ const BoardPresidentDashboard = () => {
                 >
                   <XCircle className="h-4 w-4 mr-2" />
                   {actionLoading ? "Processing..." : "Reject Application"}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => handleAction('revise')}
+                  disabled={actionLoading}
+                  className="border-yellow-500 text-yellow-600 hover:bg-yellow-50"
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  {actionLoading ? "Processing..." : "Request Revision"}
                 </Button>
                 <Button
                   variant="university"

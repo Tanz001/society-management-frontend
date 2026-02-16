@@ -134,6 +134,8 @@ const VCDashboard = () => {
   const [selectedSocietyDetail, setSelectedSocietyDetail] = useState<Society | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [advisorInfo, setAdvisorInfo] = useState<any>(null);
+  const [cabinetMembers, setCabinetMembers] = useState<any[]>([]);
+  const [loadingCabinet, setLoadingCabinet] = useState(false);
 
   // Pagination states
   const [societiesCurrentPage, setSocietiesCurrentPage] = useState(1);
@@ -142,6 +144,7 @@ const VCDashboard = () => {
   
   // Search state
   const [searchTerm, setSearchTerm] = useState("");
+  const [eventRequestSearch, setEventRequestSearch] = useState("");
 
   // Get current user info
   const getCurrentUser = () => {
@@ -273,6 +276,9 @@ const VCDashboard = () => {
         }
       }
 
+      // Fetch cabinet members (active and not archived)
+      await fetchCabinetMembers(societyData.society_id);
+
       setIsDetailModalOpen(true);
     } catch (err: any) {
       console.error("Error fetching society details:", err);
@@ -286,8 +292,39 @@ const VCDashboard = () => {
     }
   };
 
-  // Handle approve/reject action
-  const handleAction = async (action: 'approve' | 'reject') => {
+  // Fetch cabinet members (active and not archived)
+  const fetchCabinetMembers = async (societyId: number) => {
+    try {
+      setLoadingCabinet(true);
+      const token = localStorage.getItem("token");
+      if (!token) return;
+
+      const response = await axios.post(
+        `${import.meta.env.VITE_API_URL}/society/cabinet/list`,
+        {
+          society_id: societyId,
+          show_archived: false // Only fetch active, non-archived members
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.data.success) {
+        setCabinetMembers(response.data.data || []);
+      }
+    } catch (error) {
+      console.error("Error fetching cabinet members:", error);
+      setCabinetMembers([]);
+    } finally {
+      setLoadingCabinet(false);
+    }
+  };
+
+  // Handle approve/reject/revise action
+  const handleAction = async (action: 'approve' | 'reject' | 'revise') => {
     if (!selectedSociety) return;
 
     try {
@@ -317,7 +354,8 @@ const VCDashboard = () => {
         }
       );
 
-      console.log(`Society ${action}d successfully:`, response.data);
+      const actionText = action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : 'requested revision for';
+      console.log(`Society ${actionText} successfully:`, response.data);
 
       // Refresh the societies list
       await fetchSocietiesForVC();
@@ -330,7 +368,9 @@ const VCDashboard = () => {
       // Show success toast
       const message = action === 'approve'
         ? "Society has been officially approved and is now active!"
-        : "Society application has been rejected.";
+        : action === 'reject'
+        ? "Society application has been rejected."
+        : "Revision has been requested for the society application.";
       toast({
         title: "Success",
         description: message,
@@ -339,9 +379,10 @@ const VCDashboard = () => {
 
     } catch (err: any) {
       console.error(`Error ${action}ing society:`, err);
+      const actionText = action === 'approve' ? 'approve' : action === 'reject' ? 'reject' : 'revise';
       toast({
         title: "Error",
-        description: err.response?.data?.message || err.message || `Failed to ${action} society`,
+        description: err.response?.data?.message || err.message || `Failed to ${actionText} society`,
         variant: "destructive",
       });
     } finally {
@@ -480,8 +521,24 @@ const VCDashboard = () => {
         return;
       }
 
-      // VC can only approve (8) or reject (9) event requests
-      const action = selectedEventStatus === 8 ? 'approve' : 'reject';
+      // VC can approve (8), reject (9), or revise (18) event requests
+      let action: 'approve' | 'reject' | 'revise';
+      if (selectedEventStatus === 8) {
+        action = 'approve';
+      } else if (selectedEventStatus === 9) {
+        action = 'reject';
+      } else if (selectedEventStatus === 18) {
+        action = 'revise';
+      } else {
+        toast({
+          title: "Error",
+          description: "Invalid status selected. Please select Approve (8), Reject (9), or Revise (18).",
+          variant: "destructive",
+        });
+        setActionLoading(false);
+        return;
+      }
+      
       const response = await axios.put(
         `${import.meta.env.VITE_API_URL}/admin/vc/event-requests/${selectedEventRequest.req_id}/review`,
         {
@@ -919,48 +976,62 @@ const VCDashboard = () => {
                 </Button>
               </div>
 
-              {/* Filter Buttons */}
-              <div className="flex gap-2 mb-6">
-                <Button
-                  variant={eventRequestFilter === "all" ? "university" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setEventRequestFilter("all");
-                    fetchAllEventRequests();
-                  }}
-                >
-                  All
-                </Button>
-                <Button
-                  variant={eventRequestFilter === "pending" ? "university" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setEventRequestFilter("pending");
-                    fetchAllEventRequests();
-                  }}
-                >
-                  Pending
-                </Button>
-                <Button
-                  variant={eventRequestFilter === "approved" ? "university" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setEventRequestFilter("approved");
-                    fetchAllEventRequests();
-                  }}
-                >
-                  Approved
-                </Button>
-                <Button
-                  variant={eventRequestFilter === "rejected" ? "university" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setEventRequestFilter("rejected");
-                    fetchAllEventRequests();
-                  }}
-                >
-                  Rejected
-                </Button>
+              {/* Search and Filter */}
+              <div className="flex flex-col sm:flex-row gap-4 mb-6">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by event name, society, description..."
+                    value={eventRequestSearch}
+                    onChange={(e) => {
+                      setEventRequestSearch(e.target.value);
+                      setEventRequestsCurrentPage(1); // Reset to first page on search
+                    }}
+                    className="pl-10"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant={eventRequestFilter === "all" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setEventRequestFilter("all");
+                      fetchAllEventRequests();
+                    }}
+                  >
+                    All
+                  </Button>
+                  <Button
+                    variant={eventRequestFilter === "pending" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setEventRequestFilter("pending");
+                      fetchAllEventRequests();
+                    }}
+                  >
+                    Pending
+                  </Button>
+                  <Button
+                    variant={eventRequestFilter === "approved" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setEventRequestFilter("approved");
+                      fetchAllEventRequests();
+                    }}
+                  >
+                    Approved
+                  </Button>
+                  <Button
+                    variant={eventRequestFilter === "rejected" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setEventRequestFilter("rejected");
+                      fetchAllEventRequests();
+                    }}
+                  >
+                    Rejected
+                  </Button>
+                </div>
               </div>
 
               {loadingEventRequests && eventRequests.length === 0 ? (
@@ -968,10 +1039,25 @@ const VCDashboard = () => {
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-university-navy mx-auto mb-4"></div>
                   <p className="text-muted-foreground">Loading event requests...</p>
                 </div>
-              ) : eventRequests.length > 0 ? (
-                <>
-                  <div className="grid gap-4">
-                    {eventRequests.slice((eventRequestsCurrentPage - 1) * itemsPerPage, eventRequestsCurrentPage * itemsPerPage).map((request) => (
+              ) : (() => {
+                // Filter event requests based on search term
+                const filteredRequests = eventRequests.filter((request: any) => {
+                  if (!eventRequestSearch.trim()) return true;
+                  const searchLower = eventRequestSearch.toLowerCase();
+                  return (
+                    (request.title || "").toLowerCase().includes(searchLower) ||
+                    (request.event_name || "").toLowerCase().includes(searchLower) ||
+                    (request.society_name || "").toLowerCase().includes(searchLower) ||
+                    (request.description || "").toLowerCase().includes(searchLower) ||
+                    (request.venue || "").toLowerCase().includes(searchLower) ||
+                    ((request.firstName || "") + " " + (request.lastName || "")).toLowerCase().includes(searchLower)
+                  );
+                });
+
+                return filteredRequests.length > 0 ? (
+                  <>
+                    <div className="grid gap-4">
+                      {filteredRequests.slice((eventRequestsCurrentPage - 1) * itemsPerPage, eventRequestsCurrentPage * itemsPerPage).map((request) => (
                       <Card key={request.req_id} className="p-4 shadow-card">
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
@@ -1042,69 +1128,68 @@ const VCDashboard = () => {
                     ))}
                   </div>
 
-                  {/* Pagination for Event Requests */}
-                  {eventRequests.length > itemsPerPage && (
-                    <div className="flex items-center justify-between mt-6">
-                      <div className="text-sm text-muted-foreground">
-                        Showing {(eventRequestsCurrentPage - 1) * itemsPerPage + 1} to {Math.min(eventRequestsCurrentPage * itemsPerPage, eventRequests.length)} of {eventRequests.length} event requests
-                      </div>
-                      <Pagination>
-                        <PaginationContent>
-                          <PaginationItem>
-                            <PaginationPrevious
-                              onClick={() => setEventRequestsCurrentPage(prev => Math.max(1, prev - 1))}
-                              className={eventRequestsCurrentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                            />
-                          </PaginationItem>
-                          {Array.from({ length: Math.ceil(eventRequests.length / itemsPerPage) }, (_, i) => i + 1)
-                            .filter(page => {
-                              return page === 1 ||
-                                page === Math.ceil(eventRequests.length / itemsPerPage) ||
-                                (page >= eventRequestsCurrentPage - 1 && page <= eventRequestsCurrentPage + 1);
-                            })
-                            .map((page, idx, array) => {
-                              const prevPage = array[idx - 1];
-                              const showEllipsisBefore = prevPage && page - prevPage > 1;
+                    {/* Pagination for Event Requests */}
+                    {filteredRequests.length > itemsPerPage && (
+                      <div className="flex items-center justify-between mt-6">
+                        <div className="text-sm text-muted-foreground">
+                          Showing {(eventRequestsCurrentPage - 1) * itemsPerPage + 1} to {Math.min(eventRequestsCurrentPage * itemsPerPage, filteredRequests.length)} of {filteredRequests.length} event requests
+                        </div>
+                        <Pagination>
+                          <PaginationContent>
+                            <PaginationItem>
+                              <PaginationPrevious
+                                onClick={() => setEventRequestsCurrentPage(prev => Math.max(1, prev - 1))}
+                                className={eventRequestsCurrentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                              />
+                            </PaginationItem>
+                            {Array.from({ length: Math.ceil(filteredRequests.length / itemsPerPage) }, (_, i) => i + 1)
+                              .filter(page => {
+                                return page === 1 ||
+                                  page === Math.ceil(filteredRequests.length / itemsPerPage) ||
+                                  (page >= eventRequestsCurrentPage - 1 && page <= eventRequestsCurrentPage + 1);
+                              })
+                              .map((page, idx, array) => {
+                                const prevPage = array[idx - 1];
+                                const showEllipsisBefore = prevPage && page - prevPage > 1;
 
-                              return (
-                                <React.Fragment key={page}>
-                                  {showEllipsisBefore && (
+                                return (
+                                  <React.Fragment key={page}>
+                                    {showEllipsisBefore && (
+                                      <PaginationItem>
+                                        <PaginationEllipsis />
+                                      </PaginationItem>
+                                    )}
                                     <PaginationItem>
-                                      <PaginationEllipsis />
+                                      <PaginationLink
+                                        onClick={() => setEventRequestsCurrentPage(page)}
+                                        isActive={eventRequestsCurrentPage === page}
+                                        className="cursor-pointer"
+                                      >
+                                        {page}
+                                      </PaginationLink>
                                     </PaginationItem>
-                                  )}
-                                  <PaginationItem>
-                                    <PaginationLink
-                                      onClick={() => setEventRequestsCurrentPage(page)}
-                                      isActive={eventRequestsCurrentPage === page}
-                                      className="cursor-pointer"
-                                    >
-                                      {page}
-                                    </PaginationLink>
-                                  </PaginationItem>
-                                </React.Fragment>
-                              );
-                            })}
-                          <PaginationItem>
-                            <PaginationNext
-                              onClick={() => setEventRequestsCurrentPage(prev => Math.min(Math.ceil(eventRequests.length / itemsPerPage), prev + 1))}
-                              className={eventRequestsCurrentPage >= Math.ceil(eventRequests.length / itemsPerPage) ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                            />
-                          </PaginationItem>
-                        </PaginationContent>
-                      </Pagination>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="text-center py-12">
-                  <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                  <h3 className="text-lg font-medium mb-2">No Event Requests Found</h3>
-                  <p className="text-muted-foreground">
-                    No event requests have been submitted yet.
-                  </p>
-                </div>
-              )}
+                                  </React.Fragment>
+                                );
+                              })}
+                            <PaginationItem>
+                              <PaginationNext
+                                onClick={() => setEventRequestsCurrentPage(prev => Math.min(Math.ceil(filteredRequests.length / itemsPerPage), prev + 1))}
+                                className={eventRequestsCurrentPage >= Math.ceil(filteredRequests.length / itemsPerPage) ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                              />
+                            </PaginationItem>
+                          </PaginationContent>
+                        </Pagination>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <Card className="p-6 text-center">
+                    <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-medium mb-2">No Event Requests Found</h3>
+                    <p className="text-muted-foreground">{eventRequestSearch ? `No event requests match "${eventRequestSearch}"` : "No event requests have been submitted yet."}</p>
+                  </Card>
+                );
+              })()}
             </TabsContent>
 
             {/* Event Reports Tab */}
@@ -1586,6 +1671,15 @@ const VCDashboard = () => {
                 >
                   <XCircle className="h-4 w-4 mr-2" />
                   {actionLoading ? "Processing..." : "Rejection"}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => handleAction('revise')}
+                  disabled={actionLoading}
+                  className="border-yellow-500 text-yellow-600 hover:bg-yellow-50"
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  {actionLoading ? "Processing..." : "Request Revision"}
                 </Button>
                 <Button
                   variant="university"
@@ -2367,6 +2461,45 @@ const VCDashboard = () => {
                   </div>
                 </Card>
               )}
+
+              {/* Cabinet Members */}
+              <Card className="p-6">
+                <h3 className="font-semibold mb-3 text-university-navy flex items-center">
+                  <Crown className="h-5 w-5 mr-2" />
+                  Cabinet Members
+                </h3>
+                {loadingCabinet ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-university-navy"></div>
+                  </div>
+                ) : cabinetMembers.length > 0 ? (
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {cabinetMembers.map((member) => (
+                      <Card key={member.id} className="p-4 shadow-sm">
+                        <div className="flex items-start space-x-3">
+                          <div className="w-10 h-10 rounded-full flex items-center justify-center bg-university-navy/10">
+                            <Crown className="h-5 w-5 text-university-navy" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-semibold text-university-navy truncate">{member.name}</h4>
+                            <p className="text-sm text-muted-foreground truncate">{member.designation}</p>
+                            {member.tenure_start && member.tenure_end && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Tenure: {member.tenure_start} - {member.tenure_end}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Crown className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                    <p>No active cabinet members found</p>
+                  </div>
+                )}
+              </Card>
 
               {/* Achievements */}
               {selectedSocietyDetail.achievements && Array.isArray(selectedSocietyDetail.achievements) && selectedSocietyDetail.achievements.length > 0 && (

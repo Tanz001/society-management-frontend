@@ -118,13 +118,23 @@ const ProtocolOfficeDashboard = () => {
   const canAdvisorEdit = (request: any) => {
     if (!request) return false;
 
-    // Check if slot is REJECTED (3) or SUGGESTED (4)
+    // If event is rejected by any admin (3, 5, 7, 9, 12, 14), cannot edit
+    // Note: Status 16 (Revise by Board President) is NOT a rejection - it allows editing
+    const eventRejected = [3, 5, 7, 9, 12, 14].includes(request.event_status_id);
+    if (eventRejected) {
+      return false;
+    }
+
+    // Check if slot is REJECTED (3) or SUGGESTED (4) - can edit
     const slotRejectedOrSuggested = request.slot_status_id === 3 || request.slot_status_id === 4;
 
-    // Check if event is rejected by any admin (3, 5, 7, 9, 12, 14)
-    const eventRejected = [3, 5, 7, 9, 12, 14].includes(request.event_status_id);
+    // Check if event status is REVISE (15, 16, 17, 18) - can edit
+    const eventRevise = [15, 16, 17, 18].includes(request.event_status_id);
 
-    return slotRejectedOrSuggested || eventRejected;
+    // Check if event status is PENDING (1) - can edit
+    const eventPending = request.event_status_id === 1;
+
+    return slotRejectedOrSuggested || eventRevise || eventPending;
   };
 
   // Handle edit request - redirect to edit form

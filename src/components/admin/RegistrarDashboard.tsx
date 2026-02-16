@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { Input } from "@/components/ui/input";
 import {
   Pagination,
   PaginationContent,
@@ -129,6 +130,7 @@ const RegistrarDashboard = () => {
   });
   const [statsLoading, setStatsLoading] = useState(false);
   const [eventRequestFilter, setEventRequestFilter] = useState<string>("all"); // all, pending, approved, rejected
+  const [eventRequestSearch, setEventRequestSearch] = useState<string>("");
 
   // Pagination states
   const [societiesCurrentPage, setSocietiesCurrentPage] = useState(1);
@@ -482,8 +484,24 @@ const RegistrarDashboard = () => {
         return;
       }
 
-      // Registrar can only approve (6) or reject (7) event requests
-      const action = selectedEventStatus === 6 ? 'approve' : 'reject';
+      // Registrar can approve (6), reject (7), or revise (17) event requests
+      let action: 'approve' | 'reject' | 'revise';
+      if (selectedEventStatus === 6) {
+        action = 'approve';
+      } else if (selectedEventStatus === 7) {
+        action = 'reject';
+      } else if (selectedEventStatus === 17) {
+        action = 'revise';
+      } else {
+        toast({
+          title: "Error",
+          description: "Invalid status selected. Please select Approve (6), Reject (7), or Revise (17).",
+          variant: "destructive",
+        });
+        setActionLoading(false);
+        return;
+      }
+      
       const response = await axios.put(
         `${API_URL}/admin/registrar/event-requests/${selectedEventRequest.req_id}/review`,
         {
@@ -1008,48 +1026,62 @@ const RegistrarDashboard = () => {
                 </Card>
               </div>
 
-              {/* Filter Buttons */}
-              <div className="flex gap-2">
-                <Button
-                  variant={eventRequestFilter === "all" ? "university" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setEventRequestFilter("all");
-                    fetchAllEventRequests();
-                  }}
-                >
-                  All
-                </Button>
-                <Button
-                  variant={eventRequestFilter === "pending" ? "university" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setEventRequestFilter("pending");
-                    fetchAllEventRequests();
-                  }}
-                >
-                  Pending
-                </Button>
-                <Button
-                  variant={eventRequestFilter === "approved" ? "university" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setEventRequestFilter("approved");
-                    fetchAllEventRequests();
-                  }}
-                >
-                  Approved
-                </Button>
-                <Button
-                  variant={eventRequestFilter === "rejected" ? "university" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setEventRequestFilter("rejected");
-                    fetchAllEventRequests();
-                  }}
-                >
-                  Rejected
-                </Button>
+              {/* Search and Filter */}
+              <div className="flex flex-col sm:flex-row gap-4 mb-6">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by event name, society, description..."
+                    value={eventRequestSearch}
+                    onChange={(e) => {
+                      setEventRequestSearch(e.target.value);
+                      setEventRequestsCurrentPage(1); // Reset to first page on search
+                    }}
+                    className="pl-10"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant={eventRequestFilter === "all" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setEventRequestFilter("all");
+                      fetchAllEventRequests();
+                    }}
+                  >
+                    All
+                  </Button>
+                  <Button
+                    variant={eventRequestFilter === "pending" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setEventRequestFilter("pending");
+                      fetchAllEventRequests();
+                    }}
+                  >
+                    Pending
+                  </Button>
+                  <Button
+                    variant={eventRequestFilter === "approved" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setEventRequestFilter("approved");
+                      fetchAllEventRequests();
+                    }}
+                  >
+                    Approved
+                  </Button>
+                  <Button
+                    variant={eventRequestFilter === "rejected" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setEventRequestFilter("rejected");
+                      fetchAllEventRequests();
+                    }}
+                  >
+                    Rejected
+                  </Button>
+                </div>
               </div>
 
               {/* Event Requests List */}
@@ -1058,10 +1090,25 @@ const RegistrarDashboard = () => {
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-university-navy mx-auto mb-4"></div>
                   <p className="text-muted-foreground">Loading event requests...</p>
                 </div>
-              ) : eventRequests.length > 0 ? (
-                <>
-                  <div className="grid gap-6">
-                    {eventRequests.slice((eventRequestsCurrentPage - 1) * itemsPerPage, eventRequestsCurrentPage * itemsPerPage).map((request: any) => (
+              ) : (() => {
+                // Filter event requests based on search term
+                const filteredRequests = eventRequests.filter((request: any) => {
+                  if (!eventRequestSearch.trim()) return true;
+                  const searchLower = eventRequestSearch.toLowerCase();
+                  return (
+                    (request.title || "").toLowerCase().includes(searchLower) ||
+                    (request.event_name || "").toLowerCase().includes(searchLower) ||
+                    (request.society_name || "").toLowerCase().includes(searchLower) ||
+                    (request.description || "").toLowerCase().includes(searchLower) ||
+                    (request.venue || "").toLowerCase().includes(searchLower) ||
+                    ((request.firstName || "") + " " + (request.lastName || "")).toLowerCase().includes(searchLower)
+                  );
+                });
+
+                return filteredRequests.length > 0 ? (
+                  <>
+                    <div className="grid gap-6">
+                      {filteredRequests.slice((eventRequestsCurrentPage - 1) * itemsPerPage, eventRequestsCurrentPage * itemsPerPage).map((request: any) => (
                       <Card key={request.req_id} className="p-6 shadow-card hover:shadow-lg transition-shadow">
                         <div className="flex items-start justify-between">
                           <div className="flex items-start space-x-4 flex-1">
@@ -1149,69 +1196,70 @@ const RegistrarDashboard = () => {
                     ))}
                   </div>
 
-                  {/* Pagination for Event Requests */}
-                  {eventRequests.length > itemsPerPage && (
-                    <div className="flex items-center justify-between mt-6">
-                      <div className="text-sm text-muted-foreground">
-                        Showing {(eventRequestsCurrentPage - 1) * itemsPerPage + 1} to {Math.min(eventRequestsCurrentPage * itemsPerPage, eventRequests.length)} of {eventRequests.length} event requests
-                      </div>
-                      <Pagination>
-                        <PaginationContent>
-                          <PaginationItem>
-                            <PaginationPrevious
-                              onClick={() => setEventRequestsCurrentPage(prev => Math.max(1, prev - 1))}
-                              className={eventRequestsCurrentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                            />
-                          </PaginationItem>
-                          {Array.from({ length: Math.ceil(eventRequests.length / itemsPerPage) }, (_, i) => i + 1)
-                            .filter(page => {
-                              return page === 1 ||
-                                page === Math.ceil(eventRequests.length / itemsPerPage) ||
-                                (page >= eventRequestsCurrentPage - 1 && page <= eventRequestsCurrentPage + 1);
-                            })
-                            .map((page, idx, array) => {
-                              const prevPage = array[idx - 1];
-                              const showEllipsisBefore = prevPage && page - prevPage > 1;
+                    {/* Pagination for Event Requests */}
+                    {filteredRequests.length > itemsPerPage && (
+                      <div className="flex items-center justify-between mt-6">
+                        <div className="text-sm text-muted-foreground">
+                          Showing {(eventRequestsCurrentPage - 1) * itemsPerPage + 1} to {Math.min(eventRequestsCurrentPage * itemsPerPage, filteredRequests.length)} of {filteredRequests.length} event requests
+                        </div>
+                        <Pagination>
+                          <PaginationContent>
+                            <PaginationItem>
+                              <PaginationPrevious
+                                onClick={() => setEventRequestsCurrentPage(prev => Math.max(1, prev - 1))}
+                                className={eventRequestsCurrentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                              />
+                            </PaginationItem>
+                            {Array.from({ length: Math.ceil(filteredRequests.length / itemsPerPage) }, (_, i) => i + 1)
+                              .filter(page => {
+                                return page === 1 ||
+                                  page === Math.ceil(filteredRequests.length / itemsPerPage) ||
+                                  (page >= eventRequestsCurrentPage - 1 && page <= eventRequestsCurrentPage + 1);
+                              })
+                              .map((page, idx, array) => {
+                                const prevPage = array[idx - 1];
+                                const showEllipsisBefore = prevPage && page - prevPage > 1;
 
-                              return (
-                                <React.Fragment key={page}>
-                                  {showEllipsisBefore && (
+                                return (
+                                  <React.Fragment key={page}>
+                                    {showEllipsisBefore && (
+                                      <PaginationItem>
+                                        <PaginationEllipsis />
+                                      </PaginationItem>
+                                    )}
                                     <PaginationItem>
-                                      <PaginationEllipsis />
+                                      <PaginationLink
+                                        onClick={() => setEventRequestsCurrentPage(page)}
+                                        isActive={eventRequestsCurrentPage === page}
+                                        className="cursor-pointer"
+                                      >
+                                        {page}
+                                      </PaginationLink>
                                     </PaginationItem>
-                                  )}
-                                  <PaginationItem>
-                                    <PaginationLink
-                                      onClick={() => setEventRequestsCurrentPage(page)}
-                                      isActive={eventRequestsCurrentPage === page}
-                                      className="cursor-pointer"
-                                    >
-                                      {page}
-                                    </PaginationLink>
-                                  </PaginationItem>
-                                </React.Fragment>
-                              );
-                            })}
-                          <PaginationItem>
-                            <PaginationNext
-                              onClick={() => setEventRequestsCurrentPage(prev => Math.min(Math.ceil(eventRequests.length / itemsPerPage), prev + 1))}
-                              className={eventRequestsCurrentPage >= Math.ceil(eventRequests.length / itemsPerPage) ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                            />
-                          </PaginationItem>
-                        </PaginationContent>
-                      </Pagination>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="text-center py-12">
-                  <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                  <h3 className="text-lg font-medium mb-2">No Event Requests Found</h3>
-                  <p className="text-muted-foreground">
-                    No event requests have been submitted yet.
-                  </p>
-                </div>
-              )}
+                                  </React.Fragment>
+                                );
+                              })}
+                            <PaginationItem>
+                              <PaginationNext
+                                onClick={() => setEventRequestsCurrentPage(prev => Math.min(Math.ceil(filteredRequests.length / itemsPerPage), prev + 1))}
+                                className={eventRequestsCurrentPage >= Math.ceil(filteredRequests.length / itemsPerPage) ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                              />
+                            </PaginationItem>
+                          </PaginationContent>
+                        </Pagination>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-center py-12">
+                    <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                    <h3 className="text-lg font-medium mb-2">No Event Requests Found</h3>
+                    <p className="text-muted-foreground">
+                      {eventRequestSearch ? `No event requests match "${eventRequestSearch}"` : "No event requests have been submitted yet."}
+                    </p>
+                  </div>
+                );
+              })()}
             </TabsContent>
           </Tabs>
         </div>

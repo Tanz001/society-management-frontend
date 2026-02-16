@@ -1317,6 +1317,11 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
               const reqEnd = timeToMinutes(normalizedTo);
               
               const hasOverlap = slots.some((slot: any) => {
+                // Skip the previously selected slot - allow re-selecting it
+                if (previouslySelectedSlotId && slot.slot_id === previouslySelectedSlotId) {
+                  return false;
+                }
+                
                 const slotFrom = normalizeTime(slot.time_from);
                 const slotTo = normalizeTime(slot.time_to);
                 if (!slotFrom || !slotTo) return false;
@@ -1348,6 +1353,7 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
   }, [main.venue_id, main.date_from]);
 
   // Check if a time slot is occupied (with better overlap detection)
+  // Excludes the previously selected slot to allow re-selecting granted slots
   const isTimeSlotOccupied = (timeFrom: string, timeTo: string) => {
     if (!timeFrom || !timeTo || occupiedSlots.length === 0) return false;
     
@@ -1363,20 +1369,26 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
     
     if (!normalizedFrom || !normalizedTo) return false;
     
+    // Convert to minutes for easier comparison
+    const timeToMinutes = (timeStr: string) => {
+      const [hours, minutes] = timeStr.split(':').map(Number);
+      return hours * 60 + minutes;
+    };
+    
+    const reqStart = timeToMinutes(normalizedFrom);
+    const reqEnd = timeToMinutes(normalizedTo);
+    
     return occupiedSlots.some((slot) => {
+      // Skip the previously selected slot - allow re-selecting it
+      if (previouslySelectedSlotId && slot.slot_id === previouslySelectedSlotId) {
+        return false;
+      }
+      
       const slotFrom = normalizeTime(slot.time_from);
       const slotTo = normalizeTime(slot.time_to);
       
       if (!slotFrom || !slotTo) return false;
       
-      // Convert to minutes for easier comparison
-      const timeToMinutes = (timeStr: string) => {
-        const [hours, minutes] = timeStr.split(':').map(Number);
-        return hours * 60 + minutes;
-      };
-      
-      const reqStart = timeToMinutes(normalizedFrom);
-      const reqEnd = timeToMinutes(normalizedTo);
       const slotStart = timeToMinutes(slotFrom);
       const slotEnd = timeToMinutes(slotTo);
       

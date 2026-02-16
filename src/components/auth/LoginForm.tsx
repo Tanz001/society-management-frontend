@@ -12,6 +12,7 @@ const LoginForm = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [logoError, setLogoError] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -30,10 +31,18 @@ const LoginForm = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setError("");
+    setLoading(true);
 
     try {
       const API_URL = import.meta.env.VITE_API_URL;
+      
+      if (!API_URL) {
+        throw new Error("API URL is not configured. Please check your environment variables.");
+      }
+
+      console.log("Login attempt started", { email: formData.email, API_URL });
 
       const isStudent = isStudentRoll(formData.email);
 
@@ -48,7 +57,14 @@ const LoginForm = () => {
         payload = { email: formData.email, password: formData.password };
       }
 
+      console.log("Sending login request to:", url);
       const res = await axios.post(url, payload);
+      console.log("Login response received:", res.data);
+
+      // Check if response has required data
+      if (!res.data || !res.data.token) {
+        throw new Error("Invalid response from server. Token not received.");
+      }
 
       // 👉 Store login session
       localStorage.setItem("token", res.data.token);
@@ -151,10 +167,39 @@ const LoginForm = () => {
       localStorage.removeItem("user");
 
     } catch (err: any) {
-      console.error(err);
-      setError(err.response?.data?.error || err.response?.data?.message || "Login failed");
+      console.error("Login error:", err);
+      console.error("Error details:", {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status,
+        config: err.config
+      });
+      
+      let errorMessage = "Login failed. Please try again.";
+      
+      if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err.response?.data?.error) {
+        errorMessage = err.response.data.error;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      // Network error
+      if (err.code === 'ERR_NETWORK' || err.message.includes('Network Error')) {
+        errorMessage = "Network error. Please check your internet connection and try again.";
+      }
+      
+      // Timeout error
+      if (err.code === 'ECONNABORTED') {
+        errorMessage = "Request timeout. Please try again.";
+      }
+      
+      setError(errorMessage);
       localStorage.removeItem("token");
       localStorage.removeItem("user");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -374,14 +419,17 @@ const LoginForm = () => {
               {/* Login Button */}
               <Button
                 type="submit"
-                className="w-full h-12 text-white font-bold text-lg rounded-lg shadow-lg hover:shadow-xl transition-all hover:scale-[1.02]"
+                disabled={loading || !formData.email || !formData.password}
+                className="w-full h-12 text-white font-bold text-lg rounded-lg shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                 style={{
-                  background: 'linear-gradient(135deg, rgba(0, 0, 92, 0.9) 0%, rgba(91, 0, 7, 0.9) 50%, rgba(206, 173, 114, 0.8) 100%)',
+                  background: loading 
+                    ? 'linear-gradient(135deg, rgba(100, 100, 100, 0.9) 0%, rgba(100, 100, 100, 0.9) 50%, rgba(100, 100, 100, 0.8) 100%)'
+                    : 'linear-gradient(135deg, rgba(0, 0, 92, 0.9) 0%, rgba(91, 0, 7, 0.9) 50%, rgba(206, 173, 114, 0.8) 100%)',
                   border: '1px solid rgba(206, 173, 114, 0.3)',
                   boxShadow: '0 4px 15px rgba(0, 0, 92, 0.4), 0 2px 8px rgba(91, 0, 7, 0.3)',
                 }}
               >
-                LOGIN
+                {loading ? "LOGGING IN..." : "LOGIN"}
               </Button>
             </form>
 

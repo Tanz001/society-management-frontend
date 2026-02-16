@@ -34,7 +34,8 @@ import {
   Clock,
   MoreVertical,
   Lock,
-  Search
+  Search,
+  Crown
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -71,6 +72,8 @@ const AdminDashboard = () => {
   const [selectedSocietyForDetail, setSelectedSocietyForDetail] = useState<any>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [advisorInfo, setAdvisorInfo] = useState<any>(null);
+  const [cabinetMembers, setCabinetMembers] = useState<any[]>([]);
+  const [loadingCabinet, setLoadingCabinet] = useState(false);
   const [allSocieties, setAllSocieties] = useState([]);
   const [allEvents, setAllEvents] = useState([]);
   const [allStudents, setAllStudents] = useState([]);
@@ -90,6 +93,7 @@ const AdminDashboard = () => {
   const [loadingEventRequestDetails, setLoadingEventRequestDetails] = useState(false);
   const [societyFilter, setSocietyFilter] = useState("all"); // all, active, pending, rejected
   const [eventRequestFilter, setEventRequestFilter] = useState<string>("all"); // all, pending, approved, rejected
+  const [eventRequestSearch, setEventRequestSearch] = useState<string>("");
   const [societySearchTerm, setSocietySearchTerm] = useState(""); // Search term for societies
   const [eventRequestStats, setEventRequestStats] = useState({
     total: 0,
@@ -342,6 +346,9 @@ const AdminDashboard = () => {
         setAdvisorInfo(null);
       }
 
+      // Fetch cabinet members (active and not archived)
+      await fetchCabinetMembers(societyData.society_id);
+
       console.log("Opening modal with society data:", societyData);
       setIsSocietyDetailModalOpen(true);
     } catch (err: any) {
@@ -353,6 +360,37 @@ const AdminDashboard = () => {
       });
     } finally {
       setLoadingDetails(false);
+    }
+  };
+
+  // Fetch cabinet members (active and not archived)
+  const fetchCabinetMembers = async (societyId: number) => {
+    try {
+      setLoadingCabinet(true);
+      const token = localStorage.getItem("token");
+      if (!token) return;
+
+      const response = await axios.post(
+        `${import.meta.env.VITE_API_URL}/society/cabinet/list`,
+        {
+          society_id: societyId,
+          show_archived: false // Only fetch active, non-archived members
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.data.success) {
+        setCabinetMembers(response.data.data || []);
+      }
+    } catch (error) {
+      console.error("Error fetching cabinet members:", error);
+      setCabinetMembers([]);
+    } finally {
+      setLoadingCabinet(false);
     }
   };
 
@@ -1507,48 +1545,62 @@ const AdminDashboard = () => {
                 </Card>
               </div>
 
-              {/* Filter Buttons */}
-              <div className="flex gap-2 mb-6">
-                <Button
-                  variant={eventRequestFilter === "all" ? "university" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setEventRequestFilter("all");
-                    getAllEventRequests();
-                  }}
-                >
-                  All
-                </Button>
-                <Button
-                  variant={eventRequestFilter === "pending" ? "university" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setEventRequestFilter("pending");
-                    getAllEventRequests();
-                  }}
-                >
-                  Pending
-                </Button>
-                <Button
-                  variant={eventRequestFilter === "approved" ? "university" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setEventRequestFilter("approved");
-                    getAllEventRequests();
-                  }}
-                >
-                  Approved
-                </Button>
-                <Button
-                  variant={eventRequestFilter === "rejected" ? "university" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setEventRequestFilter("rejected");
-                    getAllEventRequests();
-                  }}
-                >
-                  Rejected
-                </Button>
+              {/* Search and Filter */}
+              <div className="flex flex-col sm:flex-row gap-4 mb-6">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by event name, society, description..."
+                    value={eventRequestSearch}
+                    onChange={(e) => {
+                      setEventRequestSearch(e.target.value);
+                      setEventRequestsCurrentPage(1); // Reset to first page on search
+                    }}
+                    className="pl-10"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant={eventRequestFilter === "all" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setEventRequestFilter("all");
+                      getAllEventRequests();
+                    }}
+                  >
+                    All
+                  </Button>
+                  <Button
+                    variant={eventRequestFilter === "pending" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setEventRequestFilter("pending");
+                      getAllEventRequests();
+                    }}
+                  >
+                    Pending
+                  </Button>
+                  <Button
+                    variant={eventRequestFilter === "approved" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setEventRequestFilter("approved");
+                      getAllEventRequests();
+                    }}
+                  >
+                    Approved
+                  </Button>
+                  <Button
+                    variant={eventRequestFilter === "rejected" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setEventRequestFilter("rejected");
+                      getAllEventRequests();
+                    }}
+                  >
+                    Rejected
+                  </Button>
+                </div>
               </div>
 
               {eventRequestsLoading && allEventRequests.length === 0 ? (
@@ -1558,14 +1610,30 @@ const AdminDashboard = () => {
                 </div>
               ) : allEventRequests.length > 0 ? (
                 <>
-                  {/* Filter event requests based on filter */}
+                  {/* Filter event requests based on filter and search */}
                   {(() => {
                     const filteredRequests = allEventRequests.filter((request: any) => {
-                      if (eventRequestFilter === "all") return true;
-                      if (eventRequestFilter === "pending") return request.status_id === 1;
-                      if (eventRequestFilter === "approved") return [2, 4, 6, 8, 11, 13, 15].includes(request.status_id);
-                      if (eventRequestFilter === "rejected") return request.status_id === 3 || request.status_name?.includes('Rejected');
-                      return true;
+                      // Apply status filter
+                      let passesStatusFilter = true;
+                      if (eventRequestFilter === "pending") passesStatusFilter = request.status_id === 1;
+                      else if (eventRequestFilter === "approved") passesStatusFilter = [2, 4, 6, 8, 11, 13, 15].includes(request.status_id);
+                      else if (eventRequestFilter === "rejected") passesStatusFilter = request.status_id === 3 || request.status_name?.includes('Rejected');
+                      
+                      // Apply search filter
+                      let passesSearchFilter = true;
+                      if (eventRequestSearch.trim()) {
+                        const searchLower = eventRequestSearch.toLowerCase();
+                        passesSearchFilter = (
+                          (request.title || "").toLowerCase().includes(searchLower) ||
+                          (request.event_name || "").toLowerCase().includes(searchLower) ||
+                          (request.society_name || "").toLowerCase().includes(searchLower) ||
+                          (request.description || "").toLowerCase().includes(searchLower) ||
+                          (request.venue || "").toLowerCase().includes(searchLower) ||
+                          ((request.firstName || "") + " " + (request.lastName || "")).toLowerCase().includes(searchLower)
+                        );
+                      }
+                      
+                      return passesStatusFilter && passesSearchFilter;
                     });
 
                     return filteredRequests.length > 0 ? (
@@ -2288,6 +2356,45 @@ const AdminDashboard = () => {
                   </div>
                 </Card>
               )}
+
+              {/* Cabinet Members */}
+              <Card className="p-6">
+                <h3 className="font-semibold mb-3 text-university-navy flex items-center">
+                  <Crown className="h-5 w-5 mr-2" />
+                  Cabinet Members
+                </h3>
+                {loadingCabinet ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-university-navy"></div>
+                  </div>
+                ) : cabinetMembers.length > 0 ? (
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {cabinetMembers.map((member) => (
+                      <Card key={member.id} className="p-4 shadow-sm">
+                        <div className="flex items-start space-x-3">
+                          <div className="w-10 h-10 rounded-full flex items-center justify-center bg-university-navy/10">
+                            <Crown className="h-5 w-5 text-university-navy" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-semibold text-university-navy truncate">{member.name}</h4>
+                            <p className="text-sm text-muted-foreground truncate">{member.designation}</p>
+                            {member.tenure_start && member.tenure_end && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Tenure: {member.tenure_start} - {member.tenure_end}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Crown className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                    <p>No active cabinet members found</p>
+                  </div>
+                )}
+              </Card>
 
               {/* Achievements */}
               {selectedSocietyForDetail.achievements && Array.isArray(selectedSocietyForDetail.achievements) && selectedSocietyForDetail.achievements.length > 0 && (
