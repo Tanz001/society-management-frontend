@@ -1126,6 +1126,20 @@ const AdminDashboard = () => {
                 </div>
               </div>
 
+              {/* Search Input */}
+              <div className="flex-1 relative mb-6">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search societies by name, category, location, advisor, or description..."
+                  value={societySearchTerm}
+                  onChange={(e) => {
+                    setSocietySearchTerm(e.target.value);
+                    setSocietiesCurrentPage(1); // Reset to first page when searching
+                  }}
+                  className="pl-10"
+                />
+              </div>
+
               {/* Error Display */}
               {error && (
                 <Card className="p-4 border-red-200 bg-red-50">

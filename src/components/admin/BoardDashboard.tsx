@@ -1236,7 +1236,12 @@ const BoardDashboard = () => {
                       {(() => {
                         const notesByRole: { [key: string]: any[] } = {};
                         selectedEventRequest.status_history
-                          .filter((h: any) => h.note && h.note.trim() !== "")
+                          .filter((h: any) => {
+                            // Filter out System and Advisor notes - only show admin notes
+                            const role = h.role || h.role_display_name || h.role_name || "";
+                            const roleLower = role.toLowerCase();
+                            return roleLower !== "system" && roleLower !== "advisor";
+                          })
                           .forEach((history: any) => {
                             const role = history.role || history.role_display_name || history.role_name || "Admin";
                             if (!notesByRole[role]) {
@@ -1256,13 +1261,13 @@ const BoardDashboard = () => {
                         });
 
                         if (sortedRoles.length === 0) {
-                          return <p className="text-sm text-muted-foreground italic">No admin notes yet.</p>;
+                          return <p className="text-sm text-muted-foreground italic">No status history available.</p>;
                         }
 
                         return sortedRoles.map((role) => (
                           <div key={role} className="space-y-3">
                             <h4 className="font-semibold text-sm text-university-navy border-b pb-2">
-                              {role} Notes
+                              {role}
                             </h4>
                             {notesByRole[role].map((history: any, idx: number) => (
                               <div
@@ -1282,7 +1287,10 @@ const BoardDashboard = () => {
                                     {new Date(history.changed_at).toLocaleString()}
                                   </span>
                                 </div>
-                                <p className="text-sm text-gray-700 mt-1">{history.note}</p>
+                                {/* Only show note if it exists and is not empty */}
+                                {history.note && history.note.trim() !== "" && (
+                                  <p className="text-sm text-gray-700 mt-1">{history.note}</p>
+                                )}
                               </div>
                             ))}
                           </div>

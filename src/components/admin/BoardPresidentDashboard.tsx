@@ -120,7 +120,7 @@ const BoardPresidentDashboard = () => {
   const [statsLoading, setStatsLoading] = useState(false);
   const [eventRequestFilter, setEventRequestFilter] = useState<string>("all"); // all, pending, approved, rejected
   const [eventRequestSearch, setEventRequestSearch] = useState<string>("");
-  
+
   // Pagination states
   const [eventRequestsCurrentPage, setEventRequestsCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
@@ -739,46 +739,46 @@ const BoardPresidentDashboard = () => {
                   />
                 </div>
                 <div className="flex gap-2">
-                  <Button
-                    variant={eventRequestFilter === "all" ? "university" : "outline"}
-                    size="sm"
-                    onClick={() => {
-                      setEventRequestFilter("all");
-                      fetchAllEventRequests();
-                    }}
-                  >
-                    All
-                  </Button>
-                  <Button
-                    variant={eventRequestFilter === "pending" ? "university" : "outline"}
-                    size="sm"
-                    onClick={() => {
-                      setEventRequestFilter("pending");
-                      fetchAllEventRequests();
-                    }}
-                  >
-                    Pending
-                  </Button>
-                  <Button
-                    variant={eventRequestFilter === "approved" ? "university" : "outline"}
-                    size="sm"
-                    onClick={() => {
-                      setEventRequestFilter("approved");
-                      fetchAllEventRequests();
-                    }}
-                  >
-                    Approved
-                  </Button>
-                  <Button
-                    variant={eventRequestFilter === "rejected" ? "university" : "outline"}
-                    size="sm"
-                    onClick={() => {
-                      setEventRequestFilter("rejected");
-                      fetchAllEventRequests();
-                    }}
-                  >
-                    Rejected
-                  </Button>
+                <Button
+                  variant={eventRequestFilter === "all" ? "university" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setEventRequestFilter("all");
+                    fetchAllEventRequests();
+                  }}
+                >
+                  All
+                </Button>
+                <Button
+                  variant={eventRequestFilter === "pending" ? "university" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setEventRequestFilter("pending");
+                    fetchAllEventRequests();
+                  }}
+                >
+                  Pending
+                </Button>
+                <Button
+                  variant={eventRequestFilter === "approved" ? "university" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setEventRequestFilter("approved");
+                    fetchAllEventRequests();
+                  }}
+                >
+                  Approved
+                </Button>
+                <Button
+                  variant={eventRequestFilter === "rejected" ? "university" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setEventRequestFilter("rejected");
+                    fetchAllEventRequests();
+                  }}
+                >
+                  Rejected
+                </Button>
                 </div>
               </div>
 
@@ -804,7 +804,7 @@ const BoardPresidentDashboard = () => {
 
                 return filteredRequests.length > 0 ? (
                   <>
-                    <div className="grid gap-4">
+                <div className="grid gap-4">
                       {filteredRequests.slice((eventRequestsCurrentPage - 1) * itemsPerPage, eventRequestsCurrentPage * itemsPerPage).map((request) => (
                     <Card key={request.req_id} className="p-4 shadow-card">
                       <div className="flex items-start justify-between">
@@ -873,8 +873,8 @@ const BoardPresidentDashboard = () => {
                         </div>
                       </div>
                     </Card>
-                      ))}
-                    </div>
+                  ))}
+                </div>
 
                     {/* Pagination for Event Requests */}
                     {filteredRequests.length > itemsPerPage && (
@@ -930,14 +930,14 @@ const BoardPresidentDashboard = () => {
                       </div>
                     )}
                   </>
-                ) : (
-                  <div className="text-center py-12">
-                    <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                    <h3 className="text-lg font-medium mb-2">No Event Requests Found</h3>
-                    <p className="text-muted-foreground">
+              ) : (
+                <div className="text-center py-12">
+                  <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <h3 className="text-lg font-medium mb-2">No Event Requests Found</h3>
+                  <p className="text-muted-foreground">
                       {eventRequestSearch ? `No event requests match "${eventRequestSearch}"` : "No event requests have been submitted yet."}
-                    </p>
-                  </div>
+                  </p>
+                </div>
                 );
               })()}
             </TabsContent>

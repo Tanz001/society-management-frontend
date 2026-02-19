@@ -35,6 +35,7 @@ import EventsPage from "./components/events/EventsPage";
 import MembershipRegistration from "./components/membership/MembershipRegistration";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import SocietyEventRequestPage from "./components/society/SocietyEventRequestPage";
+import SocietyEventsPage from "./components/admin/SocietyEventsPage";
 
 const queryClient = new QueryClient();
 
@@ -156,6 +157,12 @@ const App = () => (
           <Route path="/dashboard/admin/vc" element={
             <ProtectedRoute requireAuth>
               <VCDashboard />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/admin/society/:societyId/events" element={
+            <ProtectedRoute requireAuth>
+              <SocietyEventsPage />
             </ProtectedRoute>
           } />
 

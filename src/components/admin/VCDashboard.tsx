@@ -127,6 +127,9 @@ const VCDashboard = () => {
   const [eventReports, setEventReports] = useState<any[]>([]);
   const [loadingEventReports, setLoadingEventReports] = useState(false);
   const [selectedReport, setSelectedReport] = useState<any | null>(null);
+  const [reportFilter, setReportFilter] = useState<string>("all"); // all, report_submitted, report_missing
+  const [reportMissingEvents, setReportMissingEvents] = useState<any[]>([]);
+  const [loadingReportMissing, setLoadingReportMissing] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
   // Society detail modal states
@@ -145,6 +148,8 @@ const VCDashboard = () => {
   // Search state
   const [searchTerm, setSearchTerm] = useState("");
   const [eventRequestSearch, setEventRequestSearch] = useState("");
+  const [societyEvents, setSocietyEvents] = useState<any[]>([]);
+  const [loadingSocietyEvents, setLoadingSocietyEvents] = useState(false);
 
   // Get current user info
   const getCurrentUser = () => {
@@ -280,6 +285,9 @@ const VCDashboard = () => {
       await fetchCabinetMembers(societyData.society_id);
 
       setIsDetailModalOpen(true);
+
+      // Fetch recent events for this society
+      fetchSocietyRecentEvents(societyData.society_id);
     } catch (err: any) {
       console.error("Error fetching society details:", err);
       toast({
@@ -320,6 +328,52 @@ const VCDashboard = () => {
       setCabinetMembers([]);
     } finally {
       setLoadingCabinet(false);
+    }
+  };
+
+  // Fetch 3 most recent events for a society (Approved, Report Missing, Report Submitted)
+  const fetchSocietyRecentEvents = async (societyId: number) => {
+    try {
+      setLoadingSocietyEvents(true);
+      const token = localStorage.getItem("token");
+      if (!token) return;
+
+      // We'll fetch all events for the society and filter/slice client-side for now
+      // ideally backend should support limit and status filter
+      const response = await axios.post(
+        `${import.meta.env.VITE_API_URL}/admin/event-requests`,
+        {
+          role: "vc",
+          society_id: societyId,
+          filter: "all_society_events"
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.data.success) {
+        let events = response.data.data || [];
+        // Filter for Approved (10), Report Submitted (12), Report Missing (13)
+        events = events.filter((e: any) => [10, 12, 13].includes(e.status_id));
+
+        // Sort by date descending (assuming event_date or date_from)
+        events.sort((a: any, b: any) => {
+          const dateA = new Date(a.date_from || a.event_date).getTime();
+          const dateB = new Date(b.date_from || b.event_date).getTime();
+          return dateB - dateA;
+        });
+
+        // Take top 3
+        setSocietyEvents(events.slice(0, 3));
+      }
+    } catch (error) {
+      console.error("Error fetching society events:", error);
+      setSocietyEvents([]);
+    } finally {
+      setLoadingSocietyEvents(false);
     }
   };
 
@@ -598,6 +652,7 @@ const VCDashboard = () => {
       fetchEventRequestStats();
     } else if (activeTab === "event-reports") {
       fetchAllEventReports();
+      fetchReportMissingEvents();
     }
   }, [activeTab, eventRequestFilter]);
 
@@ -629,6 +684,43 @@ const VCDashboard = () => {
       setError(err.response?.data?.message || err.message || "Failed to fetch event reports");
     } finally {
       setLoadingEventReports(false);
+    }
+  };
+
+  // Fetch event requests with report missing status (status 13)
+  const fetchReportMissingEvents = async () => {
+    try {
+      setLoadingReportMissing(true);
+      setError("");
+
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        throw new Error("No authentication token found");
+      }
+
+      const response = await axios.post(
+        `${import.meta.env.VITE_API_URL}/admin/event-requests`,
+        {
+          role: "vc",
+          filter: "all"
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      console.log("Event requests fetched for report missing:", response.data);
+      // Filter for status 13 (Report Missing)
+      const missingEvents = (response.data.data || []).filter((req: any) => req.status_id === 13);
+      setReportMissingEvents(missingEvents);
+    } catch (err: any) {
+      console.error("Error fetching report missing events:", err);
+      setError(err.response?.data?.message || err.message || "Failed to fetch report missing events");
+    } finally {
+      setLoadingReportMissing(false);
     }
   };
 
@@ -991,45 +1083,58 @@ const VCDashboard = () => {
                   />
                 </div>
                 <div className="flex gap-2">
+                <Button
+                  variant={eventRequestFilter === "all" ? "university" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setEventRequestFilter("all");
+                    fetchAllEventRequests();
+                  }}
+                >
+                  All
+                </Button>
+                <Button
+                  variant={eventRequestFilter === "pending" ? "university" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setEventRequestFilter("pending");
+                    fetchAllEventRequests();
+                  }}
+                >
+                  Pending
+                </Button>
+                <Button
+                  variant={eventRequestFilter === "approved" ? "university" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setEventRequestFilter("approved");
+                    fetchAllEventRequests();
+                  }}
+                >
+                  Approved
+                </Button>
+                <Button
+                  variant={eventRequestFilter === "rejected" ? "university" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setEventRequestFilter("rejected");
+                    fetchAllEventRequests();
+                  }}
+                >
+                  Rejected
+                </Button>
                   <Button
-                    variant={eventRequestFilter === "all" ? "university" : "outline"}
+                    variant={eventRequestFilter === "report_missing" ? "university" : "outline"}
                     size="sm"
                     onClick={() => {
-                      setEventRequestFilter("all");
+                      setEventRequestFilter("report_missing"); // Frontend filter logic needs update or backend support
+                      // If backend supports "report_missing" string in filter, great. 
+                      // If not, we might need to fetch all and filter client side or update backend.
+                      // Assuming backend handles it or we handle it in filteredRequests
                       fetchAllEventRequests();
                     }}
                   >
-                    All
-                  </Button>
-                  <Button
-                    variant={eventRequestFilter === "pending" ? "university" : "outline"}
-                    size="sm"
-                    onClick={() => {
-                      setEventRequestFilter("pending");
-                      fetchAllEventRequests();
-                    }}
-                  >
-                    Pending
-                  </Button>
-                  <Button
-                    variant={eventRequestFilter === "approved" ? "university" : "outline"}
-                    size="sm"
-                    onClick={() => {
-                      setEventRequestFilter("approved");
-                      fetchAllEventRequests();
-                    }}
-                  >
-                    Approved
-                  </Button>
-                  <Button
-                    variant={eventRequestFilter === "rejected" ? "university" : "outline"}
-                    size="sm"
-                    onClick={() => {
-                      setEventRequestFilter("rejected");
-                      fetchAllEventRequests();
-                    }}
-                  >
-                    Rejected
+                    Report Missing
                   </Button>
                 </div>
               </div>
@@ -1042,6 +1147,10 @@ const VCDashboard = () => {
               ) : (() => {
                 // Filter event requests based on search term
                 const filteredRequests = eventRequests.filter((request: any) => {
+                  // Filter by status if "report_missing" is selected and backend returned all
+                  // Note: If backend already filtered, this is redundant but safe
+                  if (eventRequestFilter === "report_missing" && request.status_id !== 13) return false;
+
                   if (!eventRequestSearch.trim()) return true;
                   const searchLower = eventRequestSearch.toLowerCase();
                   return (
@@ -1055,8 +1164,8 @@ const VCDashboard = () => {
                 });
 
                 return filteredRequests.length > 0 ? (
-                  <>
-                    <div className="grid gap-4">
+                <>
+                  <div className="grid gap-4">
                       {filteredRequests.slice((eventRequestsCurrentPage - 1) * itemsPerPage, eventRequestsCurrentPage * itemsPerPage).map((request) => (
                       <Card key={request.req_id} className="p-4 shadow-card">
                         <div className="flex items-start justify-between">
@@ -1128,64 +1237,64 @@ const VCDashboard = () => {
                     ))}
                   </div>
 
-                    {/* Pagination for Event Requests */}
+                  {/* Pagination for Event Requests */}
                     {filteredRequests.length > itemsPerPage && (
-                      <div className="flex items-center justify-between mt-6">
-                        <div className="text-sm text-muted-foreground">
+                    <div className="flex items-center justify-between mt-6">
+                      <div className="text-sm text-muted-foreground">
                           Showing {(eventRequestsCurrentPage - 1) * itemsPerPage + 1} to {Math.min(eventRequestsCurrentPage * itemsPerPage, filteredRequests.length)} of {filteredRequests.length} event requests
-                        </div>
-                        <Pagination>
-                          <PaginationContent>
-                            <PaginationItem>
-                              <PaginationPrevious
-                                onClick={() => setEventRequestsCurrentPage(prev => Math.max(1, prev - 1))}
-                                className={eventRequestsCurrentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                              />
-                            </PaginationItem>
+                      </div>
+                      <Pagination>
+                        <PaginationContent>
+                          <PaginationItem>
+                            <PaginationPrevious
+                              onClick={() => setEventRequestsCurrentPage(prev => Math.max(1, prev - 1))}
+                              className={eventRequestsCurrentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                            />
+                          </PaginationItem>
                             {Array.from({ length: Math.ceil(filteredRequests.length / itemsPerPage) }, (_, i) => i + 1)
-                              .filter(page => {
-                                return page === 1 ||
+                            .filter(page => {
+                              return page === 1 ||
                                   page === Math.ceil(filteredRequests.length / itemsPerPage) ||
-                                  (page >= eventRequestsCurrentPage - 1 && page <= eventRequestsCurrentPage + 1);
-                              })
-                              .map((page, idx, array) => {
-                                const prevPage = array[idx - 1];
-                                const showEllipsisBefore = prevPage && page - prevPage > 1;
+                                (page >= eventRequestsCurrentPage - 1 && page <= eventRequestsCurrentPage + 1);
+                            })
+                            .map((page, idx, array) => {
+                              const prevPage = array[idx - 1];
+                              const showEllipsisBefore = prevPage && page - prevPage > 1;
 
-                                return (
-                                  <React.Fragment key={page}>
-                                    {showEllipsisBefore && (
-                                      <PaginationItem>
-                                        <PaginationEllipsis />
-                                      </PaginationItem>
-                                    )}
+                              return (
+                                <React.Fragment key={page}>
+                                  {showEllipsisBefore && (
                                     <PaginationItem>
-                                      <PaginationLink
-                                        onClick={() => setEventRequestsCurrentPage(page)}
-                                        isActive={eventRequestsCurrentPage === page}
-                                        className="cursor-pointer"
-                                      >
-                                        {page}
-                                      </PaginationLink>
+                                      <PaginationEllipsis />
                                     </PaginationItem>
-                                  </React.Fragment>
-                                );
-                              })}
-                            <PaginationItem>
-                              <PaginationNext
+                                  )}
+                                  <PaginationItem>
+                                    <PaginationLink
+                                      onClick={() => setEventRequestsCurrentPage(page)}
+                                      isActive={eventRequestsCurrentPage === page}
+                                      className="cursor-pointer"
+                                    >
+                                      {page}
+                                    </PaginationLink>
+                                  </PaginationItem>
+                                </React.Fragment>
+                              );
+                            })}
+                          <PaginationItem>
+                            <PaginationNext
                                 onClick={() => setEventRequestsCurrentPage(prev => Math.min(Math.ceil(filteredRequests.length / itemsPerPage), prev + 1))}
                                 className={eventRequestsCurrentPage >= Math.ceil(filteredRequests.length / itemsPerPage) ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                              />
-                            </PaginationItem>
-                          </PaginationContent>
-                        </Pagination>
-                      </div>
-                    )}
-                  </>
-                ) : (
+                            />
+                          </PaginationItem>
+                        </PaginationContent>
+                      </Pagination>
+                    </div>
+                  )}
+                </>
+              ) : (
                   <Card className="p-6 text-center">
                     <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-lg font-medium mb-2">No Event Requests Found</h3>
+                  <h3 className="text-lg font-medium mb-2">No Event Requests Found</h3>
                     <p className="text-muted-foreground">{eventRequestSearch ? `No event requests match "${eventRequestSearch}"` : "No event requests have been submitted yet."}</p>
                   </Card>
                 );
@@ -1198,21 +1307,89 @@ const VCDashboard = () => {
                 <h2 className="text-2xl font-semibold text-university-navy">Event Reports</h2>
                 <Button
                   variant="outline"
-                  onClick={fetchAllEventReports}
-                  disabled={loadingEventReports}
+                  onClick={() => {
+                    fetchAllEventReports();
+                    fetchReportMissingEvents();
+                  }}
+                  disabled={loadingEventReports || loadingReportMissing}
                 >
-                  {loadingEventReports ? "Loading..." : "Refresh"}
+                  {(loadingEventReports || loadingReportMissing) ? "Loading..." : "Refresh"}
                 </Button>
               </div>
 
-              {loadingEventReports && eventReports.length === 0 ? (
-                <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-university-navy mx-auto mb-4"></div>
-                  <p className="text-muted-foreground">Loading event reports...</p>
+              {/* Filter Options */}
+              <div className="flex items-center space-x-4 mb-6">
+                <h3 className="text-lg font-medium text-university-navy">Filter:</h3>
+                <div className="flex space-x-2">
+                  <Button
+                    variant={reportFilter === "all" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => setReportFilter("all")}
+                  >
+                    All
+                  </Button>
+                  <Button
+                    variant={reportFilter === "report_submitted" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => setReportFilter("report_submitted")}
+                  >
+                    Report Submitted ({eventReports.length})
+                  </Button>
+                  <Button
+                    variant={reportFilter === "report_missing" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => setReportFilter("report_missing")}
+                  >
+                    Report Missing ({reportMissingEvents.length})
+                  </Button>
                 </div>
-              ) : eventReports.length > 0 ? (
-                <div className="grid gap-6">
-                  {eventReports.map((report) => (
+              </div>
+
+              {(() => {
+                const isLoading = (reportFilter === "all" || reportFilter === "report_submitted") && loadingEventReports && eventReports.length === 0;
+                const isLoadingMissing = (reportFilter === "all" || reportFilter === "report_missing") && loadingReportMissing && reportMissingEvents.length === 0;
+                
+                if (isLoading || isLoadingMissing) {
+                  return (
+                    <div className="text-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-university-navy mx-auto mb-4"></div>
+                      <p className="text-muted-foreground">Loading event reports...</p>
+                    </div>
+                  );
+                }
+
+                // Filter content based on selected filter
+                const showSubmitted = reportFilter === "all" || reportFilter === "report_submitted";
+                const showMissing = reportFilter === "all" || reportFilter === "report_missing";
+                
+                const hasContent = (showSubmitted && eventReports.length > 0) || (showMissing && reportMissingEvents.length > 0);
+
+                if (!hasContent) {
+                  return (
+                    <div className="text-center py-12">
+                      <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                      <h3 className="text-lg font-medium mb-2">No Event Reports Found</h3>
+                      <p className="text-muted-foreground">
+                        {reportFilter === "report_submitted" 
+                          ? "No event reports have been submitted yet."
+                          : reportFilter === "report_missing"
+                          ? "No events are missing reports."
+                          : "No event reports or missing reports found."}
+                      </p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-6">
+                    {/* Report Submitted Section */}
+                    {showSubmitted && eventReports.length > 0 && (
+                      <div>
+                        {reportFilter === "all" && (
+                          <h3 className="text-lg font-semibold text-university-navy mb-4">Report Submitted ({eventReports.length})</h3>
+                        )}
+                        <div className="grid gap-6">
+                          {eventReports.map((report) => (
                     <Card key={report.report_id} className="p-6 shadow-card hover:shadow-lg transition-shadow border-l-4 border-l-university-gold">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
@@ -1293,18 +1470,97 @@ const VCDashboard = () => {
                           </Button>
                         </div>
                       </div>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                  <h3 className="text-lg font-medium mb-2">No Event Reports Found</h3>
-                  <p className="text-muted-foreground">
-                    No event reports have been submitted yet.
-                  </p>
-                </div>
-              )}
+                          </Card>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Report Missing Section */}
+                    {showMissing && reportMissingEvents.length > 0 && (
+                      <div>
+                        {reportFilter === "all" && (
+                          <h3 className="text-lg font-semibold text-university-navy mb-4">Report Missing ({reportMissingEvents.length})</h3>
+                        )}
+                        <div className="grid gap-6">
+                          {reportMissingEvents.map((event: any) => (
+                            <Card key={event.req_id} className="p-6 shadow-card hover:shadow-lg transition-shadow border-l-4 border-l-red-500">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center mb-3 flex-wrap gap-2">
+                                    <h3 className="text-xl font-semibold text-university-navy">{event.event_name || event.title}</h3>
+                                    <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                                      <AlertTriangle className="h-3 w-3 mr-1" />
+                                      Report Missing
+                                    </Badge>
+                                  </div>
+
+                                  {event.description && (
+                                    <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+                                      {event.description}
+                                    </p>
+                                  )}
+
+                                  <div className="grid md:grid-cols-2 gap-4 mb-4">
+                                    <div className="space-y-2">
+                                      <div className="flex items-center text-sm">
+                                        <Building className="h-4 w-4 mr-2 text-muted-foreground" />
+                                        <span className="text-muted-foreground">Society: </span>
+                                        <span className="font-medium ml-1">{event.society_name}</span>
+                                      </div>
+                                      {event.date_from && (
+                                        <div className="flex items-center text-sm">
+                                          <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
+                                          <span className="text-muted-foreground">Event Date: </span>
+                                          <span className="font-medium ml-1">{new Date(event.date_from).toLocaleDateString()}</span>
+                                        </div>
+                                      )}
+                                      {event.venue && (
+                                        <div className="flex items-center text-sm">
+                                          <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
+                                          <span className="text-muted-foreground">Venue: </span>
+                                          <span className="font-medium ml-1">{event.venue}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div className="space-y-2">
+                                      {event.event_type && (
+                                        <div className="flex items-center text-sm">
+                                          <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
+                                          <span className="text-muted-foreground">Type: </span>
+                                          <span className="font-medium ml-1">{event.event_type}</span>
+                                        </div>
+                                      )}
+                                      {event.status_name && (
+                                        <div className="flex items-center text-sm">
+                                          <Clock className="h-4 w-4 mr-2 text-muted-foreground" />
+                                          <span className="text-muted-foreground">Status: </span>
+                                          <span className="font-medium ml-1">{event.status_name}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex flex-col space-y-2 ml-4">
+                                  <Button
+                                    size="sm"
+                                    variant="university"
+                                    onClick={() => handleViewEventRequest(event.req_id)}
+                                    disabled={loading}
+                                  >
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    View Details
+                                  </Button>
+                                </div>
+                              </div>
+                            </Card>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </TabsContent>
           </Tabs>
         </div>
@@ -1647,6 +1903,67 @@ const VCDashboard = () => {
                   </div>
                 </Card>
               )}
+
+              {/* Recent Events Section */}
+              <Card className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold text-university-navy flex items-center">
+                    <Calendar className="h-5 w-5 mr-2" />
+                    Recent Events
+                  </h3>
+                  <Button
+                    variant="link"
+                    className="text-blue-600 p-0 h-auto font-semibold"
+                    onClick={() => {
+                      setIsModalOpen(false); // Close modal 
+                      navigate(`/admin/society/${selectedSociety.society_id}/events`);
+                    }}
+                  >
+                    View All
+                  </Button>
+                </div>
+
+                {loadingSocietyEvents ? (
+                  <div className="text-center py-4">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-university-navy mx-auto"></div>
+                    <p className="text-xs text-muted-foreground mt-2">Loading events...</p>
+                  </div>
+                ) : societyEvents.length > 0 ? (
+                  <div className="space-y-3">
+                    {societyEvents.map((event: any) => (
+                      <div key={event.req_id} className="border rounded-lg p-3 hover:bg-slate-50 transition-colors">
+                        <div className="flex justify-between items-start mb-1">
+                          <h4 className="font-semibold text-sm text-university-navy line-clamp-1">{event.title || event.event_name}</h4>
+                          <Badge
+                            className={`text-xs px-2 py-0 border-none ${event.status_id === 10 ? "bg-green-100 text-green-800" :
+                                event.status_id === 13 ? "bg-red-100 text-red-800" :
+                                  event.status_id === 12 ? "bg-blue-100 text-blue-800" :
+                                    "bg-slate-100 text-slate-800"
+                              }`}
+                            variant="outline"
+                          >
+                            {event.status_name}
+                          </Badge>
+                        </div>
+                        <div className="flex text-xs text-muted-foreground gap-3">
+                          <span className="flex items-center">
+                            <Calendar className="h-3 w-3 mr-1" />
+                            {new Date(event.date_from || event.event_date).toLocaleDateString()}
+                          </span>
+                          <span className="flex items-center">
+                            <MapPin className="h-3 w-3 mr-1" />
+                            {event.venue || "No venue"}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-6 bg-slate-50 rounded-lg border border-dashed">
+                    <p className="text-sm text-muted-foreground">No recent events found</p>
+                  </div>
+                )}
+              </Card>
 
               {/* VC Review Note */}
               <Card className="p-4">
@@ -2124,11 +2441,16 @@ const VCDashboard = () => {
                   <Card className="p-4">
                     <h3 className="font-semibold mb-4 text-university-navy">Admin Notes & Status History</h3>
                     <div className="space-y-6">
-                      {/* Group notes by role */}
+                      {/* Group all status changes by role (including those without notes) */}
                       {(() => {
                         const notesByRole: { [key: string]: any[] } = {};
                         selectedEventRequest.status_history
-                          .filter((h: any) => h.note && h.note.trim() !== "")
+                          .filter((h: any) => {
+                            // Filter out System and Advisor notes - only show admin notes
+                            const role = h.role || h.role_display_name || h.role_name || "";
+                            const roleLower = role.toLowerCase();
+                            return roleLower !== "system" && roleLower !== "advisor";
+                          })
                           .forEach((history: any) => {
                             const role = history.role || history.role_display_name || history.role_name || "Admin";
                             if (!notesByRole[role]) {
@@ -2148,13 +2470,13 @@ const VCDashboard = () => {
                         });
 
                         if (sortedRoles.length === 0) {
-                          return <p className="text-sm text-muted-foreground italic">No admin notes yet.</p>;
+                          return <p className="text-sm text-muted-foreground italic">No status history available.</p>;
                         }
 
                         return sortedRoles.map((role) => (
                           <div key={role} className="space-y-3">
                             <h4 className="font-semibold text-sm text-university-navy border-b pb-2">
-                              {role} Notes
+                              {role}
                             </h4>
                             {notesByRole[role].map((history: any, idx: number) => (
                               <div
@@ -2174,7 +2496,10 @@ const VCDashboard = () => {
                                     {new Date(history.changed_at).toLocaleString()}
                                   </span>
                                 </div>
-                                <p className="text-sm text-gray-700 mt-1">{history.note}</p>
+                                {/* Only show note if it exists and is not empty */}
+                                {history.note && history.note.trim() !== "" && (
+                                  <p className="text-sm text-gray-700 mt-1">{history.note}</p>
+                                )}
                               </div>
                             ))}
                           </div>
@@ -2521,30 +2846,72 @@ const VCDashboard = () => {
                 </Card>
               )}
 
-              {/* Events */}
-              {selectedSocietyDetail.events && Array.isArray(selectedSocietyDetail.events) && selectedSocietyDetail.events.length > 0 && (
+              {/* Recent Events Section */}
                 <Card className="p-6">
-                  <h3 className="font-semibold mb-3 text-university-navy flex items-center">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold text-university-navy flex items-center">
                     <Calendar className="h-5 w-5 mr-2" />
-                    Events
+                    Recent Events
                   </h3>
-                  <div className="space-y-2">
-                    {selectedSocietyDetail.events.map((event: any, index: number) => (
-                      <div key={index} className="flex items-start space-x-2">
-                        <div className="w-2 h-2 bg-university-gold rounded-full mt-2"></div>
-                        <div className="flex-1">
-                          <span className="text-muted-foreground font-medium">{event.title || event.event_name || "Untitled Event"}</span>
-                          {event.event_date && (
-                            <span className="text-xs text-muted-foreground ml-2">
-                              ({new Date(event.event_date).toLocaleDateString()})
+                  {societyEvents.length > 0 && (
+                    <Button
+                      variant="link"
+                      className="text-blue-600 p-0 h-auto font-semibold"
+                      onClick={() => {
+                        setIsDetailModalOpen(false);
+                        navigate(`/admin/society/${selectedSocietyDetail.society_id}/events`);
+                      }}
+                    >
+                      View All
+                    </Button>
+                  )}
+                </div>
+
+                {loadingSocietyEvents ? (
+                  <div className="text-center py-4">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-university-navy mx-auto"></div>
+                    <p className="text-xs text-muted-foreground mt-2">Loading events...</p>
+                  </div>
+                ) : societyEvents.length > 0 ? (
+                  <div className="space-y-3">
+                    {societyEvents.map((event: any) => (
+                      <div 
+                        key={event.req_id || event.id} 
+                        className="border rounded-lg p-3 hover:bg-slate-50 transition-colors cursor-pointer"
+                        onClick={() => handleViewEventRequest(event.req_id || event.id)}
+                      >
+                        <div className="flex justify-between items-start mb-1">
+                          <h4 className="font-semibold text-sm text-university-navy line-clamp-1">{event.title || event.event_name}</h4>
+                          <Badge
+                            className={`text-xs px-2 py-0 border-none ${event.status_id === 10 ? "bg-green-100 text-green-800" :
+                                event.status_id === 13 ? "bg-red-100 text-red-800" :
+                                  event.status_id === 12 ? "bg-blue-100 text-blue-800" :
+                                    "bg-slate-100 text-slate-800"
+                              }`}
+                            variant="outline"
+                          >
+                            {event.status_name}
+                          </Badge>
+                        </div>
+                        <div className="flex text-xs text-muted-foreground gap-3">
+                          <span className="flex items-center">
+                            <Calendar className="h-3 w-3 mr-1" />
+                            {new Date(event.date_from || event.event_date).toLocaleDateString()}
                             </span>
-                          )}
+                          <span className="flex items-center">
+                            <MapPin className="h-3 w-3 mr-1" />
+                            {event.venue || "No venue"}
+                          </span>
                         </div>
                       </div>
                     ))}
                   </div>
-                </Card>
+                ) : (
+                  <div className="text-center py-6 bg-slate-50 rounded-lg border border-dashed">
+                    <p className="text-sm text-muted-foreground">No recent events found</p>
+                  </div>
               )}
+              </Card>
 
               {/* Status History - Filter out 'Approved' statuses */}
               {selectedSocietyDetail.status_history && Array.isArray(selectedSocietyDetail.status_history) && 
@@ -2569,7 +2936,8 @@ const VCDashboard = () => {
                             {new Date(history.changed_at).toLocaleString()}
                           </span>
                         </div>
-                        {history.note && (
+                        {/* Only show note if it exists and is not empty */}
+                        {history.note && history.note.trim() !== "" && (
                           <p className="text-sm text-muted-foreground mt-1">{history.note}</p>
                         )}
                       </div>

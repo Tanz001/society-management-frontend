@@ -1040,47 +1040,47 @@ const RegistrarDashboard = () => {
                     className="pl-10"
                   />
                 </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant={eventRequestFilter === "all" ? "university" : "outline"}
-                    size="sm"
-                    onClick={() => {
-                      setEventRequestFilter("all");
-                      fetchAllEventRequests();
-                    }}
-                  >
-                    All
-                  </Button>
-                  <Button
-                    variant={eventRequestFilter === "pending" ? "university" : "outline"}
-                    size="sm"
-                    onClick={() => {
-                      setEventRequestFilter("pending");
-                      fetchAllEventRequests();
-                    }}
-                  >
-                    Pending
-                  </Button>
-                  <Button
-                    variant={eventRequestFilter === "approved" ? "university" : "outline"}
-                    size="sm"
-                    onClick={() => {
-                      setEventRequestFilter("approved");
-                      fetchAllEventRequests();
-                    }}
-                  >
-                    Approved
-                  </Button>
-                  <Button
-                    variant={eventRequestFilter === "rejected" ? "university" : "outline"}
-                    size="sm"
-                    onClick={() => {
-                      setEventRequestFilter("rejected");
-                      fetchAllEventRequests();
-                    }}
-                  >
-                    Rejected
-                  </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant={eventRequestFilter === "all" ? "university" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setEventRequestFilter("all");
+                    fetchAllEventRequests();
+                  }}
+                >
+                  All
+                </Button>
+                <Button
+                  variant={eventRequestFilter === "pending" ? "university" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setEventRequestFilter("pending");
+                    fetchAllEventRequests();
+                  }}
+                >
+                  Pending
+                </Button>
+                <Button
+                  variant={eventRequestFilter === "approved" ? "university" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setEventRequestFilter("approved");
+                    fetchAllEventRequests();
+                  }}
+                >
+                  Approved
+                </Button>
+                <Button
+                  variant={eventRequestFilter === "rejected" ? "university" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setEventRequestFilter("rejected");
+                    fetchAllEventRequests();
+                  }}
+                >
+                  Rejected
+                </Button>
                 </div>
               </div>
 
@@ -1106,8 +1106,8 @@ const RegistrarDashboard = () => {
                 });
 
                 return filteredRequests.length > 0 ? (
-                  <>
-                    <div className="grid gap-6">
+                <>
+                  <div className="grid gap-6">
                       {filteredRequests.slice((eventRequestsCurrentPage - 1) * itemsPerPage, eventRequestsCurrentPage * itemsPerPage).map((request: any) => (
                       <Card key={request.req_id} className="p-6 shadow-card hover:shadow-lg transition-shadow">
                         <div className="flex items-start justify-between">
@@ -1196,68 +1196,68 @@ const RegistrarDashboard = () => {
                     ))}
                   </div>
 
-                    {/* Pagination for Event Requests */}
+                  {/* Pagination for Event Requests */}
                     {filteredRequests.length > itemsPerPage && (
-                      <div className="flex items-center justify-between mt-6">
-                        <div className="text-sm text-muted-foreground">
+                    <div className="flex items-center justify-between mt-6">
+                      <div className="text-sm text-muted-foreground">
                           Showing {(eventRequestsCurrentPage - 1) * itemsPerPage + 1} to {Math.min(eventRequestsCurrentPage * itemsPerPage, filteredRequests.length)} of {filteredRequests.length} event requests
-                        </div>
-                        <Pagination>
-                          <PaginationContent>
-                            <PaginationItem>
-                              <PaginationPrevious
-                                onClick={() => setEventRequestsCurrentPage(prev => Math.max(1, prev - 1))}
-                                className={eventRequestsCurrentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                              />
-                            </PaginationItem>
+                      </div>
+                      <Pagination>
+                        <PaginationContent>
+                          <PaginationItem>
+                            <PaginationPrevious
+                              onClick={() => setEventRequestsCurrentPage(prev => Math.max(1, prev - 1))}
+                              className={eventRequestsCurrentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                            />
+                          </PaginationItem>
                             {Array.from({ length: Math.ceil(filteredRequests.length / itemsPerPage) }, (_, i) => i + 1)
-                              .filter(page => {
-                                return page === 1 ||
+                            .filter(page => {
+                              return page === 1 ||
                                   page === Math.ceil(filteredRequests.length / itemsPerPage) ||
-                                  (page >= eventRequestsCurrentPage - 1 && page <= eventRequestsCurrentPage + 1);
-                              })
-                              .map((page, idx, array) => {
-                                const prevPage = array[idx - 1];
-                                const showEllipsisBefore = prevPage && page - prevPage > 1;
+                                (page >= eventRequestsCurrentPage - 1 && page <= eventRequestsCurrentPage + 1);
+                            })
+                            .map((page, idx, array) => {
+                              const prevPage = array[idx - 1];
+                              const showEllipsisBefore = prevPage && page - prevPage > 1;
 
-                                return (
-                                  <React.Fragment key={page}>
-                                    {showEllipsisBefore && (
-                                      <PaginationItem>
-                                        <PaginationEllipsis />
-                                      </PaginationItem>
-                                    )}
+                              return (
+                                <React.Fragment key={page}>
+                                  {showEllipsisBefore && (
                                     <PaginationItem>
-                                      <PaginationLink
-                                        onClick={() => setEventRequestsCurrentPage(page)}
-                                        isActive={eventRequestsCurrentPage === page}
-                                        className="cursor-pointer"
-                                      >
-                                        {page}
-                                      </PaginationLink>
+                                      <PaginationEllipsis />
                                     </PaginationItem>
-                                  </React.Fragment>
-                                );
-                              })}
-                            <PaginationItem>
-                              <PaginationNext
+                                  )}
+                                  <PaginationItem>
+                                    <PaginationLink
+                                      onClick={() => setEventRequestsCurrentPage(page)}
+                                      isActive={eventRequestsCurrentPage === page}
+                                      className="cursor-pointer"
+                                    >
+                                      {page}
+                                    </PaginationLink>
+                                  </PaginationItem>
+                                </React.Fragment>
+                              );
+                            })}
+                          <PaginationItem>
+                            <PaginationNext
                                 onClick={() => setEventRequestsCurrentPage(prev => Math.min(Math.ceil(filteredRequests.length / itemsPerPage), prev + 1))}
                                 className={eventRequestsCurrentPage >= Math.ceil(filteredRequests.length / itemsPerPage) ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                              />
-                            </PaginationItem>
-                          </PaginationContent>
-                        </Pagination>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="text-center py-12">
-                    <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                    <h3 className="text-lg font-medium mb-2">No Event Requests Found</h3>
-                    <p className="text-muted-foreground">
+                            />
+                          </PaginationItem>
+                        </PaginationContent>
+                      </Pagination>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-center py-12">
+                  <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <h3 className="text-lg font-medium mb-2">No Event Requests Found</h3>
+                  <p className="text-muted-foreground">
                       {eventRequestSearch ? `No event requests match "${eventRequestSearch}"` : "No event requests have been submitted yet."}
-                    </p>
-                  </div>
+                  </p>
+                </div>
                 );
               })()}
             </TabsContent>
@@ -2012,11 +2012,16 @@ const RegistrarDashboard = () => {
                   <Card className="p-4">
                     <h3 className="font-semibold mb-4 text-university-navy">Admin Notes & Status History</h3>
                     <div className="space-y-6">
-                      {/* Group notes by role */}
+                      {/* Group all status changes by role (including those without notes) */}
                       {(() => {
                         const notesByRole: { [key: string]: any[] } = {};
                         selectedEventRequest.status_history
-                          .filter((h: any) => h.note && h.note.trim() !== "")
+                          .filter((h: any) => {
+                            // Filter out System and Advisor notes - only show admin notes
+                            const role = h.role || h.role_display_name || h.role_name || "";
+                            const roleLower = role.toLowerCase();
+                            return roleLower !== "system" && roleLower !== "advisor";
+                          })
                           .forEach((history: any) => {
                             const role = history.role || history.role_display_name || history.role_name || "Admin";
                             if (!notesByRole[role]) {
@@ -2036,13 +2041,13 @@ const RegistrarDashboard = () => {
                         });
 
                         if (sortedRoles.length === 0) {
-                          return <p className="text-sm text-muted-foreground italic">No admin notes yet.</p>;
+                          return <p className="text-sm text-muted-foreground italic">No status history available.</p>;
                         }
 
                         return sortedRoles.map((role) => (
                           <div key={role} className="space-y-3">
                             <h4 className="font-semibold text-sm text-university-navy border-b pb-2">
-                              {role} Notes
+                              {role}
                             </h4>
                             {notesByRole[role].map((history: any, idx: number) => (
                               <div
@@ -2062,7 +2067,10 @@ const RegistrarDashboard = () => {
                                     {new Date(history.changed_at).toLocaleString()}
                                   </span>
                                 </div>
-                                <p className="text-sm text-gray-700 mt-1">{history.note}</p>
+                                {/* Only show note if it exists and is not empty */}
+                                {history.note && history.note.trim() !== "" && (
+                                  <p className="text-sm text-gray-700 mt-1">{history.note}</p>
+                                )}
                               </div>
                             ))}
                           </div>

@@ -633,8 +633,14 @@ const EventRequestDetailModal: React.FC<EventRequestDetailModalProps> = ({
                                     <h3 className="font-semibold mb-4 text-slate-800 border-b pb-2">Admin Notes & Status History</h3>
                                     <div className="space-y-6">
                                         {(() => {
+                                            // Show ALL status changes, not just those with notes
                                             const historyItems: any[] = eventRequest.status_history
-                                                .filter((h: any) => h.note && h.note.trim() !== "")
+                                                .filter((h: any) => {
+                                                    // Filter out System and Advisor notes - only show admin notes
+                                                    const role = h.role || h.role_display_name || h.role_name || "";
+                                                    const roleLower = role.toLowerCase();
+                                                    return roleLower !== "system" && roleLower !== "advisor";
+                                                })
                                                 .sort((a: any, b: any) =>
                                                     new Date(a.changed_at).getTime() - new Date(b.changed_at).getTime()
                                                 );
@@ -659,7 +665,7 @@ const EventRequestDetailModal: React.FC<EventRequestDetailModalProps> = ({
                                             });
 
                                             if (sortedRoles.length === 0) {
-                                                return <p className="text-sm text-muted-foreground italic">No history available.</p>;
+                                                return <p className="text-sm text-muted-foreground italic">No status history available.</p>;
                                             }
 
                                             return sortedRoles.map((role) => (
@@ -690,11 +696,9 @@ const EventRequestDetailModal: React.FC<EventRequestDetailModalProps> = ({
                                                                     {new Date(history.changed_at).toLocaleString()}
                                                                 </span>
                                                             </div>
-                                                            {history.note && (
+                                                            {/* Only show note if it exists and is not empty */}
+                                                            {history.note && history.note.trim() !== "" && (
                                                                 <p className="text-sm text-slate-800 mt-1 whitespace-pre-wrap">{history.note}</p>
-                                                            )}
-                                                            {!history.note && history.status_name && (
-                                                                <p className="text-xs text-muted-foreground italic mt-0.5">Status updated with no additional notes.</p>
                                                             )}
                                                         </div>
                                                     ))}
