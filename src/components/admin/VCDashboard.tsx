@@ -1135,7 +1135,7 @@ const VCDashboard = () => {
                     }}
                   >
                     Report Missing
-                  </Button>
+                </Button>
                 </div>
               </div>
 
@@ -1351,10 +1351,10 @@ const VCDashboard = () => {
                 
                 if (isLoading || isLoadingMissing) {
                   return (
-                    <div className="text-center py-8">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-university-navy mx-auto mb-4"></div>
-                      <p className="text-muted-foreground">Loading event reports...</p>
-                    </div>
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-university-navy mx-auto mb-4"></div>
+                  <p className="text-muted-foreground">Loading event reports...</p>
+                </div>
                   );
                 }
 
@@ -1388,8 +1388,8 @@ const VCDashboard = () => {
                         {reportFilter === "all" && (
                           <h3 className="text-lg font-semibold text-university-navy mb-4">Report Submitted ({eventReports.length})</h3>
                         )}
-                        <div className="grid gap-6">
-                          {eventReports.map((report) => (
+                <div className="grid gap-6">
+                  {eventReports.map((report) => (
                     <Card key={report.report_id} className="p-6 shadow-card hover:shadow-lg transition-shadow border-l-4 border-l-university-gold">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
@@ -1470,9 +1470,9 @@ const VCDashboard = () => {
                           </Button>
                         </div>
                       </div>
-                          </Card>
-                          ))}
-                        </div>
+                    </Card>
+                  ))}
+                </div>
                       </div>
                     )}
 
@@ -1513,8 +1513,8 @@ const VCDashboard = () => {
                                           <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
                                           <span className="text-muted-foreground">Event Date: </span>
                                           <span className="font-medium ml-1">{new Date(event.date_from).toLocaleDateString()}</span>
-                                        </div>
-                                      )}
+                </div>
+              )}
                                       {event.venue && (
                                         <div className="flex items-center text-sm">
                                           <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
@@ -2498,7 +2498,7 @@ const VCDashboard = () => {
                                 </div>
                                 {/* Only show note if it exists and is not empty */}
                                 {history.note && history.note.trim() !== "" && (
-                                  <p className="text-sm text-gray-700 mt-1">{history.note}</p>
+                                <p className="text-sm text-gray-700 mt-1">{history.note}</p>
                                 )}
                               </div>
                             ))}

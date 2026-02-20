@@ -1463,7 +1463,8 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
         if (!main.date_from) {
           errors.date_from = "Please fill the input";
           isValid = false;
-        } else if (!isDateAtLeast7DaysAway(main.date_from)) {
+        } else if (!isEditMode && !isDateAtLeast7DaysAway(main.date_from)) {
+          // Skip 7-day validation when editing existing event request
           errors.date_from = "You have to send request at least 7 days before the event";
           isValid = false;
         }
@@ -1680,8 +1681,8 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
     setMain((prev) => {
       const updated = { ...prev, [name]: value };
       
-      // Check for 7-day minimum requirement when date_from changes
-      if (name === 'date_from' && value) {
+      // Check for 7-day minimum requirement when date_from changes (only for new requests, not edits)
+      if (name === 'date_from' && value && !isEditMode) {
         if (!isDateAtLeast7DaysAway(value)) {
           setFieldErrors((prev) => ({
             ...prev,
@@ -1694,6 +1695,13 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
             return updated;
           });
         }
+      } else if (name === 'date_from' && value && isEditMode) {
+        // Clear any existing 7-day validation error when in edit mode
+        setFieldErrors((prev) => {
+          const updated = { ...prev };
+          delete updated.date_from;
+          return updated;
+        });
       }
       
       // Check for time slot conflict when time_from or time_to changes
@@ -1933,7 +1941,8 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
       toast.error("Start date is required");
       return false;
     }
-    if (!isDateAtLeast7DaysAway(main.date_from)) {
+    // Skip 7-day validation when editing existing event request
+    if (!isEditMode && !isDateAtLeast7DaysAway(main.date_from)) {
       console.error("Validation failed: Event date must be at least 7 days from today");
       toast.error("You have to send request at least 7 days before the event");
       setFieldErrors((prev) => ({

@@ -1289,7 +1289,7 @@ const BoardDashboard = () => {
                                 </div>
                                 {/* Only show note if it exists and is not empty */}
                                 {history.note && history.note.trim() !== "" && (
-                                  <p className="text-sm text-gray-700 mt-1">{history.note}</p>
+                                <p className="text-sm text-gray-700 mt-1">{history.note}</p>
                                 )}
                               </div>
                             ))}

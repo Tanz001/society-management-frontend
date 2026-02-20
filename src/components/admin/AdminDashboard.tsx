@@ -1574,46 +1574,46 @@ const AdminDashboard = () => {
                   />
                 </div>
                 <div className="flex gap-2">
-                  <Button
-                    variant={eventRequestFilter === "all" ? "university" : "outline"}
-                    size="sm"
-                    onClick={() => {
-                      setEventRequestFilter("all");
-                      getAllEventRequests();
-                    }}
-                  >
-                    All
-                  </Button>
-                  <Button
-                    variant={eventRequestFilter === "pending" ? "university" : "outline"}
-                    size="sm"
-                    onClick={() => {
-                      setEventRequestFilter("pending");
-                      getAllEventRequests();
-                    }}
-                  >
-                    Pending
-                  </Button>
-                  <Button
-                    variant={eventRequestFilter === "approved" ? "university" : "outline"}
-                    size="sm"
-                    onClick={() => {
-                      setEventRequestFilter("approved");
-                      getAllEventRequests();
-                    }}
-                  >
-                    Approved
-                  </Button>
-                  <Button
-                    variant={eventRequestFilter === "rejected" ? "university" : "outline"}
-                    size="sm"
-                    onClick={() => {
-                      setEventRequestFilter("rejected");
-                      getAllEventRequests();
-                    }}
-                  >
-                    Rejected
-                  </Button>
+                <Button
+                  variant={eventRequestFilter === "all" ? "university" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setEventRequestFilter("all");
+                    getAllEventRequests();
+                  }}
+                >
+                  All
+                </Button>
+                <Button
+                  variant={eventRequestFilter === "pending" ? "university" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setEventRequestFilter("pending");
+                    getAllEventRequests();
+                  }}
+                >
+                  Pending
+                </Button>
+                <Button
+                  variant={eventRequestFilter === "approved" ? "university" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setEventRequestFilter("approved");
+                    getAllEventRequests();
+                  }}
+                >
+                  Approved
+                </Button>
+                <Button
+                  variant={eventRequestFilter === "rejected" ? "university" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setEventRequestFilter("rejected");
+                    getAllEventRequests();
+                  }}
+                >
+                  Rejected
+                </Button>
                 </div>
               </div>
 
