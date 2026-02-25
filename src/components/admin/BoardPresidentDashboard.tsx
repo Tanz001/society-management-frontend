@@ -286,11 +286,12 @@ const BoardPresidentDashboard = () => {
         throw new Error("No authentication token found");
       }
 
+      // Always fetch ALL event requests for the role
       const response = await axios.post(
         `${import.meta.env.VITE_API_URL}/admin/event-requests`,
         {
           role: "board_president",
-          filter: eventRequestFilter
+          filter: "all"
         },
         {
           headers: {
@@ -300,7 +301,17 @@ const BoardPresidentDashboard = () => {
       );
 
       console.log("Event requests fetched:", response.data);
-      setEventRequests(response.data.data || []);
+      const allRequests = response.data.data || [];
+      setEventRequests(allRequests);
+
+      // Update stats locally based on the refined logic
+      setEventRequestStats({
+        total: allRequests.length,
+        pending: allRequests.filter((r: any) => [2, 16].includes(r.status_id)).length,
+        approved: allRequests.filter((r: any) => [4, 6, 8, 10, 11, 12, 13].includes(r.status_id)).length,
+        rejected: allRequests.filter((r: any) => [5, 7, 9, 14].includes(r.status_id)).length
+      });
+
       setEventRequestsCurrentPage(1); // Reset to first page when data changes
     } catch (err: any) {
       console.error("Error fetching event requests:", err);
@@ -405,7 +416,7 @@ const BoardPresidentDashboard = () => {
         setActionLoading(false);
         return;
       }
-      
+
       const response = await axios.put(
         `${API_URL}/admin/board-president/event-requests/${selectedEventRequest.req_id}/review`,
         {
@@ -420,9 +431,9 @@ const BoardPresidentDashboard = () => {
 
       console.log("Event request status updated successfully:", response.data);
 
-      // Refresh the event requests list and stats
+      // Refresh the event requests list (stats are updated locally within this call)
       await fetchAllEventRequests();
-      await fetchEventRequestStats();
+      // await fetchEventRequestStats();
 
       // Close modal
       setIsEventStatusModalOpen(false);
@@ -459,7 +470,7 @@ const BoardPresidentDashboard = () => {
   useEffect(() => {
     if (activeTab === "event-requests") {
       fetchAllEventRequests();
-      fetchEventRequestStats();
+      // fetchEventRequestStats();
     }
   }, [activeTab, eventRequestFilter]);
 
@@ -739,46 +750,34 @@ const BoardPresidentDashboard = () => {
                   />
                 </div>
                 <div className="flex gap-2">
-                <Button
-                  variant={eventRequestFilter === "all" ? "university" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setEventRequestFilter("all");
-                    fetchAllEventRequests();
-                  }}
-                >
-                  All
-                </Button>
-                <Button
-                  variant={eventRequestFilter === "pending" ? "university" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setEventRequestFilter("pending");
-                    fetchAllEventRequests();
-                  }}
-                >
-                  Pending
-                </Button>
-                <Button
-                  variant={eventRequestFilter === "approved" ? "university" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setEventRequestFilter("approved");
-                    fetchAllEventRequests();
-                  }}
-                >
-                  Approved
-                </Button>
-                <Button
-                  variant={eventRequestFilter === "rejected" ? "university" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setEventRequestFilter("rejected");
-                    fetchAllEventRequests();
-                  }}
-                >
-                  Rejected
-                </Button>
+                  <Button
+                    variant={eventRequestFilter === "all" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => setEventRequestFilter("all")}
+                  >
+                    All
+                  </Button>
+                  <Button
+                    variant={eventRequestFilter === "pending" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => setEventRequestFilter("pending")}
+                  >
+                    Pending
+                  </Button>
+                  <Button
+                    variant={eventRequestFilter === "approved" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => setEventRequestFilter("approved")}
+                  >
+                    Approved
+                  </Button>
+                  <Button
+                    variant={eventRequestFilter === "rejected" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => setEventRequestFilter("rejected")}
+                  >
+                    Rejected
+                  </Button>
                 </div>
               </div>
 
@@ -788,8 +787,18 @@ const BoardPresidentDashboard = () => {
                   <p className="text-muted-foreground">Loading event requests...</p>
                 </div>
               ) : (() => {
-                // Filter event requests based on search term
+                // Filter event requests based on both tab selection and search term
                 const filteredRequests = eventRequests.filter((request: any) => {
+                  // 1. Status Filter (Refined Logic)
+                  if (eventRequestFilter === "pending") {
+                    if (![2, 16].includes(request.status_id)) return false;
+                  } else if (eventRequestFilter === "approved") {
+                    if (![4, 6, 8, 10, 11, 12, 13].includes(request.status_id)) return false;
+                  } else if (eventRequestFilter === "rejected") {
+                    if (![5, 7, 9, 14].includes(request.status_id)) return false;
+                  }
+
+                  // 2. Search Filter
                   if (!eventRequestSearch.trim()) return true;
                   const searchLower = eventRequestSearch.toLowerCase();
                   return (
@@ -804,77 +813,77 @@ const BoardPresidentDashboard = () => {
 
                 return filteredRequests.length > 0 ? (
                   <>
-                <div className="grid gap-4">
+                    <div className="grid gap-4">
                       {filteredRequests.slice((eventRequestsCurrentPage - 1) * itemsPerPage, eventRequestsCurrentPage * itemsPerPage).map((request) => (
-                    <Card key={request.req_id} className="p-4 shadow-card">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center mb-2 flex-wrap gap-2">
-                            <h3 className="text-lg font-semibold text-university-navy">{request.title}</h3>
-                            {request.status_name && (
-                              <Badge variant={request.status_id === 2 ? "default" : request.status_id === 3 ? "destructive" : "secondary"}>
-                                {request.status_name}
-                              </Badge>
-                            )}
-                            {request.society_name && (
-                              <Badge variant="outline">{request.society_name}</Badge>
-                            )}
-                          </div>
-                          <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                            {request.description}
-                          </p>
-                          <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mb-2">
-                            <span>📅 {new Date(request.event_date).toLocaleDateString()}</span>
-                            <span>🕐 {request.event_time}</span>
-                            <span>📍 {request.venue}</span>
-                            {request.firstName && request.lastName && (
-                              <span>👤 {request.firstName} {request.lastName}</span>
-                            )}
-                          </div>
-                          {request.note && (
-                            <div className="bg-blue-50 border-l-4 border-blue-200 p-2 mt-2 rounded">
-                              <p className="text-xs font-medium text-blue-900 mb-1">Note:</p>
-                              <p className="text-xs text-blue-800">{request.note}</p>
+                        <Card key={request.req_id} className="p-4 shadow-card">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center mb-2 flex-wrap gap-2">
+                                <h3 className="text-lg font-semibold text-university-navy">{request.title}</h3>
+                                {request.status_name && (
+                                  <Badge variant={request.status_id === 2 ? "default" : request.status_id === 3 ? "destructive" : "secondary"}>
+                                    {request.status_name}
+                                  </Badge>
+                                )}
+                                {request.society_name && (
+                                  <Badge variant="outline">{request.society_name}</Badge>
+                                )}
+                              </div>
+                              <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                                {request.description}
+                              </p>
+                              <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mb-2">
+                                <span>📅 {new Date(request.event_date).toLocaleDateString()}</span>
+                                <span>🕐 {request.event_time}</span>
+                                <span>📍 {request.venue}</span>
+                                {request.firstName && request.lastName && (
+                                  <span>👤 {request.firstName} {request.lastName}</span>
+                                )}
+                              </div>
+                              {request.note && (
+                                <div className="bg-blue-50 border-l-4 border-blue-200 p-2 mt-2 rounded">
+                                  <p className="text-xs font-medium text-blue-900 mb-1">Note:</p>
+                                  <p className="text-xs text-blue-800">{request.note}</p>
+                                </div>
+                              )}
+                              <div className="flex items-center text-xs text-muted-foreground mt-2">
+                                <Clock className="h-3 w-3 mr-1" />
+                                Created: {new Date(request.created_at).toLocaleString()}
+                              </div>
                             </div>
-                          )}
-                          <div className="flex items-center text-xs text-muted-foreground mt-2">
-                            <Clock className="h-3 w-3 mr-1" />
-                            Created: {new Date(request.created_at).toLocaleString()}
+                            <div className="flex items-start gap-2 ml-4">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8 p-0"
+                                  >
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem
+                                    onClick={() => handleViewEventRequest(request.req_id)}
+                                    disabled={loadingEventRequests}
+                                  >
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    View Details
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => handleChangeEventStatus(request)}
+                                    disabled={loadingEventRequests}
+                                  >
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    Update Status
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
                           </div>
-                        </div>
-                        <div className="flex items-start gap-2 ml-4">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0"
-                              >
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={() => handleViewEventRequest(request.req_id)}
-                                disabled={loadingEventRequests}
-                              >
-                                <Eye className="h-4 w-4 mr-2" />
-                                View Details
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => handleChangeEventStatus(request)}
-                                disabled={loadingEventRequests}
-                              >
-                                <Edit className="h-4 w-4 mr-2" />
-                                Update Status
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
+                        </Card>
+                      ))}
+                    </div>
 
                     {/* Pagination for Event Requests */}
                     {filteredRequests.length > itemsPerPage && (
@@ -930,14 +939,14 @@ const BoardPresidentDashboard = () => {
                       </div>
                     )}
                   </>
-              ) : (
-                <div className="text-center py-12">
-                  <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                  <h3 className="text-lg font-medium mb-2">No Event Requests Found</h3>
-                  <p className="text-muted-foreground">
+                ) : (
+                  <div className="text-center py-12">
+                    <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                    <h3 className="text-lg font-medium mb-2">No Event Requests Found</h3>
+                    <p className="text-muted-foreground">
                       {eventRequestSearch ? `No event requests match "${eventRequestSearch}"` : "No event requests have been submitted yet."}
-                  </p>
-                </div>
+                    </p>
+                  </div>
                 );
               })()}
             </TabsContent>

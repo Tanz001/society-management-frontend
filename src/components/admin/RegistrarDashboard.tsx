@@ -382,12 +382,13 @@ const RegistrarDashboard = () => {
         throw new Error("No authentication token found");
       }
 
+      // Always fetch ALL event requests for the role
       const response = await axios.post(
         `${API_URL}/admin/event-requests`,  // ✅ POST
         {
           role: currentUser?.role || "registrar",
-          filter: eventRequestFilter
-        },                   // ✅ send role in body
+          filter: "all"
+        },
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -396,7 +397,17 @@ const RegistrarDashboard = () => {
       );
 
       console.log("Event requests fetched:", response.data);
-      setEventRequests(response.data.data || []);
+      const allRequests = response.data.data || [];
+      setEventRequests(allRequests);
+
+      // Update stats locally based on the refined logic
+      setEventRequestStats({
+        total: allRequests.length,
+        pending: allRequests.filter((r: any) => [4, 17].includes(r.status_id)).length,
+        approved: allRequests.filter((r: any) => [6, 8, 10, 11, 12, 13].includes(r.status_id)).length,
+        rejected: allRequests.filter((r: any) => [7, 9, 14].includes(r.status_id)).length
+      });
+
       setEventRequestsCurrentPage(1); // Reset to first page when data changes
     } catch (err: any) {
       console.error("Error fetching event requests:", err);
@@ -501,7 +512,7 @@ const RegistrarDashboard = () => {
         setActionLoading(false);
         return;
       }
-      
+
       const response = await axios.put(
         `${API_URL}/admin/registrar/event-requests/${selectedEventRequest.req_id}/review`,
         {
@@ -554,7 +565,7 @@ const RegistrarDashboard = () => {
   useEffect(() => {
     if (activeTab === "event-requests") {
       fetchAllEventRequests();
-      fetchEventRequestStats();
+      // fetchEventRequestStats();
     }
   }, [activeTab, eventRequestFilter]);
 
@@ -1040,47 +1051,35 @@ const RegistrarDashboard = () => {
                     className="pl-10"
                   />
                 </div>
-              <div className="flex gap-2">
-                <Button
-                  variant={eventRequestFilter === "all" ? "university" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setEventRequestFilter("all");
-                    fetchAllEventRequests();
-                  }}
-                >
-                  All
-                </Button>
-                <Button
-                  variant={eventRequestFilter === "pending" ? "university" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setEventRequestFilter("pending");
-                    fetchAllEventRequests();
-                  }}
-                >
-                  Pending
-                </Button>
-                <Button
-                  variant={eventRequestFilter === "approved" ? "university" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setEventRequestFilter("approved");
-                    fetchAllEventRequests();
-                  }}
-                >
-                  Approved
-                </Button>
-                <Button
-                  variant={eventRequestFilter === "rejected" ? "university" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setEventRequestFilter("rejected");
-                    fetchAllEventRequests();
-                  }}
-                >
-                  Rejected
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant={eventRequestFilter === "all" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => setEventRequestFilter("all")}
+                  >
+                    All
+                  </Button>
+                  <Button
+                    variant={eventRequestFilter === "pending" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => setEventRequestFilter("pending")}
+                  >
+                    Pending
+                  </Button>
+                  <Button
+                    variant={eventRequestFilter === "approved" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => setEventRequestFilter("approved")}
+                  >
+                    Approved
+                  </Button>
+                  <Button
+                    variant={eventRequestFilter === "rejected" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => setEventRequestFilter("rejected")}
+                  >
+                    Rejected
+                  </Button>
                 </div>
               </div>
 
@@ -1091,8 +1090,18 @@ const RegistrarDashboard = () => {
                   <p className="text-muted-foreground">Loading event requests...</p>
                 </div>
               ) : (() => {
-                // Filter event requests based on search term
+                // Filter event requests based on both tab selection and search term
                 const filteredRequests = eventRequests.filter((request: any) => {
+                  // 1. Status Filter (Refined Logic)
+                  if (eventRequestFilter === "pending") {
+                    if (![4, 17].includes(request.status_id)) return false;
+                  } else if (eventRequestFilter === "approved") {
+                    if (![6, 8, 10, 11, 12, 13].includes(request.status_id)) return false;
+                  } else if (eventRequestFilter === "rejected") {
+                    if (![7, 9, 14].includes(request.status_id)) return false;
+                  }
+
+                  // 2. Search Filter
                   if (!eventRequestSearch.trim()) return true;
                   const searchLower = eventRequestSearch.toLowerCase();
                   return (
@@ -1106,158 +1115,158 @@ const RegistrarDashboard = () => {
                 });
 
                 return filteredRequests.length > 0 ? (
-                <>
-                  <div className="grid gap-6">
+                  <>
+                    <div className="grid gap-6">
                       {filteredRequests.slice((eventRequestsCurrentPage - 1) * itemsPerPage, eventRequestsCurrentPage * itemsPerPage).map((request: any) => (
-                      <Card key={request.req_id} className="p-6 shadow-card hover:shadow-lg transition-shadow">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-start space-x-4 flex-1">
-                            <div className="w-16 h-16 bg-university-navy/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                              <Calendar className="h-8 w-8 text-university-navy" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center mb-2 flex-wrap gap-2">
-                                <h3 className="text-xl font-semibold text-university-navy">{request.title}</h3>
-                                <Badge
-                                  variant={
-                                    request.status_id === 6 ? 'default' :
-                                      request.status_id === 4 ? 'default' :
-                                        request.status_id === 2 ? 'default' :
-                                          request.status_id === 1 ? 'secondary' :
-                                            'destructive'
-                                  }
-                                  className={
-                                    request.status_id === 6 ? 'bg-green-600' :
-                                      request.status_id === 4 ? 'bg-blue-600' :
-                                        request.status_id === 2 ? 'bg-green-600' :
-                                          ''
-                                  }
-                                >
-                                  {request.status_name}
-                                </Badge>
-                                {request.society_name && (
-                                  <Badge variant="outline">{request.society_name}</Badge>
-                                )}
+                        <Card key={request.req_id} className="p-6 shadow-card hover:shadow-lg transition-shadow">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-start space-x-4 flex-1">
+                              <div className="w-16 h-16 bg-university-navy/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                                <Calendar className="h-8 w-8 text-university-navy" />
                               </div>
-                              <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                                {request.description}
-                              </p>
-                              <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mb-2">
-                                <span>📅 {new Date(request.event_date).toLocaleDateString()}</span>
-                                <span>🕐 {request.event_time}</span>
-                                <span>📍 {request.venue}</span>
-                                {request.firstName && request.lastName && (
-                                  <span>👤 {request.firstName} {request.lastName}</span>
-                                )}
-                              </div>
-                              {request.note && (
-                                <div className="bg-blue-50 border-l-4 border-blue-200 p-2 mt-2 rounded">
-                                  <p className="text-xs font-medium text-blue-900 mb-1">Note:</p>
-                                  <p className="text-xs text-blue-800">{request.note}</p>
-                                </div>
-                              )}
-                              <div className="flex items-center text-xs text-muted-foreground mt-2">
-                                <Clock className="h-3 w-3 mr-1" />
-                                Created: {new Date(request.created_at).toLocaleString()}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex items-start gap-2 ml-4">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 w-8 p-0"
-                                >
-                                  <MoreVertical className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem
-                                  onClick={() => handleViewEventRequest(request.req_id)}
-                                  disabled={loadingEventRequests}
-                                >
-                                  <Eye className="h-4 w-4 mr-2" />
-                                  View Details
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => handleChangeEventStatus(request)}
-                                  disabled={loadingEventRequests}
-                                >
-                                  <Edit className="h-4 w-4 mr-2" />
-                                  Update Status
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        </div>
-                      </Card>
-                    ))}
-                  </div>
-
-                  {/* Pagination for Event Requests */}
-                    {filteredRequests.length > itemsPerPage && (
-                    <div className="flex items-center justify-between mt-6">
-                      <div className="text-sm text-muted-foreground">
-                          Showing {(eventRequestsCurrentPage - 1) * itemsPerPage + 1} to {Math.min(eventRequestsCurrentPage * itemsPerPage, filteredRequests.length)} of {filteredRequests.length} event requests
-                      </div>
-                      <Pagination>
-                        <PaginationContent>
-                          <PaginationItem>
-                            <PaginationPrevious
-                              onClick={() => setEventRequestsCurrentPage(prev => Math.max(1, prev - 1))}
-                              className={eventRequestsCurrentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                            />
-                          </PaginationItem>
-                            {Array.from({ length: Math.ceil(filteredRequests.length / itemsPerPage) }, (_, i) => i + 1)
-                            .filter(page => {
-                              return page === 1 ||
-                                  page === Math.ceil(filteredRequests.length / itemsPerPage) ||
-                                (page >= eventRequestsCurrentPage - 1 && page <= eventRequestsCurrentPage + 1);
-                            })
-                            .map((page, idx, array) => {
-                              const prevPage = array[idx - 1];
-                              const showEllipsisBefore = prevPage && page - prevPage > 1;
-
-                              return (
-                                <React.Fragment key={page}>
-                                  {showEllipsisBefore && (
-                                    <PaginationItem>
-                                      <PaginationEllipsis />
-                                    </PaginationItem>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center mb-2 flex-wrap gap-2">
+                                  <h3 className="text-xl font-semibold text-university-navy">{request.title}</h3>
+                                  <Badge
+                                    variant={
+                                      request.status_id === 6 ? 'default' :
+                                        request.status_id === 4 ? 'default' :
+                                          request.status_id === 2 ? 'default' :
+                                            request.status_id === 1 ? 'secondary' :
+                                              'destructive'
+                                    }
+                                    className={
+                                      request.status_id === 6 ? 'bg-green-600' :
+                                        request.status_id === 4 ? 'bg-blue-600' :
+                                          request.status_id === 2 ? 'bg-green-600' :
+                                            ''
+                                    }
+                                  >
+                                    {request.status_name}
+                                  </Badge>
+                                  {request.society_name && (
+                                    <Badge variant="outline">{request.society_name}</Badge>
                                   )}
-                                  <PaginationItem>
-                                    <PaginationLink
-                                      onClick={() => setEventRequestsCurrentPage(page)}
-                                      isActive={eventRequestsCurrentPage === page}
-                                      className="cursor-pointer"
-                                    >
-                                      {page}
-                                    </PaginationLink>
-                                  </PaginationItem>
-                                </React.Fragment>
-                              );
-                            })}
-                          <PaginationItem>
-                            <PaginationNext
+                                </div>
+                                <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                                  {request.description}
+                                </p>
+                                <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mb-2">
+                                  <span>📅 {new Date(request.event_date).toLocaleDateString()}</span>
+                                  <span>🕐 {request.event_time}</span>
+                                  <span>📍 {request.venue}</span>
+                                  {request.firstName && request.lastName && (
+                                    <span>👤 {request.firstName} {request.lastName}</span>
+                                  )}
+                                </div>
+                                {request.note && (
+                                  <div className="bg-blue-50 border-l-4 border-blue-200 p-2 mt-2 rounded">
+                                    <p className="text-xs font-medium text-blue-900 mb-1">Note:</p>
+                                    <p className="text-xs text-blue-800">{request.note}</p>
+                                  </div>
+                                )}
+                                <div className="flex items-center text-xs text-muted-foreground mt-2">
+                                  <Clock className="h-3 w-3 mr-1" />
+                                  Created: {new Date(request.created_at).toLocaleString()}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-start gap-2 ml-4">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8 p-0"
+                                  >
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem
+                                    onClick={() => handleViewEventRequest(request.req_id)}
+                                    disabled={loadingEventRequests}
+                                  >
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    View Details
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => handleChangeEventStatus(request)}
+                                    disabled={loadingEventRequests}
+                                  >
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    Update Status
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+
+                    {/* Pagination for Event Requests */}
+                    {filteredRequests.length > itemsPerPage && (
+                      <div className="flex items-center justify-between mt-6">
+                        <div className="text-sm text-muted-foreground">
+                          Showing {(eventRequestsCurrentPage - 1) * itemsPerPage + 1} to {Math.min(eventRequestsCurrentPage * itemsPerPage, filteredRequests.length)} of {filteredRequests.length} event requests
+                        </div>
+                        <Pagination>
+                          <PaginationContent>
+                            <PaginationItem>
+                              <PaginationPrevious
+                                onClick={() => setEventRequestsCurrentPage(prev => Math.max(1, prev - 1))}
+                                className={eventRequestsCurrentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                              />
+                            </PaginationItem>
+                            {Array.from({ length: Math.ceil(filteredRequests.length / itemsPerPage) }, (_, i) => i + 1)
+                              .filter(page => {
+                                return page === 1 ||
+                                  page === Math.ceil(filteredRequests.length / itemsPerPage) ||
+                                  (page >= eventRequestsCurrentPage - 1 && page <= eventRequestsCurrentPage + 1);
+                              })
+                              .map((page, idx, array) => {
+                                const prevPage = array[idx - 1];
+                                const showEllipsisBefore = prevPage && page - prevPage > 1;
+
+                                return (
+                                  <React.Fragment key={page}>
+                                    {showEllipsisBefore && (
+                                      <PaginationItem>
+                                        <PaginationEllipsis />
+                                      </PaginationItem>
+                                    )}
+                                    <PaginationItem>
+                                      <PaginationLink
+                                        onClick={() => setEventRequestsCurrentPage(page)}
+                                        isActive={eventRequestsCurrentPage === page}
+                                        className="cursor-pointer"
+                                      >
+                                        {page}
+                                      </PaginationLink>
+                                    </PaginationItem>
+                                  </React.Fragment>
+                                );
+                              })}
+                            <PaginationItem>
+                              <PaginationNext
                                 onClick={() => setEventRequestsCurrentPage(prev => Math.min(Math.ceil(filteredRequests.length / itemsPerPage), prev + 1))}
                                 className={eventRequestsCurrentPage >= Math.ceil(filteredRequests.length / itemsPerPage) ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                            />
-                          </PaginationItem>
-                        </PaginationContent>
-                      </Pagination>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="text-center py-12">
-                  <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                  <h3 className="text-lg font-medium mb-2">No Event Requests Found</h3>
-                  <p className="text-muted-foreground">
+                              />
+                            </PaginationItem>
+                          </PaginationContent>
+                        </Pagination>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-center py-12">
+                    <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                    <h3 className="text-lg font-medium mb-2">No Event Requests Found</h3>
+                    <p className="text-muted-foreground">
                       {eventRequestSearch ? `No event requests match "${eventRequestSearch}"` : "No event requests have been submitted yet."}
-                  </p>
-                </div>
+                    </p>
+                  </div>
                 );
               })()}
             </TabsContent>
@@ -2069,7 +2078,7 @@ const RegistrarDashboard = () => {
                                 </div>
                                 {/* Only show note if it exists and is not empty */}
                                 {history.note && history.note.trim() !== "" && (
-                                <p className="text-sm text-gray-700 mt-1">{history.note}</p>
+                                  <p className="text-sm text-gray-700 mt-1">{history.note}</p>
                                 )}
                               </div>
                             ))}

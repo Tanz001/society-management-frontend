@@ -833,11 +833,13 @@ const BoardSecretaryDashboard = () => {
         throw new Error("No authentication token found");
       }
 
+      // Always fetch ALL event requests for the role
+      // Local filtering will be handled on the frontend
       const response = await axios.post(
         `${import.meta.env.VITE_API_URL}/admin/event-requests`,
         {
           role: "board_secretary",
-          filter: eventRequestFilter
+          filter: "all"
         },
         {
           headers: {
@@ -847,8 +849,18 @@ const BoardSecretaryDashboard = () => {
       );
 
       console.log("Event requests fetched:", response.data);
-      setEventRequests(response.data.data || []);
-      setEventRequestsCurrentPage(1); // Reset to first page when data changes
+      const allRequests = response.data.data || [];
+      setEventRequests(allRequests);
+
+      // Update stats locally based on the refined logic
+      setEventRequestStats({
+        total: allRequests.length,
+        pending: allRequests.filter((r: any) => [1, 15].includes(r.status_id)).length,
+        approved: allRequests.filter((r: any) => [2, 4, 6, 8, 10, 11, 12, 13].includes(r.status_id)).length,
+        rejected: allRequests.filter((r: any) => [3, 5, 7, 9, 14].includes(r.status_id)).length
+      });
+
+      setEventRequestsCurrentPage(1);
     } catch (err: any) {
       console.error("Error fetching event requests:", err);
       setError(err.response?.data?.message || err.message || "Failed to fetch event requests");
@@ -926,7 +938,7 @@ const BoardSecretaryDashboard = () => {
         setActionLoading(false);
         return;
       }
-      
+
       const response = await axios.put(
         `${import.meta.env.VITE_API_URL}/admin/board-secretary/event-requests/${selectedEventRequest.req_id}/review`,
         {
@@ -941,9 +953,9 @@ const BoardSecretaryDashboard = () => {
 
       console.log("Event request status updated successfully:", response.data);
 
-      // Refresh the event requests list and stats
+      // Refresh the event requests list (stats are updated locally within this call)
       await fetchAllEventRequests();
-      await fetchEventRequestStats();
+      // await fetchEventRequestStats();
 
       // Close modal
       setIsEventStatusModalOpen(false);
@@ -1009,7 +1021,7 @@ const BoardSecretaryDashboard = () => {
   useEffect(() => {
     if (activeTab === "event-requests") {
       fetchAllEventRequests();
-      fetchEventRequestStats();
+      // fetchEventRequestStats();
     }
     // if (activeTab === "faculty") {
     //   fetchAllFaculty();
@@ -1379,46 +1391,34 @@ const BoardSecretaryDashboard = () => {
                   />
                 </div>
                 <div className="flex gap-2">
-                <Button
-                  variant={eventRequestFilter === "all" ? "university" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setEventRequestFilter("all");
-                    fetchAllEventRequests();
-                  }}
-                >
-                  All
-                </Button>
-                <Button
-                  variant={eventRequestFilter === "pending" ? "university" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setEventRequestFilter("pending");
-                    fetchAllEventRequests();
-                  }}
-                >
-                  Pending
-                </Button>
-                <Button
-                  variant={eventRequestFilter === "approved" ? "university" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setEventRequestFilter("approved");
-                    fetchAllEventRequests();
-                  }}
-                >
-                  Approved
-                </Button>
-                <Button
-                  variant={eventRequestFilter === "rejected" ? "university" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setEventRequestFilter("rejected");
-                    fetchAllEventRequests();
-                  }}
-                >
-                  Rejected
-                </Button>
+                  <Button
+                    variant={eventRequestFilter === "all" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => setEventRequestFilter("all")}
+                  >
+                    All
+                  </Button>
+                  <Button
+                    variant={eventRequestFilter === "pending" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => setEventRequestFilter("pending")}
+                  >
+                    Pending
+                  </Button>
+                  <Button
+                    variant={eventRequestFilter === "approved" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => setEventRequestFilter("approved")}
+                  >
+                    Approved
+                  </Button>
+                  <Button
+                    variant={eventRequestFilter === "rejected" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => setEventRequestFilter("rejected")}
+                  >
+                    Rejected
+                  </Button>
                 </div>
               </div>
 
@@ -1428,8 +1428,18 @@ const BoardSecretaryDashboard = () => {
                   <p className="text-muted-foreground">Loading event requests...</p>
                 </div>
               ) : (() => {
-                // Filter event requests based on search term
+                // Filter event requests based on both tab selection and search term
                 const filteredRequests = eventRequests.filter((request: any) => {
+                  // 1. Status Filter (Refined Logic)
+                  if (eventRequestFilter === "pending") {
+                    if (![1, 15].includes(request.status_id)) return false;
+                  } else if (eventRequestFilter === "approved") {
+                    if (![2, 4, 6, 8, 10, 11, 12, 13].includes(request.status_id)) return false;
+                  } else if (eventRequestFilter === "rejected") {
+                    if (![3, 5, 7, 9, 14].includes(request.status_id)) return false;
+                  }
+
+                  // 2. Search Filter
                   if (!eventRequestSearch.trim()) return true;
                   const searchLower = eventRequestSearch.toLowerCase();
                   return (
@@ -1443,152 +1453,152 @@ const BoardSecretaryDashboard = () => {
                 });
 
                 return filteredRequests.length > 0 ? (
-                <>
-                  <div className="grid gap-4">
+                  <>
+                    <div className="grid gap-4">
                       {filteredRequests.slice((eventRequestsCurrentPage - 1) * itemsPerPage, eventRequestsCurrentPage * itemsPerPage).map((request) => (
-                      <Card key={request.req_id} className="p-4 shadow-card">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center mb-2 flex-wrap gap-2">
-                              <h3 className="text-lg font-semibold text-university-navy">{request.title}</h3>
-                              {request.status_name && (
-                                <Badge variant={request.status_id === 2 ? "default" : request.status_id === 3 ? "destructive" : "secondary"}>
-                                  {request.status_name}
-                                </Badge>
-                              )}
-                              {request.society_name && (
-                                <Badge variant="outline">{request.society_name}</Badge>
-                              )}
-                            </div>
-                            <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                              {request.description}
-                            </p>
-                            <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mb-2">
-                              <span>📅 {new Date(request.event_date).toLocaleDateString()}</span>
-                              <span>🕐 {request.event_time ? formatTimeToAMPM(request.event_time) : request.time_from ? formatTimeToAMPM(request.time_from) : "N/A"}</span>
-                              <span>📍 {request.venue}</span>
-                              {request.firstName && request.lastName && (
-                                <span>👤 {request.firstName} {request.lastName}</span>
-                              )}
-                            </div>
-                            {request.note && (
-                              <div className="bg-blue-50 border-l-4 border-blue-200 p-2 mt-2 rounded">
-                                <p className="text-xs font-medium text-blue-900 mb-1">Note:</p>
-                                <p className="text-xs text-blue-800">{request.note}</p>
-                              </div>
-                            )}
-                            {request.cancelled_reason && (
-                              <div className="bg-red-50 border-l-4 border-red-200 p-2 mt-2 rounded">
-                                <p className="text-xs font-medium text-red-900 mb-1">Cancellation Reason:</p>
-                                <p className="text-xs text-red-800">{request.cancelled_reason}</p>
-                                {request.cancelled_at && (
-                                  <p className="text-xs text-red-600 mt-1">
-                                    Cancelled on: {new Date(request.cancelled_at).toLocaleString()}
-                                  </p>
+                        <Card key={request.req_id} className="p-4 shadow-card">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center mb-2 flex-wrap gap-2">
+                                <h3 className="text-lg font-semibold text-university-navy">{request.title}</h3>
+                                {request.status_name && (
+                                  <Badge variant={request.status_id === 2 ? "default" : request.status_id === 3 ? "destructive" : "secondary"}>
+                                    {request.status_name}
+                                  </Badge>
+                                )}
+                                {request.society_name && (
+                                  <Badge variant="outline">{request.society_name}</Badge>
                                 )}
                               </div>
-                            )}
-                            <div className="flex items-center text-xs text-muted-foreground mt-2">
-                              <Clock className="h-3 w-3 mr-1" />
-                              Created: {new Date(request.created_at).toLocaleString()}
+                              <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                                {request.description}
+                              </p>
+                              <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mb-2">
+                                <span>📅 {new Date(request.event_date).toLocaleDateString()}</span>
+                                <span>🕐 {request.event_time ? formatTimeToAMPM(request.event_time) : request.time_from ? formatTimeToAMPM(request.time_from) : "N/A"}</span>
+                                <span>📍 {request.venue}</span>
+                                {request.firstName && request.lastName && (
+                                  <span>👤 {request.firstName} {request.lastName}</span>
+                                )}
+                              </div>
+                              {request.note && (
+                                <div className="bg-blue-50 border-l-4 border-blue-200 p-2 mt-2 rounded">
+                                  <p className="text-xs font-medium text-blue-900 mb-1">Note:</p>
+                                  <p className="text-xs text-blue-800">{request.note}</p>
+                                </div>
+                              )}
+                              {request.cancelled_reason && (
+                                <div className="bg-red-50 border-l-4 border-red-200 p-2 mt-2 rounded">
+                                  <p className="text-xs font-medium text-red-900 mb-1">Cancellation Reason:</p>
+                                  <p className="text-xs text-red-800">{request.cancelled_reason}</p>
+                                  {request.cancelled_at && (
+                                    <p className="text-xs text-red-600 mt-1">
+                                      Cancelled on: {new Date(request.cancelled_at).toLocaleString()}
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+                              <div className="flex items-center text-xs text-muted-foreground mt-2">
+                                <Clock className="h-3 w-3 mr-1" />
+                                Created: {new Date(request.created_at).toLocaleString()}
+                              </div>
+                            </div>
+                            <div className="flex items-start gap-2 ml-4">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8 p-0"
+                                  >
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem
+                                    onClick={() => handleViewEventRequest(request.req_id)}
+                                    disabled={loadingEventRequests}
+                                  >
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    View Details
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => handleChangeEventStatus(request)}
+                                    disabled={loadingEventRequests}
+                                  >
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    Update Status
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </div>
                           </div>
-                          <div className="flex items-start gap-2 ml-4">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 w-8 p-0"
-                                >
-                                  <MoreVertical className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem
-                                  onClick={() => handleViewEventRequest(request.req_id)}
-                                  disabled={loadingEventRequests}
-                                >
-                                  <Eye className="h-4 w-4 mr-2" />
-                                  View Details
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => handleChangeEventStatus(request)}
-                                  disabled={loadingEventRequests}
-                                >
-                                  <Edit className="h-4 w-4 mr-2" />
-                                  Update Status
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        </div>
-                      </Card>
-                    ))}
-                  </div>
+                        </Card>
+                      ))}
+                    </div>
 
-                  {/* Pagination for Event Requests */}
+                    {/* Pagination for Event Requests */}
                     {filteredRequests.length > itemsPerPage && (
-                    <div className="flex items-center justify-between mt-6">
-                      <div className="text-sm text-muted-foreground">
+                      <div className="flex items-center justify-between mt-6">
+                        <div className="text-sm text-muted-foreground">
                           Showing {(eventRequestsCurrentPage - 1) * itemsPerPage + 1} to {Math.min(eventRequestsCurrentPage * itemsPerPage, filteredRequests.length)} of {filteredRequests.length} event requests
-                      </div>
-                      <Pagination>
-                        <PaginationContent>
-                          <PaginationItem>
-                            <PaginationPrevious
-                              onClick={() => setEventRequestsCurrentPage(prev => Math.max(1, prev - 1))}
-                              className={eventRequestsCurrentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                            />
-                          </PaginationItem>
+                        </div>
+                        <Pagination>
+                          <PaginationContent>
+                            <PaginationItem>
+                              <PaginationPrevious
+                                onClick={() => setEventRequestsCurrentPage(prev => Math.max(1, prev - 1))}
+                                className={eventRequestsCurrentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                              />
+                            </PaginationItem>
                             {Array.from({ length: Math.ceil(filteredRequests.length / itemsPerPage) }, (_, i) => i + 1)
-                            .filter(page => {
-                              return page === 1 ||
+                              .filter(page => {
+                                return page === 1 ||
                                   page === Math.ceil(filteredRequests.length / itemsPerPage) ||
-                                (page >= eventRequestsCurrentPage - 1 && page <= eventRequestsCurrentPage + 1);
-                            })
-                            .map((page, idx, array) => {
-                              const prevPage = array[idx - 1];
-                              const showEllipsisBefore = prevPage && page - prevPage > 1;
+                                  (page >= eventRequestsCurrentPage - 1 && page <= eventRequestsCurrentPage + 1);
+                              })
+                              .map((page, idx, array) => {
+                                const prevPage = array[idx - 1];
+                                const showEllipsisBefore = prevPage && page - prevPage > 1;
 
-                              return (
-                                <React.Fragment key={page}>
-                                  {showEllipsisBefore && (
+                                return (
+                                  <React.Fragment key={page}>
+                                    {showEllipsisBefore && (
+                                      <PaginationItem>
+                                        <PaginationEllipsis />
+                                      </PaginationItem>
+                                    )}
                                     <PaginationItem>
-                                      <PaginationEllipsis />
+                                      <PaginationLink
+                                        onClick={() => setEventRequestsCurrentPage(page)}
+                                        isActive={eventRequestsCurrentPage === page}
+                                        className="cursor-pointer"
+                                      >
+                                        {page}
+                                      </PaginationLink>
                                     </PaginationItem>
-                                  )}
-                                  <PaginationItem>
-                                    <PaginationLink
-                                      onClick={() => setEventRequestsCurrentPage(page)}
-                                      isActive={eventRequestsCurrentPage === page}
-                                      className="cursor-pointer"
-                                    >
-                                      {page}
-                                    </PaginationLink>
-                                  </PaginationItem>
-                                </React.Fragment>
-                              );
-                            })}
-                          <PaginationItem>
-                            <PaginationNext
+                                  </React.Fragment>
+                                );
+                              })}
+                            <PaginationItem>
+                              <PaginationNext
                                 onClick={() => setEventRequestsCurrentPage(prev => Math.min(Math.ceil(filteredRequests.length / itemsPerPage), prev + 1))}
                                 className={eventRequestsCurrentPage >= Math.ceil(filteredRequests.length / itemsPerPage) ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                            />
-                          </PaginationItem>
-                        </PaginationContent>
-                      </Pagination>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="text-center py-12">
-                  <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                  <h3 className="text-lg font-medium mb-2">No Event Requests Found</h3>
-                  <p className="text-muted-foreground">
+                              />
+                            </PaginationItem>
+                          </PaginationContent>
+                        </Pagination>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-center py-12">
+                    <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                    <h3 className="text-lg font-medium mb-2">No Event Requests Found</h3>
+                    <p className="text-muted-foreground">
                       {eventRequestSearch ? `No event requests match "${eventRequestSearch}"` : "No event requests have been submitted yet."}
-                  </p>
-                </div>
+                    </p>
+                  </div>
                 );
               })()}
             </TabsContent>
@@ -2455,7 +2465,11 @@ const BoardSecretaryDashboard = () => {
           )}
         </DialogContent>
       </Dialog>
-    </div >
+      <ChangePasswordDialog
+        isOpen={isPasswordModalOpen}
+        onOpenChange={setIsPasswordModalOpen}
+      />
+    </div>
   );
 };
 

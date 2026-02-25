@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Calendar, Clock, FileText, Building, Users, Eye, MapPin } from "lucide-react";
+import { Calendar, Clock, FileText, Building, Users, Eye, MapPin, FileDown } from "lucide-react";
 
 interface AdminEventReportsSectionProps {
   isActive: boolean;
@@ -16,9 +16,34 @@ const AdminEventReportsSection = ({ isActive }: AdminEventReportsSectionProps) =
   const [selectedReport, setSelectedReport] = useState<any | null>(null);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [loadingReportDetails, setLoadingReportDetails] = useState(false);
+  const [pdfLoadingId, setPdfLoadingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const hasFetchedRef = useRef(false);
   const previousIsActiveRef = useRef(false);
+
+  const API_URL = import.meta.env.VITE_API_URL;
+
+  const handleDownloadPdf = useCallback(async (reportId: number) => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    setPdfLoadingId(reportId);
+    try {
+      const response = await axios.get(`${API_URL}/admin/event-reports/${reportId}/pdf?download=1`, {
+        responseType: "blob",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const url = URL.createObjectURL(response.data);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `GCU-Activity-Report-${reportId}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError("Failed to download PDF");
+    } finally {
+      setPdfLoadingId(null);
+    }
+  }, [API_URL]);
 
   const fetchAllEventReports = useCallback(async () => {
     try {
@@ -189,11 +214,22 @@ const AdminEventReportsSection = ({ isActive }: AdminEventReportsSectionProps) =
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => window.open(`${import.meta.env.VITE_API_URL}/${report.report_file}`, "_blank")}
+                    onClick={() => handleDownloadPdf(report.report_id)}
+                    disabled={pdfLoadingId === report.report_id}
                   >
-                    <FileText className="h-4 w-4 mr-2" />
-                    Download
+                    <FileDown className="h-4 w-4 mr-2" />
+                    {pdfLoadingId === report.report_id ? "Loading..." : "Download PDF"}
                   </Button>
+                  {report.report_file && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => window.open(`${API_URL}/${report.report_file}`, "_blank")}
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      Download File
+                    </Button>
+                  )}
                 </div>
               </div>
             </Card>
@@ -305,21 +341,73 @@ const AdminEventReportsSection = ({ isActive }: AdminEventReportsSectionProps) =
 
               {selectedReport.report_description && (
                 <Card className="p-4">
-                  <h3 className="font-semibold mb-3 text-university-navy">Report Description</h3>
+                  <h3 className="font-semibold mb-3 text-university-navy">Activity Details</h3>
                   <p className="text-muted-foreground leading-relaxed">{selectedReport.report_description}</p>
                 </Card>
               )}
 
+              {(selectedReport.attendance_details || selectedReport.key_takeaways || selectedReport.discourse_gist) && (
+                <Card className="p-4">
+                  <h3 className="font-semibold mb-3 text-university-navy">Activity Report</h3>
+                  <div className="space-y-4 text-sm">
+                    {selectedReport.president_name && (
+                      <div>
+                        <span className="text-muted-foreground">President: </span>
+                        <span className="font-medium">{selectedReport.president_name}</span>
+                      </div>
+                    )}
+                    {selectedReport.advisor_name && (
+                      <div>
+                        <span className="text-muted-foreground">Advisor: </span>
+                        <span className="font-medium">{selectedReport.advisor_name}</span>
+                      </div>
+                    )}
+                    {selectedReport.attendance_details && (
+                      <div>
+                        <span className="text-muted-foreground block mb-1">Attendance Details:</span>
+                        <p className="text-muted-foreground leading-relaxed">{selectedReport.attendance_details}</p>
+                      </div>
+                    )}
+                    {selectedReport.key_takeaways && (
+                      <div>
+                        <span className="text-muted-foreground block mb-1">Key Takeaways:</span>
+                        <p className="text-muted-foreground leading-relaxed">{selectedReport.key_takeaways}</p>
+                      </div>
+                    )}
+                    {selectedReport.discourse_gist && (
+                      <div>
+                        <span className="text-muted-foreground block mb-1">Discourse Gist:</span>
+                        <p className="text-muted-foreground leading-relaxed">{selectedReport.discourse_gist}</p>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              )}
+
               <Card className="p-4">
-                <h3 className="font-semibold mb-3 text-university-navy">Report File</h3>
+                <h3 className="font-semibold mb-3 text-university-navy">PDF Report</h3>
                 <Button
                   variant="outline"
-                  onClick={() => window.open(`${import.meta.env.VITE_API_URL}/${selectedReport.report_file}`, "_blank")}
+                  onClick={() => selectedReport?.report_id && handleDownloadPdf(selectedReport.report_id)}
+                  disabled={pdfLoadingId === selectedReport?.report_id}
                 >
-                  <FileText className="h-4 w-4 mr-2" />
-                  Download Report
+                  <FileDown className="h-4 w-4 mr-2" />
+                  {pdfLoadingId === selectedReport?.report_id ? "Loading..." : "Download PDF"}
                 </Button>
               </Card>
+
+              {selectedReport.report_file && (
+                <Card className="p-4">
+                  <h3 className="font-semibold mb-3 text-university-navy">Report File</h3>
+                  <Button
+                    variant="outline"
+                    onClick={() => window.open(`${API_URL}/${selectedReport.report_file}`, "_blank")}
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    Download Report
+                  </Button>
+                </Card>
+              )}
             </div>
           )}
         </DialogContent>

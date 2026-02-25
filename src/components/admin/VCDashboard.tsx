@@ -24,6 +24,7 @@ import {
   LogOut,
   Clock,
   FileText,
+  FileDown,
   Award,
   Crown,
   Edit,
@@ -131,6 +132,7 @@ const VCDashboard = () => {
   const [reportMissingEvents, setReportMissingEvents] = useState<any[]>([]);
   const [loadingReportMissing, setLoadingReportMissing] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [pdfLoadingId, setPdfLoadingId] = useState<number | null>(null);
 
   // Society detail modal states
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -144,7 +146,7 @@ const VCDashboard = () => {
   const [societiesCurrentPage, setSocietiesCurrentPage] = useState(1);
   const [eventRequestsCurrentPage, setEventRequestsCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
-  
+
   // Search state
   const [searchTerm, setSearchTerm] = useState("");
   const [eventRequestSearch, setEventRequestSearch] = useState("");
@@ -423,8 +425,8 @@ const VCDashboard = () => {
       const message = action === 'approve'
         ? "Society has been officially approved and is now active!"
         : action === 'reject'
-        ? "Society application has been rejected."
-        : "Revision has been requested for the society application.";
+          ? "Society application has been rejected."
+          : "Revision has been requested for the society application.";
       toast({
         title: "Success",
         description: message,
@@ -473,11 +475,12 @@ const VCDashboard = () => {
         throw new Error("No authentication token found");
       }
 
+      // Always fetch ALL event requests for the role
       const response = await axios.post(
         `${import.meta.env.VITE_API_URL}/admin/event-requests`,  // ✅ POST
         {
           role: currentUser?.role || "vc",
-          filter: eventRequestFilter
+          filter: "all"
         },
         {
           headers: {
@@ -487,7 +490,17 @@ const VCDashboard = () => {
       );
 
       console.log("Event requests fetched:", response.data);
-      setEventRequests(response.data.data || []);
+      const allRequests = response.data.data || [];
+      setEventRequests(allRequests);
+
+      // Update stats locally based on the refined logic
+      setEventRequestStats({
+        total: allRequests.length,
+        pending: allRequests.filter((r: any) => [6, 18].includes(r.status_id)).length,
+        approved: allRequests.filter((r: any) => [8, 10, 11, 12, 13].includes(r.status_id)).length,
+        rejected: allRequests.filter((r: any) => [9, 14].includes(r.status_id)).length
+      });
+
       setEventRequestsCurrentPage(1); // Reset to first page when data changes
     } catch (err: any) {
       console.error("Error fetching event requests:", err);
@@ -592,7 +605,7 @@ const VCDashboard = () => {
         setActionLoading(false);
         return;
       }
-      
+
       const response = await axios.put(
         `${import.meta.env.VITE_API_URL}/admin/vc/event-requests/${selectedEventRequest.req_id}/review`,
         {
@@ -607,9 +620,9 @@ const VCDashboard = () => {
 
       console.log("Event request status updated successfully:", response.data);
 
-      // Refresh the event requests list and stats
+      // Refresh the event requests list (stats are updated locally within this call)
       await fetchAllEventRequests();
-      await fetchEventRequestStats();
+      // await fetchEventRequestStats();
 
       // Close modal
       setIsEventStatusModalOpen(false);
@@ -649,7 +662,7 @@ const VCDashboard = () => {
       setSocietiesCurrentPage(1); // Reset to first page when switching tabs
     } else if (activeTab === "event-requests") {
       fetchAllEventRequests();
-      fetchEventRequestStats();
+      // fetchEventRequestStats();
     } else if (activeTab === "event-reports") {
       fetchAllEventReports();
       fetchReportMissingEvents();
@@ -741,6 +754,28 @@ const VCDashboard = () => {
       setError(err.response?.data?.message || "Failed to fetch report details");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDownloadPdf = async (reportId: number) => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    setPdfLoadingId(reportId);
+    try {
+      const response = await axios.get(`${import.meta.env.VITE_API_URL}/admin/event-reports/${reportId}/pdf?download=1`, {
+        responseType: "blob",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const url = URL.createObjectURL(response.data);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `GCU-Activity-Report-${reportId}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError("Failed to download PDF");
+    } finally {
+      setPdfLoadingId(null);
     }
   };
 
@@ -921,58 +956,58 @@ const VCDashboard = () => {
                         )}
                         <div className="grid gap-6">
                           {filteredSocieties.slice((societiesCurrentPage - 1) * itemsPerPage, societiesCurrentPage * itemsPerPage).map((society) => (
-                      <Card
-                        key={society.society_id}
-                        className="p-6 shadow-card border-l-4 border-l-university-gold cursor-pointer hover:bg-slate-50 transition-colors"
-                        onClick={() => handleViewDetails(society)}
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-start space-x-4 flex-1">
-                            <div className="w-16 h-16 bg-university-navy/10 rounded-lg flex items-center justify-center">
-                              {society.society_logo ? (
-                                <img
-                                  src={`${import.meta.env.VITE_API_URL}/${society.society_logo}`}
-                                  alt={society.name}
-                                  className="w-12 h-12 rounded-lg object-cover"
-                                />
-                              ) : (
-                                <Building className="h-8 w-8 text-university-navy" />
-                              )}
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex items-center mb-2">
-                                <h3 className="text-xl font-semibold text-university-navy mr-3">{society.name}</h3>
-                                {society.status_id !== 2 && !society.status_name.toLowerCase().includes('approved') && (
-                                  <Badge variant="default" className="mr-2 bg-blue-100 text-blue-800">
-                                    {society.status_name}
-                                  </Badge>
-                                )}
-                                <Badge variant="outline">{society.category}</Badge>
+                            <Card
+                              key={society.society_id}
+                              className="p-6 shadow-card border-l-4 border-l-university-gold cursor-pointer hover:bg-slate-50 transition-colors"
+                              onClick={() => handleViewDetails(society)}
+                            >
+                              <div className="flex items-start justify-between">
+                                <div className="flex items-start space-x-4 flex-1">
+                                  <div className="w-16 h-16 bg-university-navy/10 rounded-lg flex items-center justify-center">
+                                    {society.society_logo ? (
+                                      <img
+                                        src={`${import.meta.env.VITE_API_URL}/${society.society_logo}`}
+                                        alt={society.name}
+                                        className="w-12 h-12 rounded-lg object-cover"
+                                      />
+                                    ) : (
+                                      <Building className="h-8 w-8 text-university-navy" />
+                                    )}
+                                  </div>
+                                  <div className="flex-1">
+                                    <div className="flex items-center mb-2">
+                                      <h3 className="text-xl font-semibold text-university-navy mr-3">{society.name}</h3>
+                                      {society.status_id !== 2 && !society.status_name.toLowerCase().includes('approved') && (
+                                        <Badge variant="default" className="mr-2 bg-blue-100 text-blue-800">
+                                          {society.status_name}
+                                        </Badge>
+                                      )}
+                                      <Badge variant="outline">{society.category}</Badge>
+                                    </div>
+                                    <p className="text-sm text-muted-foreground mb-2">
+                                      📍 {society.location} • 👨‍🏫 {society.advisor}
+                                    </p>
+                                    {society.student_info && (
+                                      <p className="text-sm text-muted-foreground mb-2">
+                                        📧 {society.student_info.firstName} {society.student_info.lastName} ({society.student_info.rollNo})
+                                      </p>
+                                    )}
+                                    <p className="text-sm text-muted-foreground mb-3">
+                                      {society.description.length > 150
+                                        ? `${society.description.substring(0, 150)}...`
+                                        : society.description
+                                      }
+                                    </p>
+                                    <div className="flex items-center text-xs text-muted-foreground">
+                                      <Clock className="h-3 w-3 mr-1" />
+                                      Updated: {new Date(society.updated_at || society.created_at).toLocaleDateString()}
+                                    </div>
+                                  </div>
+                                </div>
                               </div>
-                              <p className="text-sm text-muted-foreground mb-2">
-                                📍 {society.location} • 👨‍🏫 {society.advisor}
-                              </p>
-                              {society.student_info && (
-                                <p className="text-sm text-muted-foreground mb-2">
-                                  📧 {society.student_info.firstName} {society.student_info.lastName} ({society.student_info.rollNo})
-                                </p>
-                              )}
-                              <p className="text-sm text-muted-foreground mb-3">
-                                {society.description.length > 150
-                                  ? `${society.description.substring(0, 150)}...`
-                                  : society.description
-                                }
-                              </p>
-                              <div className="flex items-center text-xs text-muted-foreground">
-                                <Clock className="h-3 w-3 mr-1" />
-                                Updated: {new Date(society.updated_at || society.created_at).toLocaleDateString()}
-                              </div>
-                            </div>
-                          </div>
+                            </Card>
+                          ))}
                         </div>
-                      </Card>
-                    ))}
-                  </div>
 
                         {/* Pagination for Societies */}
                         {filteredSocieties.length > itemsPerPage && (
@@ -1083,59 +1118,41 @@ const VCDashboard = () => {
                   />
                 </div>
                 <div className="flex gap-2">
-                <Button
-                  variant={eventRequestFilter === "all" ? "university" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setEventRequestFilter("all");
-                    fetchAllEventRequests();
-                  }}
-                >
-                  All
-                </Button>
-                <Button
-                  variant={eventRequestFilter === "pending" ? "university" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setEventRequestFilter("pending");
-                    fetchAllEventRequests();
-                  }}
-                >
-                  Pending
-                </Button>
-                <Button
-                  variant={eventRequestFilter === "approved" ? "university" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setEventRequestFilter("approved");
-                    fetchAllEventRequests();
-                  }}
-                >
-                  Approved
-                </Button>
-                <Button
-                  variant={eventRequestFilter === "rejected" ? "university" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setEventRequestFilter("rejected");
-                    fetchAllEventRequests();
-                  }}
-                >
-                  Rejected
-                </Button>
+                  <Button
+                    variant={eventRequestFilter === "all" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => setEventRequestFilter("all")}
+                  >
+                    All
+                  </Button>
+                  <Button
+                    variant={eventRequestFilter === "pending" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => setEventRequestFilter("pending")}
+                  >
+                    Pending
+                  </Button>
+                  <Button
+                    variant={eventRequestFilter === "approved" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => setEventRequestFilter("approved")}
+                  >
+                    Approved
+                  </Button>
+                  <Button
+                    variant={eventRequestFilter === "rejected" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => setEventRequestFilter("rejected")}
+                  >
+                    Rejected
+                  </Button>
                   <Button
                     variant={eventRequestFilter === "report_missing" ? "university" : "outline"}
                     size="sm"
-                    onClick={() => {
-                      setEventRequestFilter("report_missing"); // Frontend filter logic needs update or backend support
-                      // If backend supports "report_missing" string in filter, great. 
-                      // If not, we might need to fetch all and filter client side or update backend.
-                      // Assuming backend handles it or we handle it in filteredRequests
-                      fetchAllEventRequests();
-                    }}
+                    onClick={() => setEventRequestFilter("report_missing")}
                   >
                     Report Missing
-                </Button>
+                  </Button>
                 </div>
               </div>
 
@@ -1145,12 +1162,20 @@ const VCDashboard = () => {
                   <p className="text-muted-foreground">Loading event requests...</p>
                 </div>
               ) : (() => {
-                // Filter event requests based on search term
+                // Filter event requests based on both tab selection and search term
                 const filteredRequests = eventRequests.filter((request: any) => {
-                  // Filter by status if "report_missing" is selected and backend returned all
-                  // Note: If backend already filtered, this is redundant but safe
-                  if (eventRequestFilter === "report_missing" && request.status_id !== 13) return false;
+                  // 1. Status Filter (Refined Logic)
+                  if (eventRequestFilter === "pending") {
+                    if (![6, 18].includes(request.status_id)) return false;
+                  } else if (eventRequestFilter === "approved") {
+                    if (![8, 10, 11, 12, 13].includes(request.status_id)) return false;
+                  } else if (eventRequestFilter === "rejected") {
+                    if (![9, 14].includes(request.status_id)) return false;
+                  } else if (eventRequestFilter === "report_missing") {
+                    if (request.status_id !== 13) return false;
+                  }
 
+                  // 2. Search Filter
                   if (!eventRequestSearch.trim()) return true;
                   const searchLower = eventRequestSearch.toLowerCase();
                   return (
@@ -1164,137 +1189,137 @@ const VCDashboard = () => {
                 });
 
                 return filteredRequests.length > 0 ? (
-                <>
-                  <div className="grid gap-4">
+                  <>
+                    <div className="grid gap-4">
                       {filteredRequests.slice((eventRequestsCurrentPage - 1) * itemsPerPage, eventRequestsCurrentPage * itemsPerPage).map((request) => (
-                      <Card key={request.req_id} className="p-4 shadow-card">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center mb-2 flex-wrap gap-2">
-                              <h3 className="text-lg font-semibold text-university-navy">{request.title}</h3>
-                              {request.status_name && (
-                                <Badge variant={request.status_id === 2 ? "default" : request.status_id === 3 ? "destructive" : "secondary"}>
-                                  {request.status_name}
-                                </Badge>
-                              )}
-                              {request.society_name && (
-                                <Badge variant="outline">{request.society_name}</Badge>
-                              )}
-                            </div>
-                            <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                              {request.description}
-                            </p>
-                            <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mb-2">
-                              <span>📅 {new Date(request.event_date).toLocaleDateString()}</span>
-                              <span>🕐 {request.event_time ? formatTimeToAMPM(request.event_time) : request.time_from ? formatTimeToAMPM(request.time_from) : "N/A"}</span>
-                              <span>📍 {request.venue}</span>
-                              {request.firstName && request.lastName && (
-                                <span>👤 {request.firstName} {request.lastName}</span>
-                              )}
-                            </div>
-                            {request.note && (
-                              <div className="bg-blue-50 border-l-4 border-blue-200 p-2 mt-2 rounded">
-                                <p className="text-xs font-medium text-blue-900 mb-1">Note:</p>
-                                <p className="text-xs text-blue-800">{request.note}</p>
+                        <Card key={request.req_id} className="p-4 shadow-card">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center mb-2 flex-wrap gap-2">
+                                <h3 className="text-lg font-semibold text-university-navy">{request.title}</h3>
+                                {request.status_name && (
+                                  <Badge variant={request.status_id === 2 ? "default" : request.status_id === 3 ? "destructive" : "secondary"}>
+                                    {request.status_name}
+                                  </Badge>
+                                )}
+                                {request.society_name && (
+                                  <Badge variant="outline">{request.society_name}</Badge>
+                                )}
                               </div>
-                            )}
-                            <div className="flex items-center text-xs text-muted-foreground mt-2">
-                              <Clock className="h-3 w-3 mr-1" />
-                              Created: {new Date(request.created_at).toLocaleString()}
+                              <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                                {request.description}
+                              </p>
+                              <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mb-2">
+                                <span>📅 {new Date(request.event_date).toLocaleDateString()}</span>
+                                <span>🕐 {request.event_time ? formatTimeToAMPM(request.event_time) : request.time_from ? formatTimeToAMPM(request.time_from) : "N/A"}</span>
+                                <span>📍 {request.venue}</span>
+                                {request.firstName && request.lastName && (
+                                  <span>👤 {request.firstName} {request.lastName}</span>
+                                )}
+                              </div>
+                              {request.note && (
+                                <div className="bg-blue-50 border-l-4 border-blue-200 p-2 mt-2 rounded">
+                                  <p className="text-xs font-medium text-blue-900 mb-1">Note:</p>
+                                  <p className="text-xs text-blue-800">{request.note}</p>
+                                </div>
+                              )}
+                              <div className="flex items-center text-xs text-muted-foreground mt-2">
+                                <Clock className="h-3 w-3 mr-1" />
+                                Created: {new Date(request.created_at).toLocaleString()}
+                              </div>
+                            </div>
+                            <div className="flex items-start gap-2 ml-4">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8 p-0"
+                                  >
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem
+                                    onClick={() => handleViewEventRequest(request.req_id)}
+                                    disabled={loadingEventRequests}
+                                  >
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    View Details
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => handleChangeEventStatus(request)}
+                                    disabled={loadingEventRequests}
+                                  >
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    Update Status
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </div>
                           </div>
-                          <div className="flex items-start gap-2 ml-4">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 w-8 p-0"
-                                >
-                                  <MoreVertical className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem
-                                  onClick={() => handleViewEventRequest(request.req_id)}
-                                  disabled={loadingEventRequests}
-                                >
-                                  <Eye className="h-4 w-4 mr-2" />
-                                  View Details
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => handleChangeEventStatus(request)}
-                                  disabled={loadingEventRequests}
-                                >
-                                  <Edit className="h-4 w-4 mr-2" />
-                                  Update Status
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        </div>
-                      </Card>
-                    ))}
-                  </div>
+                        </Card>
+                      ))}
+                    </div>
 
-                  {/* Pagination for Event Requests */}
+                    {/* Pagination for Event Requests */}
                     {filteredRequests.length > itemsPerPage && (
-                    <div className="flex items-center justify-between mt-6">
-                      <div className="text-sm text-muted-foreground">
+                      <div className="flex items-center justify-between mt-6">
+                        <div className="text-sm text-muted-foreground">
                           Showing {(eventRequestsCurrentPage - 1) * itemsPerPage + 1} to {Math.min(eventRequestsCurrentPage * itemsPerPage, filteredRequests.length)} of {filteredRequests.length} event requests
-                      </div>
-                      <Pagination>
-                        <PaginationContent>
-                          <PaginationItem>
-                            <PaginationPrevious
-                              onClick={() => setEventRequestsCurrentPage(prev => Math.max(1, prev - 1))}
-                              className={eventRequestsCurrentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                            />
-                          </PaginationItem>
+                        </div>
+                        <Pagination>
+                          <PaginationContent>
+                            <PaginationItem>
+                              <PaginationPrevious
+                                onClick={() => setEventRequestsCurrentPage(prev => Math.max(1, prev - 1))}
+                                className={eventRequestsCurrentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                              />
+                            </PaginationItem>
                             {Array.from({ length: Math.ceil(filteredRequests.length / itemsPerPage) }, (_, i) => i + 1)
-                            .filter(page => {
-                              return page === 1 ||
+                              .filter(page => {
+                                return page === 1 ||
                                   page === Math.ceil(filteredRequests.length / itemsPerPage) ||
-                                (page >= eventRequestsCurrentPage - 1 && page <= eventRequestsCurrentPage + 1);
-                            })
-                            .map((page, idx, array) => {
-                              const prevPage = array[idx - 1];
-                              const showEllipsisBefore = prevPage && page - prevPage > 1;
+                                  (page >= eventRequestsCurrentPage - 1 && page <= eventRequestsCurrentPage + 1);
+                              })
+                              .map((page, idx, array) => {
+                                const prevPage = array[idx - 1];
+                                const showEllipsisBefore = prevPage && page - prevPage > 1;
 
-                              return (
-                                <React.Fragment key={page}>
-                                  {showEllipsisBefore && (
+                                return (
+                                  <React.Fragment key={page}>
+                                    {showEllipsisBefore && (
+                                      <PaginationItem>
+                                        <PaginationEllipsis />
+                                      </PaginationItem>
+                                    )}
                                     <PaginationItem>
-                                      <PaginationEllipsis />
+                                      <PaginationLink
+                                        onClick={() => setEventRequestsCurrentPage(page)}
+                                        isActive={eventRequestsCurrentPage === page}
+                                        className="cursor-pointer"
+                                      >
+                                        {page}
+                                      </PaginationLink>
                                     </PaginationItem>
-                                  )}
-                                  <PaginationItem>
-                                    <PaginationLink
-                                      onClick={() => setEventRequestsCurrentPage(page)}
-                                      isActive={eventRequestsCurrentPage === page}
-                                      className="cursor-pointer"
-                                    >
-                                      {page}
-                                    </PaginationLink>
-                                  </PaginationItem>
-                                </React.Fragment>
-                              );
-                            })}
-                          <PaginationItem>
-                            <PaginationNext
+                                  </React.Fragment>
+                                );
+                              })}
+                            <PaginationItem>
+                              <PaginationNext
                                 onClick={() => setEventRequestsCurrentPage(prev => Math.min(Math.ceil(filteredRequests.length / itemsPerPage), prev + 1))}
                                 className={eventRequestsCurrentPage >= Math.ceil(filteredRequests.length / itemsPerPage) ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                            />
-                          </PaginationItem>
-                        </PaginationContent>
-                      </Pagination>
-                    </div>
-                  )}
-                </>
-              ) : (
+                              />
+                            </PaginationItem>
+                          </PaginationContent>
+                        </Pagination>
+                      </div>
+                    )}
+                  </>
+                ) : (
                   <Card className="p-6 text-center">
                     <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-medium mb-2">No Event Requests Found</h3>
+                    <h3 className="text-lg font-medium mb-2">No Event Requests Found</h3>
                     <p className="text-muted-foreground">{eventRequestSearch ? `No event requests match "${eventRequestSearch}"` : "No event requests have been submitted yet."}</p>
                   </Card>
                 );
@@ -1348,20 +1373,20 @@ const VCDashboard = () => {
               {(() => {
                 const isLoading = (reportFilter === "all" || reportFilter === "report_submitted") && loadingEventReports && eventReports.length === 0;
                 const isLoadingMissing = (reportFilter === "all" || reportFilter === "report_missing") && loadingReportMissing && reportMissingEvents.length === 0;
-                
+
                 if (isLoading || isLoadingMissing) {
                   return (
-                <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-university-navy mx-auto mb-4"></div>
-                  <p className="text-muted-foreground">Loading event reports...</p>
-                </div>
+                    <div className="text-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-university-navy mx-auto mb-4"></div>
+                      <p className="text-muted-foreground">Loading event reports...</p>
+                    </div>
                   );
                 }
 
                 // Filter content based on selected filter
                 const showSubmitted = reportFilter === "all" || reportFilter === "report_submitted";
                 const showMissing = reportFilter === "all" || reportFilter === "report_missing";
-                
+
                 const hasContent = (showSubmitted && eventReports.length > 0) || (showMissing && reportMissingEvents.length > 0);
 
                 if (!hasContent) {
@@ -1370,11 +1395,11 @@ const VCDashboard = () => {
                       <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                       <h3 className="text-lg font-medium mb-2">No Event Reports Found</h3>
                       <p className="text-muted-foreground">
-                        {reportFilter === "report_submitted" 
+                        {reportFilter === "report_submitted"
                           ? "No event reports have been submitted yet."
                           : reportFilter === "report_missing"
-                          ? "No events are missing reports."
-                          : "No event reports or missing reports found."}
+                            ? "No events are missing reports."
+                            : "No event reports or missing reports found."}
                       </p>
                     </div>
                   );
@@ -1388,91 +1413,100 @@ const VCDashboard = () => {
                         {reportFilter === "all" && (
                           <h3 className="text-lg font-semibold text-university-navy mb-4">Report Submitted ({eventReports.length})</h3>
                         )}
-                <div className="grid gap-6">
-                  {eventReports.map((report) => (
-                    <Card key={report.report_id} className="p-6 shadow-card hover:shadow-lg transition-shadow border-l-4 border-l-university-gold">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center mb-3 flex-wrap gap-2">
-                            <h3 className="text-xl font-semibold text-university-navy">{report.report_title}</h3>
-                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                              <FileText className="h-3 w-3 mr-1" />
-                              Report Submitted
-                            </Badge>
-                          </div>
+                        <div className="grid gap-6">
+                          {eventReports.map((report) => (
+                            <Card key={report.report_id} className="p-6 shadow-card hover:shadow-lg transition-shadow border-l-4 border-l-university-gold">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center mb-3 flex-wrap gap-2">
+                                    <h3 className="text-xl font-semibold text-university-navy">{report.report_title}</h3>
+                                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                      <FileText className="h-3 w-3 mr-1" />
+                                      Report Submitted
+                                    </Badge>
+                                  </div>
 
-                          {report.report_description && (
-                            <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-                              {report.report_description}
-                            </p>
-                          )}
+                                  {report.report_description && (
+                                    <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+                                      {report.report_description}
+                                    </p>
+                                  )}
 
-                          <div className="grid md:grid-cols-2 gap-4 mb-4">
-                            <div className="space-y-2">
-                              <div className="flex items-center text-sm">
-                                <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
-                                <span className="text-muted-foreground">Event: </span>
-                                <span className="font-medium ml-1">{report.event_title}</span>
-                              </div>
-                              <div className="flex items-center text-sm">
-                                <Building className="h-4 w-4 mr-2 text-muted-foreground" />
-                                <span className="text-muted-foreground">Society: </span>
-                                <span className="font-medium ml-1">{report.society_name}</span>
-                              </div>
-                              {report.event_date && (
-                                <div className="flex items-center text-sm">
-                                  <Clock className="h-4 w-4 mr-2 text-muted-foreground" />
-                                  <span className="text-muted-foreground">Event Date: </span>
-                                  <span className="font-medium ml-1">{new Date(report.event_date).toLocaleDateString()}</span>
+                                  <div className="grid md:grid-cols-2 gap-4 mb-4">
+                                    <div className="space-y-2">
+                                      <div className="flex items-center text-sm">
+                                        <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
+                                        <span className="text-muted-foreground">Event: </span>
+                                        <span className="font-medium ml-1">{report.event_title}</span>
+                                      </div>
+                                      <div className="flex items-center text-sm">
+                                        <Building className="h-4 w-4 mr-2 text-muted-foreground" />
+                                        <span className="text-muted-foreground">Society: </span>
+                                        <span className="font-medium ml-1">{report.society_name}</span>
+                                      </div>
+                                      {report.event_date && (
+                                        <div className="flex items-center text-sm">
+                                          <Clock className="h-4 w-4 mr-2 text-muted-foreground" />
+                                          <span className="text-muted-foreground">Event Date: </span>
+                                          <span className="font-medium ml-1">{new Date(report.event_date).toLocaleDateString()}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div className="space-y-2">
+                                      <div className="flex items-center text-sm">
+                                        <Users className="h-4 w-4 mr-2 text-muted-foreground" />
+                                        <span className="text-muted-foreground">Submitted by: </span>
+                                        <span className="font-medium ml-1">{report.firstName} {report.lastName}</span>
+                                      </div>
+                                      {report.RollNO && (
+                                        <div className="flex items-center text-sm">
+                                          <FileText className="h-4 w-4 mr-2 text-muted-foreground" />
+                                          <span className="text-muted-foreground">Roll No: </span>
+                                          <span className="font-medium ml-1">{report.RollNO}</span>
+                                        </div>
+                                      )}
+                                      <div className="flex items-center text-sm">
+                                        <Clock className="h-4 w-4 mr-2 text-muted-foreground" />
+                                        <span className="text-muted-foreground">Submitted: </span>
+                                        <span className="font-medium ml-1">{new Date(report.submitted_at).toLocaleDateString()}</span>
+                                      </div>
+                                    </div>
+                                  </div>
                                 </div>
-                              )}
-                            </div>
-                            <div className="space-y-2">
-                              <div className="flex items-center text-sm">
-                                <Users className="h-4 w-4 mr-2 text-muted-foreground" />
-                                <span className="text-muted-foreground">Submitted by: </span>
-                                <span className="font-medium ml-1">{report.firstName} {report.lastName}</span>
-                              </div>
-                              {report.RollNO && (
-                                <div className="flex items-center text-sm">
-                                  <FileText className="h-4 w-4 mr-2 text-muted-foreground" />
-                                  <span className="text-muted-foreground">Roll No: </span>
-                                  <span className="font-medium ml-1">{report.RollNO}</span>
+                                <div className="flex flex-col space-y-2 ml-4">
+                                  <Button
+                                    size="sm"
+                                    variant="university"
+                                    onClick={() => handleViewReport(report.report_id)}
+                                    disabled={loading}
+                                  >
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    View Report
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleDownloadPdf(report.report_id)}
+                                    disabled={pdfLoadingId === report.report_id}
+                                  >
+                                    <FileDown className="h-4 w-4 mr-2" />
+                                    {pdfLoadingId === report.report_id ? "Loading..." : "Download PDF"}
+                                  </Button>
+                                  {report.report_file && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => window.open(`${import.meta.env.VITE_API_URL}/${report.report_file}`, "_blank")}
+                                    >
+                                      <FileText className="h-4 w-4 mr-2" />
+                                      Download File
+                                    </Button>
+                                  )}
                                 </div>
-                              )}
-                              <div className="flex items-center text-sm">
-                                <Clock className="h-4 w-4 mr-2 text-muted-foreground" />
-                                <span className="text-muted-foreground">Submitted: </span>
-                                <span className="font-medium ml-1">{new Date(report.submitted_at).toLocaleDateString()}</span>
                               </div>
-                            </div>
-                          </div>
+                            </Card>
+                          ))}
                         </div>
-                        <div className="flex flex-col space-y-2 ml-4">
-                          <Button
-                            size="sm"
-                            variant="university"
-                            onClick={() => handleViewReport(report.report_id)}
-                            disabled={loading}
-                          >
-                            <Eye className="h-4 w-4 mr-2" />
-                            View Report
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              window.open(`${import.meta.env.VITE_API_URL}/${report.report_file}`, '_blank');
-                            }}
-                          >
-                            <FileText className="h-4 w-4 mr-2" />
-                            Download
-                          </Button>
-                        </div>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
                       </div>
                     )}
 
@@ -1513,8 +1547,8 @@ const VCDashboard = () => {
                                           <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
                                           <span className="text-muted-foreground">Event Date: </span>
                                           <span className="font-medium ml-1">{new Date(event.date_from).toLocaleDateString()}</span>
-                </div>
-              )}
+                                        </div>
+                                      )}
                                       {event.venue && (
                                         <div className="flex items-center text-sm">
                                           <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
@@ -1711,30 +1745,44 @@ const VCDashboard = () => {
                 </div>
               </Card>
 
-              {/* Report File */}
+              {/* PDF Report */}
               <Card className="p-4 bg-blue-50 border-blue-200">
-                <h3 className="font-semibold mb-3 text-university-navy">Report File</h3>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <FileText className="h-8 w-8 text-blue-600" />
-                    <div>
-                      <p className="font-medium text-university-navy">
-                        {selectedReport.report_file.split('/').pop()}
-                      </p>
-                      <p className="text-xs text-muted-foreground">Click download to view the full report</p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="university"
-                    onClick={() => {
-                      window.open(`${import.meta.env.VITE_API_URL}/${selectedReport.report_file}`, '_blank');
-                    }}
-                  >
-                    <FileText className="h-4 w-4 mr-2" />
-                    Download Report
-                  </Button>
-                </div>
+                <h3 className="font-semibold mb-3 text-university-navy">PDF Report</h3>
+                <Button
+                  variant="university"
+                  onClick={() => selectedReport?.report_id && handleDownloadPdf(selectedReport.report_id)}
+                  disabled={pdfLoadingId === selectedReport?.report_id}
+                >
+                  <FileDown className="h-4 w-4 mr-2" />
+                  {pdfLoadingId === selectedReport?.report_id ? "Loading..." : "Download PDF"}
+                </Button>
               </Card>
+
+              {selectedReport.report_file && (
+                <Card className="p-4 bg-blue-50 border-blue-200">
+                  <h3 className="font-semibold mb-3 text-university-navy">Report File</h3>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <FileText className="h-8 w-8 text-blue-600" />
+                      <div>
+                        <p className="font-medium text-university-navy">
+                          {selectedReport.report_file.split('/').pop()}
+                        </p>
+                        <p className="text-xs text-muted-foreground">Click download to view the full report</p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="university"
+                      onClick={() => {
+                        window.open(`${import.meta.env.VITE_API_URL}/${selectedReport.report_file}`, '_blank');
+                      }}
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      Download Report
+                    </Button>
+                  </div>
+                </Card>
+              )}
 
               {/* Action Buttons */}
               <div className="flex justify-end space-x-3 pt-4 border-t">
@@ -1936,9 +1984,9 @@ const VCDashboard = () => {
                           <h4 className="font-semibold text-sm text-university-navy line-clamp-1">{event.title || event.event_name}</h4>
                           <Badge
                             className={`text-xs px-2 py-0 border-none ${event.status_id === 10 ? "bg-green-100 text-green-800" :
-                                event.status_id === 13 ? "bg-red-100 text-red-800" :
-                                  event.status_id === 12 ? "bg-blue-100 text-blue-800" :
-                                    "bg-slate-100 text-slate-800"
+                              event.status_id === 13 ? "bg-red-100 text-red-800" :
+                                event.status_id === 12 ? "bg-blue-100 text-blue-800" :
+                                  "bg-slate-100 text-slate-800"
                               }`}
                             variant="outline"
                           >
@@ -2498,7 +2546,7 @@ const VCDashboard = () => {
                                 </div>
                                 {/* Only show note if it exists and is not empty */}
                                 {history.note && history.note.trim() !== "" && (
-                                <p className="text-sm text-gray-700 mt-1">{history.note}</p>
+                                  <p className="text-sm text-gray-700 mt-1">{history.note}</p>
                                 )}
                               </div>
                             ))}
@@ -2647,10 +2695,10 @@ const VCDashboard = () => {
                     <div className="flex items-center gap-2 mb-2">
                       <h2 className="text-2xl font-bold text-university-navy">{selectedSocietyDetail.name}</h2>
                       {/* Hide status badge if it contains 'Approved' */}
-                      {selectedSocietyDetail.status_name && 
-                       !selectedSocietyDetail.status_name.toLowerCase().includes('approved') && (
-                        <Badge variant="secondary">{selectedSocietyDetail.status_name}</Badge>
-                      )}
+                      {selectedSocietyDetail.status_name &&
+                        !selectedSocietyDetail.status_name.toLowerCase().includes('approved') && (
+                          <Badge variant="secondary">{selectedSocietyDetail.status_name}</Badge>
+                        )}
                       <Badge variant="outline">{selectedSocietyDetail.category}</Badge>
                     </div>
                     <p className="text-muted-foreground mb-2">
@@ -2847,7 +2895,7 @@ const VCDashboard = () => {
               )}
 
               {/* Recent Events Section */}
-                <Card className="p-6">
+              <Card className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-semibold text-university-navy flex items-center">
                     <Calendar className="h-5 w-5 mr-2" />
@@ -2875,8 +2923,8 @@ const VCDashboard = () => {
                 ) : societyEvents.length > 0 ? (
                   <div className="space-y-3">
                     {societyEvents.map((event: any) => (
-                      <div 
-                        key={event.req_id || event.id} 
+                      <div
+                        key={event.req_id || event.id}
                         className="border rounded-lg p-3 hover:bg-slate-50 transition-colors cursor-pointer"
                         onClick={() => handleViewEventRequest(event.req_id || event.id)}
                       >
@@ -2884,9 +2932,9 @@ const VCDashboard = () => {
                           <h4 className="font-semibold text-sm text-university-navy line-clamp-1">{event.title || event.event_name}</h4>
                           <Badge
                             className={`text-xs px-2 py-0 border-none ${event.status_id === 10 ? "bg-green-100 text-green-800" :
-                                event.status_id === 13 ? "bg-red-100 text-red-800" :
-                                  event.status_id === 12 ? "bg-blue-100 text-blue-800" :
-                                    "bg-slate-100 text-slate-800"
+                              event.status_id === 13 ? "bg-red-100 text-red-800" :
+                                event.status_id === 12 ? "bg-blue-100 text-blue-800" :
+                                  "bg-slate-100 text-slate-800"
                               }`}
                             variant="outline"
                           >
@@ -2897,7 +2945,7 @@ const VCDashboard = () => {
                           <span className="flex items-center">
                             <Calendar className="h-3 w-3 mr-1" />
                             {new Date(event.date_from || event.event_date).toLocaleDateString()}
-                            </span>
+                          </span>
                           <span className="flex items-center">
                             <MapPin className="h-3 w-3 mr-1" />
                             {event.venue || "No venue"}
@@ -2910,41 +2958,41 @@ const VCDashboard = () => {
                   <div className="text-center py-6 bg-slate-50 rounded-lg border border-dashed">
                     <p className="text-sm text-muted-foreground">No recent events found</p>
                   </div>
-              )}
+                )}
               </Card>
 
               {/* Status History - Filter out 'Approved' statuses */}
-              {selectedSocietyDetail.status_history && Array.isArray(selectedSocietyDetail.status_history) && 
-               selectedSocietyDetail.status_history.filter((h: any) => 
-                 h.status_name && !h.status_name.toLowerCase().includes('approved')
-               ).length > 0 && (
-                <Card className="p-6">
-                  <h3 className="font-semibold mb-3 text-university-navy flex items-center">
-                    <Clock className="h-5 w-5 mr-2" />
-                    Status History
-                  </h3>
-                  <div className="space-y-3">
-                    {selectedSocietyDetail.status_history
-                      .filter((history: any) => 
-                        history.status_name && !history.status_name.toLowerCase().includes('approved')
-                      )
-                      .map((history: any, index: number) => (
-                      <div key={index} className="border-l-4 border-blue-500 pl-4 py-2 bg-blue-50 rounded-r">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="font-medium text-sm">{history.status_name || "Status Change"}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(history.changed_at).toLocaleString()}
-                          </span>
-                        </div>
-                        {/* Only show note if it exists and is not empty */}
-                        {history.note && history.note.trim() !== "" && (
-                          <p className="text-sm text-muted-foreground mt-1">{history.note}</p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              )}
+              {selectedSocietyDetail.status_history && Array.isArray(selectedSocietyDetail.status_history) &&
+                selectedSocietyDetail.status_history.filter((h: any) =>
+                  h.status_name && !h.status_name.toLowerCase().includes('approved')
+                ).length > 0 && (
+                  <Card className="p-6">
+                    <h3 className="font-semibold mb-3 text-university-navy flex items-center">
+                      <Clock className="h-5 w-5 mr-2" />
+                      Status History
+                    </h3>
+                    <div className="space-y-3">
+                      {selectedSocietyDetail.status_history
+                        .filter((history: any) =>
+                          history.status_name && !history.status_name.toLowerCase().includes('approved')
+                        )
+                        .map((history: any, index: number) => (
+                          <div key={index} className="border-l-4 border-blue-500 pl-4 py-2 bg-blue-50 rounded-r">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="font-medium text-sm">{history.status_name || "Status Change"}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {new Date(history.changed_at).toLocaleString()}
+                              </span>
+                            </div>
+                            {/* Only show note if it exists and is not empty */}
+                            {history.note && history.note.trim() !== "" && (
+                              <p className="text-sm text-muted-foreground mt-1">{history.note}</p>
+                            )}
+                          </div>
+                        ))}
+                    </div>
+                  </Card>
+                )}
             </div>
           ) : (
             <div className="text-center py-12">

@@ -1,10 +1,16 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Upload, FileText, X, Loader2, CheckCircle } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Loader2, FileText, Building, User } from "lucide-react";
 import axios from "axios";
 import toast from "react-hot-toast";
 
@@ -16,164 +22,119 @@ interface EventReportUploadProps {
   onSuccess: () => void;
 }
 
-const EventReportUpload = ({ eventId, eventTitle, isOpen, onClose, onSuccess }: EventReportUploadProps) => {
-  const [reportTitle, setReportTitle] = useState("");
-  const [reportDescription, setReportDescription] = useState("");
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [dragActive, setDragActive] = useState(false);
+const EventReportUpload = ({
+  eventId,
+  eventTitle,
+  isOpen,
+  onClose,
+  onSuccess,
+}: EventReportUploadProps) => {
+  const [formContext, setFormContext] = useState<{
+    society_name: string;
+    advisor_name: string;
+    event_title?: string;
+    event_date?: string;
+    event_time?: string;
+  } | null>(null);
+  const [loadingContext, setLoadingContext] = useState(false);
+  const [presidentName, setPresidentName] = useState("");
+  const [activityTitle, setActivityTitle] = useState("");
+  const [activityDetails, setActivityDetails] = useState("");
+  const [attendanceDetails, setAttendanceDetails] = useState("");
+  const [keyTakeaways, setKeyTakeaways] = useState("");
+  const [discourseGist, setDiscourseGist] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      // Check file size (50MB limit)
-      if (file.size > 50 * 1024 * 1024) {
-        toast.error("File size must be less than 50MB");
-        return;
-      }
-      // Check file type
-      const allowedTypes = ['application/pdf', 'application/msword', 
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'image/jpeg', 'image/jpg', 'image/png'];
-      if (!allowedTypes.includes(file.type)) {
-        toast.error("Only PDF, Word documents, and images are allowed");
-        return;
-      }
-      setSelectedFile(file);
-    }
-  };
+  const API_URL = import.meta.env.VITE_API_URL;
 
-  const handleDrag = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
-    }
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const file = e.dataTransfer.files[0];
-      if (file.size > 50 * 1024 * 1024) {
-        toast.error("File size must be less than 50MB");
+  useEffect(() => {
+    if (isOpen && eventId) {
+      setLoadingContext(true);
+      const token = localStorage.getItem("token");
+      if (!token) {
+        setLoadingContext(false);
         return;
       }
-      const allowedTypes = ['application/pdf', 'application/msword', 
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'image/jpeg', 'image/jpg', 'image/png'];
-      if (!allowedTypes.includes(file.type)) {
-        toast.error("Only PDF, Word documents, and images are allowed");
-        return;
-      }
-      setSelectedFile(file);
+      axios
+        .get(`${API_URL}/society/event-report/context/${eventId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        .then((res) => {
+          if (res.data.success && res.data.data) {
+            setFormContext(res.data.data);
+          }
+        })
+        .catch(() => {
+          toast.error("Could not load form context");
+          setFormContext(null);
+        })
+        .finally(() => setLoadingContext(false));
     }
-  };
+  }, [isOpen, eventId, API_URL]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!eventId || eventId === 0) {
-      toast.error("Event ID is missing");
-      console.error("Event ID is missing or invalid:", eventId);
+    if (!eventId || !activityTitle.trim()) {
+      toast.error("Activity title is required");
       return;
     }
-    
-    if (!reportTitle.trim()) {
-      toast.error("Report title is required");
+    if (!presidentName.trim()) {
+      toast.error("President name is required");
       return;
     }
-
-    if (!selectedFile) {
-      toast.error("Please select a file to upload");
+    const token = localStorage.getItem("token");
+    if (!token) {
+      toast.error("Authentication required");
       return;
     }
-
+    setSubmitting(true);
     try {
-      const API_URL = import.meta.env.VITE_API_URL;
-      setUploading(true);
-      const token = localStorage.getItem("token");
-      
-      if (!token) {
-        toast.error("Authentication required");
-        return;
-      }
-
-      // Create FormData and ensure event_req_id is sent first (before file)
-      // This helps multer parse text fields correctly
-      const formData = new FormData();
-      formData.append("event_req_id", String(eventId));
-      formData.append("report_title", reportTitle);
-      formData.append("report_description", reportDescription);
-      formData.append("report_file", selectedFile);
-      
-      // Log FormData contents for debugging
-      console.log("Uploading event report - FormData contents:");
-      for (const [key, value] of formData.entries()) {
-        if (value instanceof File) {
-          console.log(`  ${key}: [File] ${value.name} (${value.size} bytes)`);
-        } else {
-          console.log(`  ${key}: ${value}`);
-        }
-      }
-      
-      console.log("Uploading event report:", {
-        event_req_id: eventId,
-        event_req_id_type: typeof eventId,
-        report_title: reportTitle,
-        has_file: !!selectedFile,
-        file_name: selectedFile.name,
-        file_size: selectedFile.size
-      });
-
       const response = await axios.post(
-        `${API_URL}/society/event-report/upload`,
-        formData,
+        `${API_URL}/society/activity-report/upload`,
+        {
+          event_req_id: eventId,
+          president_name: presidentName.trim(),
+          activity_title: activityTitle.trim(),
+          activity_details: activityDetails.trim() || undefined,
+          attendance_details: attendanceDetails.trim() || undefined,
+          key_takeaways: keyTakeaways.trim() || undefined,
+          discourse_gist: discourseGist.trim() || undefined,
+        },
         {
           headers: {
             Authorization: `Bearer ${token}`,
-            "Content-Type": "multipart/form-data",
+            "Content-Type": "application/json",
           },
         }
       );
-
       if (response.data.success) {
-        toast.success("Event report uploaded successfully!");
-        // Reset form
-        setReportTitle("");
-        setReportDescription("");
-        setSelectedFile(null);
+        toast.success("Activity report submitted successfully!");
+        resetForm();
         onSuccess();
         onClose();
       }
-    } catch (error: any) {
-      console.error("Error uploading report:", error);
-      toast.error(error.response?.data?.message || "Failed to upload report");
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to submit report");
     } finally {
-      setUploading(false);
+      setSubmitting(false);
     }
+  };
+
+  const resetForm = () => {
+    setPresidentName("");
+    setActivityTitle("");
+    setActivityDetails("");
+    setAttendanceDetails("");
+    setKeyTakeaways("");
+    setDiscourseGist("");
   };
 
   const handleClose = () => {
-    if (!uploading) {
-      setReportTitle("");
-      setReportDescription("");
-      setSelectedFile(null);
+    if (!submitting) {
+      resetForm();
+      setFormContext(null);
       onClose();
     }
-  };
-
-  const getFileIcon = () => {
-    if (!selectedFile) return <FileText className="h-8 w-8 text-muted-foreground" />;
-    const ext = selectedFile.name.split('.').pop()?.toLowerCase();
-    if (ext === 'pdf') return <FileText className="h-8 w-8 text-red-500" />;
-    if (['doc', 'docx'].includes(ext || '')) return <FileText className="h-8 w-8 text-blue-500" />;
-    return <FileText className="h-8 w-8 text-green-500" />;
   };
 
   return (
@@ -181,152 +142,158 @@ const EventReportUpload = ({ eventId, eventTitle, isOpen, onClose, onSuccess }: 
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold text-university-navy">
-            Upload Event Report
+            Submit Activity Report
           </DialogTitle>
           <DialogDescription>
-            Complete the event by uploading a detailed report for: <strong>{eventTitle}</strong>
+            Submit an activity report for: <strong>{eventTitle}</strong>
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Report Title */}
-          <div className="space-y-2">
-            <Label htmlFor="report_title" className="text-sm font-semibold">
-              Report Title <span className="text-red-500">*</span>
-            </Label>
-            <Input
-              id="report_title"
-              placeholder="e.g., Annual Tech Conference 2024 Report"
-              value={reportTitle}
-              onChange={(e) => setReportTitle(e.target.value)}
-              required
-              className="h-11"
-            />
+        {loadingContext ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-university-navy" />
           </div>
-
-          {/* Report Description */}
-          <div className="space-y-2">
-            <Label htmlFor="report_description" className="text-sm font-semibold">
-              Report Description / Summary
-            </Label>
-            <Textarea
-              id="report_description"
-              placeholder="Provide a brief summary or remarks about the event..."
-              value={reportDescription}
-              onChange={(e) => setReportDescription(e.target.value)}
-              rows={4}
-              className="resize-none"
-            />
-          </div>
-
-          {/* File Upload */}
-          <div className="space-y-2">
-            <Label className="text-sm font-semibold">
-              Report File <span className="text-red-500">*</span>
-            </Label>
-            
-            {!selectedFile ? (
-              <div
-                onDragEnter={handleDrag}
-                onDragLeave={handleDrag}
-                onDragOver={handleDrag}
-                onDrop={handleDrop}
-                className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                  dragActive
-                    ? "border-university-navy bg-university-navy/5"
-                    : "border-gray-300 hover:border-university-navy/50"
-                }`}
-              >
-                <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                <p className="text-sm font-medium text-university-navy mb-2">
-                  Drag and drop your report file here, or click to browse
-                </p>
-                <p className="text-xs text-muted-foreground mb-4">
-                  Supported formats: PDF, Word (.doc, .docx), Images (.jpg, .png)
-                  <br />
-                  Maximum file size: 50MB
-                </p>
-                <Input
-                  type="file"
-                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                  onChange={handleFileSelect}
-                  className="hidden"
-                  id="file-upload"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => document.getElementById("file-upload")?.click()}
-                  className="mt-2"
-                >
-                  <Upload className="h-4 w-4 mr-2" />
-                  Choose File
-                </Button>
-              </div>
-            ) : (
-              <div className="border-2 border-university-navy/20 rounded-lg p-4 bg-university-navy/5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3 flex-1">
-                    {getFileIcon()}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-university-navy truncate">
-                        {selectedFile.name}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSelectedFile(null)}
-                    disabled={uploading}
-                    className="ml-2"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Read-only context */}
+            {formContext && (
+              <div className="grid gap-4 rounded-lg border bg-muted/30 p-4">
+                <div className="flex items-center gap-2 text-sm">
+                  <Building className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">Society:</span>
+                  <span className="font-medium">{formContext.society_name}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <User className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">Advisor:</span>
+                  <span className="font-medium">{formContext.advisor_name || "—"}</span>
                 </div>
               </div>
             )}
-          </div>
 
-          {/* Submit Button */}
-          <div className="flex justify-end space-x-3 pt-4 border-t">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleClose}
-              disabled={uploading}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant="university"
-              disabled={uploading || !reportTitle.trim() || !selectedFile}
-              className="min-w-[120px]"
-            >
-              {uploading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Uploading...
-                </>
-              ) : (
-                <>
-                  <Upload className="h-4 w-4 mr-2" />
-                  Upload Report
-                </>
-              )}
-            </Button>
-          </div>
-        </form>
+            {/* President Name */}
+            <div className="space-y-2">
+              <Label htmlFor="president_name" className="text-sm font-semibold">
+                President Name <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="president_name"
+                placeholder="Society president / head name"
+                value={presidentName}
+                onChange={(e) => setPresidentName(e.target.value)}
+                required
+                className="h-11"
+              />
+            </div>
+
+            {/* Activity Title */}
+            <div className="space-y-2">
+              <Label htmlFor="activity_title" className="text-sm font-semibold">
+                Activity Title <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="activity_title"
+                placeholder="e.g., Annual Tech Conference 2024"
+                value={activityTitle}
+                onChange={(e) => setActivityTitle(e.target.value)}
+                required
+                className="h-11"
+              />
+            </div>
+
+            {/* Activity Details */}
+            <div className="space-y-2">
+              <Label htmlFor="activity_details" className="text-sm font-semibold">
+                Activity Details
+              </Label>
+              <Textarea
+                id="activity_details"
+                placeholder="Describe the activity, agenda, and main points..."
+                value={activityDetails}
+                onChange={(e) => setActivityDetails(e.target.value)}
+                rows={4}
+                className="resize-none"
+              />
+            </div>
+
+            {/* Attendance Details */}
+            <div className="space-y-2">
+              <Label htmlFor="attendance_details" className="text-sm font-semibold">
+                Attendance Details
+              </Label>
+              <Textarea
+                id="attendance_details"
+                placeholder="Number of participants, demographics, notable attendees..."
+                value={attendanceDetails}
+                onChange={(e) => setAttendanceDetails(e.target.value)}
+                rows={3}
+                className="resize-none"
+              />
+            </div>
+
+            {/* Key Takeaways */}
+            <div className="space-y-2">
+              <Label htmlFor="key_takeaways" className="text-sm font-semibold">
+                Key Takeaways
+              </Label>
+              <Textarea
+                id="key_takeaways"
+                placeholder="Main outcomes, learnings, and impact..."
+                value={keyTakeaways}
+                onChange={(e) => setKeyTakeaways(e.target.value)}
+                rows={3}
+                className="resize-none"
+              />
+            </div>
+
+            {/* Discourse Gist */}
+            <div className="space-y-2">
+              <Label htmlFor="discourse_gist" className="text-sm font-semibold">
+                Discourse Gist
+              </Label>
+              <Textarea
+                id="discourse_gist"
+                placeholder="Summary of discussions, feedback, or notable quotes..."
+                value={discourseGist}
+                onChange={(e) => setDiscourseGist(e.target.value)}
+                rows={3}
+                className="resize-none"
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 border-t pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleClose}
+                disabled={submitting}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="university"
+                disabled={submitting || !activityTitle.trim() || !presidentName.trim()}
+                className="min-w-[140px]"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Submitting...
+                  </>
+                ) : (
+                  <>
+                    <FileText className="h-4 w-4 mr-2" />
+                    Submit Report
+                  </>
+                )}
+              </Button>
+            </div>
+          </form>
+        )}
       </DialogContent>
     </Dialog>
   );
 };
 
 export default EventReportUpload;
-
-

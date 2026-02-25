@@ -85,6 +85,7 @@ const AdminDashboard = () => {
   const [studentsLoading, setStudentsLoading] = useState(false);
   const [eventRequestsLoading, setEventRequestsLoading] = useState(false);
   const [eventReportsLoading, setEventReportsLoading] = useState(false);
+  const [pdfLoadingId, setPdfLoadingId] = useState<number | null>(null);
   const [facultyLoading, setFacultyLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selectedEventRequest, setSelectedEventRequest] = useState<any>(null);
@@ -609,6 +610,29 @@ const AdminDashboard = () => {
       setError(err.response?.data?.message || err.message || "Failed to fetch event reports");
     } finally {
       setEventReportsLoading(false);
+    }
+  };
+
+  const handleDownloadPdf = async (reportId: number) => {
+    const token = localStorage.getItem("token");
+    const API_URL = import.meta.env.VITE_API_URL;
+    if (!token) return;
+    setPdfLoadingId(reportId);
+    try {
+      const response = await axios.get(`${API_URL}/admin/event-reports/${reportId}/pdf?download=1`, {
+        responseType: "blob",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const url = URL.createObjectURL(response.data);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `GCU-Activity-Report-${reportId}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError("Failed to download PDF");
+    } finally {
+      setPdfLoadingId(null);
     }
   };
 
@@ -1811,18 +1835,26 @@ const AdminDashboard = () => {
                             <span>👤 {report.firstName} {report.lastName}</span>
                             <span>📆 Submitted: {new Date(report.submitted_at).toLocaleDateString()}</span>
                           </div>
-                          {report.report_file && (
-                            <div className="mt-2">
+                          <div className="flex flex-wrap gap-2 mt-3">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleDownloadPdf(report.report_id)}
+                              disabled={pdfLoadingId === report.report_id}
+                            >
+                              {pdfLoadingId === report.report_id ? "Loading..." : "Download PDF"}
+                            </Button>
+                            {report.report_file && (
                               <a
                                 href={`${import.meta.env.VITE_API_URL}/${report.report_file}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-sm text-university-navy hover:underline"
+                                className="text-sm text-university-navy hover:underline inline-flex items-center"
                               >
                                 📄 View Report File
                               </a>
-                            </div>
-                          )}
+                            )}
+                          </div>
                         </div>
                       </div>
                     </Card>
