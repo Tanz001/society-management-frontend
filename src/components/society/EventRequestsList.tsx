@@ -63,6 +63,20 @@ interface StatusHistory {
   role_display_name: string;
 }
 
+// Extract displayable note from history - handles JSON remarks like {"role":"...","note":null}
+const getDisplayNote = (history: StatusHistory): string | null => {
+  let note: string | null = history.note ?? null;
+  if (note == null && history.remarks) {
+    try {
+      const parsed = JSON.parse(history.remarks);
+      note = parsed.note ?? null;
+    } catch {
+      note = history.remarks;
+    }
+  }
+  return (note && String(note).trim() !== "") ? String(note).trim() : null;
+};
+
 const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
   const navigate = useNavigate();
   const [eventRequests, setEventRequests] = useState<EventRequest[]>([]);
@@ -560,15 +574,15 @@ const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
                 const historyWithoutNotes: StatusHistory[] = [];
                 
                 statusHistory.forEach((history) => {
-                  const note = history.note || history.remarks;
+                  const displayNote = getDisplayNote(history);
                   const role = history.role || history.role_display_name || history.role_name || "Admin";
-                  
+
                   // Filter out System notes - only show admin and protocol notes
                   if (role === "System" || role === "SYSTEM") {
                     return; // Skip system notes
                   }
-                  
-                  if (note && note.trim() !== "") {
+
+                  if (displayNote) {
                     if (!notesByRole[role]) {
                       notesByRole[role] = [];
                     }
@@ -620,7 +634,7 @@ const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
                                 </div>
                                 
                                 <div className="bg-blue-50 border-l-4 border-blue-200 p-3 rounded mb-2">
-                                  <p className="text-sm text-blue-800">{history.note || history.remarks}</p>
+                                  <p className="text-sm text-blue-800">{getDisplayNote(history) || "—"}</p>
                                 </div>
 
                                 <div className="flex items-center gap-4 text-xs text-muted-foreground mt-2">
