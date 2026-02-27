@@ -2150,6 +2150,7 @@ const RegistrarDashboard = () => {
                             if (!n) return false;
                             if (/^Event request updated and resubmitted\.?$/i.test(n)) return false;
                             if (/^Event request updated\.\s*Status remains .+\.?$/i.test(n)) return false;
+                            if (/^Event request updated\.\s*Status set to .+ after revision by .+\.?$/i.test(n)) return false;
                           }
                           return true;
                         });
