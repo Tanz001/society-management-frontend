@@ -65,13 +65,13 @@ interface StatusHistory {
 
 // Extract displayable note from history - handles JSON remarks like {"role":"...","note":null}
 const getDisplayNote = (history: StatusHistory): string | null => {
-  let note: string | null = history.note ?? null;
-  if (note == null && history.remarks) {
+  let note: string | null = history.note ?? history.remarks ?? null;
+  if (note && typeof note === 'string') {
     try {
-      const parsed = JSON.parse(history.remarks);
+      const parsed = JSON.parse(note);
       note = parsed.note ?? null;
     } catch {
-      note = history.remarks;
+      // Not JSON, keep as is
     }
   }
   return (note && String(note).trim() !== "") ? String(note).trim() : null;
@@ -97,7 +97,7 @@ const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
 
     setLoading(true);
     try {
-       const API_URL = import.meta.env.VITE_API_URL;
+      const API_URL = import.meta.env.VITE_API_URL;
       const token = localStorage.getItem("token");
       if (!token) {
         toast.error("Authentication required");
@@ -138,7 +138,7 @@ const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
     setLoadingHistory(true);
     setIsHistoryModalOpen(false); // Reset modal state
     try {
-       const API_URL = import.meta.env.VITE_API_URL;
+      const API_URL = import.meta.env.VITE_API_URL;
       const token = localStorage.getItem("token");
       if (!token) {
         toast.error("Authentication required");
@@ -180,7 +180,7 @@ const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
   // Fetch suggested slots for an event request
   const fetchSuggestedSlots = async (slotRequestId: number) => {
     if (!slotRequestId) return;
-    
+
     setLoadingSuggestedSlots(true);
     try {
       const API_URL = import.meta.env.VITE_API_URL;
@@ -369,18 +369,18 @@ const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
                     <h3 className="text-lg font-semibold text-university-navy">{request.title}</h3>
                     {getStatusBadge(request.status_id || 1, request.status_name || 'Pending')}
                     {request.slot_status_name && (
-                      <Badge 
+                      <Badge
                         variant={
                           request.slot_status_id === 2 ? "default" :
-                          request.slot_status_id === 3 ? "destructive" :
-                          request.slot_status_id === 4 ? "secondary" :
-                          "outline"
+                            request.slot_status_id === 3 ? "destructive" :
+                              request.slot_status_id === 4 ? "secondary" :
+                                "outline"
                         }
                         className={
                           request.slot_status_id === 2 ? "bg-green-100 text-green-800 border-green-200" :
-                          request.slot_status_id === 3 ? "bg-red-100 text-red-800 border-red-200" :
-                          request.slot_status_id === 4 ? "bg-blue-100 text-blue-800 border-blue-200" :
-                          "bg-yellow-100 text-yellow-800 border-yellow-200"
+                            request.slot_status_id === 3 ? "bg-red-100 text-red-800 border-red-200" :
+                              request.slot_status_id === 4 ? "bg-blue-100 text-blue-800 border-blue-200" :
+                                "bg-yellow-100 text-yellow-800 border-yellow-200"
                         }
                       >
                         Slot: {request.slot_status_name}
@@ -393,7 +393,7 @@ const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
                     )}
                   </div>
                   <p className="text-sm text-muted-foreground mb-4">{request.description}</p>
-                  
+
                   {/* Slot Information */}
                   {request.slot_date && (
                     <div className="bg-blue-50 border-l-4 border-blue-200 p-3 mb-4 rounded">
@@ -472,12 +472,12 @@ const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                  {canEdit(request) && (
+                        {canEdit(request) && (
                           <DropdownMenuItem
-                      onClick={() => handleEditRequest(request.req_id)}
-                    >
-                      <Pencil className="h-4 w-4 mr-2" />
-                      Edit Request
+                            onClick={() => handleEditRequest(request.req_id)}
+                          >
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Edit Request
                           </DropdownMenuItem>
                         )}
                         {request.slot_request_id && (
@@ -514,32 +514,32 @@ const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
                   )}
                   {request.cancelled_reason && (
                     <>
-                  {request.slot_request_id && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setSelectedRequest(request);
-                        fetchSuggestedSlots(request.slot_request_id);
-                      }}
-                      disabled={loadingSuggestedSlots}
-                    >
-                      <Lightbulb className="h-4 w-4 mr-2" />
-                      View Suggested Slots
-                    </Button>
-                  )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setSelectedRequest(request);
-                      fetchStatusHistory(request.req_id);
-                    }}
-                    disabled={loadingHistory}
-                  >
-                    <History className="h-4 w-4 mr-2" />
-                    View Status History
-                  </Button>
+                      {request.slot_request_id && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedRequest(request);
+                            fetchSuggestedSlots(request.slot_request_id);
+                          }}
+                          disabled={loadingSuggestedSlots}
+                        >
+                          <Lightbulb className="h-4 w-4 mr-2" />
+                          View Suggested Slots
+                        </Button>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedRequest(request);
+                          fetchStatusHistory(request.req_id);
+                        }}
+                        disabled={loadingHistory}
+                      >
+                        <History className="h-4 w-4 mr-2" />
+                        View Status History
+                      </Button>
                     </>
                   )}
                 </div>
@@ -570,29 +570,66 @@ const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
             <div className="space-y-6">
               {/* Group notes by role */}
               {(() => {
-                const notesByRole: { [key: string]: StatusHistory[] } = {};
-                const historyWithoutNotes: StatusHistory[] = [];
-                
-                statusHistory.forEach((history) => {
-                  const displayNote = getDisplayNote(history);
-                  const role = history.role || history.role_display_name || history.role_name || "Admin";
+                // Sort items chronologically first
+                const sortedHistory: any[] = [...statusHistory]
+                  .sort((a: any, b: any) =>
+                    new Date(a.changed_at).getTime() - new Date(b.changed_at).getTime()
+                  );
 
-                  // Filter out System notes - only show admin and protocol notes
-                  if (role === "System" || role === "SYSTEM") {
-                    return; // Skip system notes
-                  }
+                // Process history to group Advisor notes under the latest Admin
+                let currentAdminRole = "Advisor";
+                const processedHistory = sortedHistory.map((h: any) => {
+                  const role = h.role || h.role_display_name || h.role_name || "";
+                  const roleLower = role.toLowerCase();
 
-                  if (displayNote) {
-                    if (!notesByRole[role]) {
-                      notesByRole[role] = [];
+                  let effectiveRole = role || "Admin";
+                  let isAdvisorNote = roleLower === "advisor" || roleLower === "society";
+                  let displayNote = getDisplayNote(h) || h.remarks;
+                  let displayRoleName = (h.firstName && h.lastName) ? `${h.firstName} ${h.lastName}` : role;
+
+                  // Extract advisor notes that were recorded as system-like messages
+                  if (displayNote && displayNote.startsWith("Event request updated. Status set to Pending after revision by")) {
+                    isAdvisorNote = true;
+                    displayRoleName = "Advisor";
+
+                    // Try to extract just the note part
+                    const noteMatch = displayNote.match(/Note:\s*(.*)/i);
+                    if (noteMatch && noteMatch[1]) {
+                      displayNote = noteMatch[1].trim();
                     }
-                    notesByRole[role].push(history);
-                  } else {
-                    historyWithoutNotes.push(history);
                   }
+
+                  if (!isAdvisorNote && roleLower !== "system") {
+                    currentAdminRole = effectiveRole;
+                  }
+
+                  return {
+                    ...h,
+                    displayNote: displayNote,
+                    _displayRoleName: displayRoleName,
+                    _effectiveRole: isAdvisorNote ? currentAdminRole : effectiveRole,
+                    _roleLower: roleLower,
+                    _isAdvisorNote: isAdvisorNote
+                  };
+                }).filter((h: any) => {
+                  if (h._roleLower === "system" && !h._isAdvisorNote) return false;
+                  // Exclude initial submission status
+                  if (h.displayNote === "Event request submitted" || h.displayNote === "Event request created") return false;
+                  // Exclude advisor notes with no content
+                  if (h._isAdvisorNote && (!h.displayNote || String(h.displayNote).trim() === "")) return false;
+                  return true;
                 });
 
-                const roleOrder = ["Board Secretary", "Board President", "Registrar", "VC", "Transport Office", "Protocol Office"];
+                const notesByRole: { [key: string]: any[] } = {};
+                processedHistory.forEach((history: any) => {
+                  const role = history._effectiveRole;
+                  if (!notesByRole[role]) {
+                    notesByRole[role] = [];
+                  }
+                  notesByRole[role].push(history);
+                });
+
+                const roleOrder = ["Advisor", "Board Secretary", "Board President", "Registrar", "VC", "Transport Office", "Protocol Office", "Chief Proctor", "Security Office"];
                 const sortedRoles = Object.keys(notesByRole).sort((a, b) => {
                   const aIndex = roleOrder.indexOf(a);
                   const bIndex = roleOrder.indexOf(b);
@@ -602,140 +639,45 @@ const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
                   return aIndex - bIndex;
                 });
 
-                return (
-                  <>
-                    {/* Display notes grouped by role */}
-                    {sortedRoles.map((role) => (
-                      <div key={role} className="space-y-3">
-                        <h4 className="font-semibold text-sm text-university-navy border-b pb-2">
-                          {role} Notes
-                        </h4>
-                        {notesByRole[role].map((history) => (
-                          <Card key={history.history_id} className="p-4 shadow-card border-l-4 border-l-blue-500">
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <Badge 
-                                    variant={
-                                      [2, 4, 6, 8, 10, 11].includes(history.status_id) ? "default" : 
-                                      [3, 5, 7, 9].includes(history.status_id) ? "destructive" : 
-                                      "secondary"
-                                    }
-                                    className={
-                                      [2, 4, 6, 8, 10, 11].includes(history.status_id) 
-                                        ? "bg-green-100 text-green-800 border-green-200" : 
-                                      [3, 5, 7, 9].includes(history.status_id)
-                                        ? "bg-red-100 text-red-800 border-red-200" :
-                                        "bg-yellow-100 text-yellow-800 border-yellow-200"
-                                    }
-                                  >
-                                    {history.status_name}
-                                  </Badge>
-                                </div>
-                                
-                                <div className="bg-blue-50 border-l-4 border-blue-200 p-3 rounded mb-2">
-                                  <p className="text-sm text-blue-800">{getDisplayNote(history) || "—"}</p>
-                                </div>
-
-                                <div className="flex items-center gap-4 text-xs text-muted-foreground mt-2">
-                                  <div className="flex items-center">
-                                    <User className="h-3 w-3 mr-1" />
-                                    <span>
-                                      {history.firstName} {history.lastName}
-                                      {history.RollNO && ` (${history.RollNO})`}
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center">
-                                    <Clock className="h-3 w-3 mr-1" />
-                                    <span>{new Date(history.changed_at).toLocaleString()}</span>
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="ml-4">
-                                {[2, 4, 6, 8, 10, 11].includes(history.status_id) ? (
-                                  <CheckCircle className="h-5 w-5 text-green-600" />
-                                ) : [3, 5, 7, 9].includes(history.status_id) ? (
-                                  <XCircle className="h-5 w-5 text-red-600" />
-                                ) : (
-                                  <Clock className="h-5 w-5 text-yellow-600" />
-                                )}
-                              </div>
-                            </div>
-                          </Card>
-                        ))}
+                return sortedRoles.map((role) => (
+                  <div key={role} className="space-y-3">
+                    <h4 className="font-semibold text-sm text-university-navy flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-university-navy"></span>
+                      {role}
+                    </h4>
+                    {notesByRole[role].map((history: any, idx: number) => (
+                      <div
+                        key={history.history_id || idx}
+                        className={`border-l-4 ${history.displayNote ? 'border-blue-500' : 'border-slate-300'} pl-4 py-2 ${history.displayNote ? 'bg-blue-50/50' : 'bg-slate-50/30'} rounded-r`}
+                      >
+                        <div className="flex items-start justify-between mb-1">
+                          <div>
+                            <p className="text-xs font-medium text-slate-700">
+                              {history._displayRoleName}
+                              {history.status_name && !history._isAdvisorNote && (
+                                <span className="text-muted-foreground font-normal">
+                                  {" "}changed status to <span className="font-medium text-slate-800">{history.status_name}</span>
+                                </span>
+                              )}
+                              {history._isAdvisorNote && (
+                                <span className="text-muted-foreground font-normal">
+                                  {" "}added a note
+                                </span>
+                              )}
+                            </p>
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(history.changed_at).toLocaleString()}
+                          </span>
+                        </div>
+                        {/* Only show note if it exists and is not empty */}
+                        {history.displayNote && history.displayNote.trim() !== "" && (
+                          <p className="text-sm text-slate-800 mt-1 whitespace-pre-wrap">{history.displayNote}</p>
+                        )}
                       </div>
                     ))}
-                    
-                    {/* Display status changes without notes */}
-                    {historyWithoutNotes.length > 0 && (
-                      <div className="space-y-3">
-                        <h4 className="font-semibold text-sm text-university-navy border-b pb-2">
-                          Status Changes
-                        </h4>
-                        {historyWithoutNotes.map((history) => (
-                          <Card key={history.history_id} className="p-4 shadow-card border-l-4 border-l-university-navy">
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <Badge 
-                                    variant={
-                                      [2, 4, 6, 8, 10, 11].includes(history.status_id) ? "default" : 
-                                      [3, 5, 7, 9].includes(history.status_id) ? "destructive" : 
-                                      "secondary"
-                                    }
-                                    className={
-                                      [2, 4, 6, 8, 10, 11].includes(history.status_id) 
-                                        ? "bg-green-100 text-green-800 border-green-200" : 
-                                      [3, 5, 7, 9].includes(history.status_id)
-                                        ? "bg-red-100 text-red-800 border-red-200" :
-                                        "bg-yellow-100 text-yellow-800 border-yellow-200"
-                                    }
-                                  >
-                                    {history.status_name}
-                                  </Badge>
-                                  {history.role_display_name && (
-                                    <Badge variant="outline" className="text-xs">
-                                      {history.role_display_name}
-                                    </Badge>
-                                  )}
-                                </div>
-                                
-                                {history.status_description && (
-                                  <p className="text-sm text-muted-foreground mb-2">
-                                    {history.status_description}
-                                  </p>
-                                )}
-
-                                <div className="flex items-center gap-4 text-xs text-muted-foreground mt-2">
-                                  <div className="flex items-center">
-                                    <User className="h-3 w-3 mr-1" />
-                                    <span>
-                                      {history.firstName} {history.lastName}
-                                      {history.RollNO && ` (${history.RollNO})`}
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center">
-                                    <Clock className="h-3 w-3 mr-1" />
-                                    <span>{new Date(history.changed_at).toLocaleString()}</span>
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="ml-4">
-                                {[2, 4, 6, 8, 10, 11].includes(history.status_id) ? (
-                                  <CheckCircle className="h-5 w-5 text-green-600" />
-                                ) : [3, 5, 7, 9].includes(history.status_id) ? (
-                                  <XCircle className="h-5 w-5 text-red-600" />
-                                ) : (
-                                  <Clock className="h-5 w-5 text-yellow-600" />
-                                )}
-                              </div>
-                            </div>
-                          </Card>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                );
+                  </div>
+                ));
               })()}
             </div>
           ) : (

@@ -878,7 +878,8 @@ const GuestSection = ({
 const DocumentSection = ({
   documents,
   handleFileGroup,
-  removeDocument
+  removeDocument,
+  existingDocuments = [],
 }: {
   documents: {
     brochure: File[];
@@ -891,6 +892,7 @@ const DocumentSection = ({
     files: FileList | null
   ) => void;
   removeDocument: (type: keyof typeof documents, index: number) => void;
+  existingDocuments?: Array<{ doc_id: number; doc_type: string; file_path: string }>;
 }) => {
   const totalFiles =
     documents.brochure.length +
@@ -898,9 +900,43 @@ const DocumentSection = ({
     documents.schedule.length +
     documents.invitation.length;
 
+  const getExistingForType = (docType: string) =>
+    existingDocuments.filter((d) => d.doc_type?.toLowerCase() === docType.toLowerCase());
+
+  const API_URL = import.meta.env.VITE_API_URL;
+
   return (
     <div className="space-y-4 border rounded p-4">
       <h4 className="font-medium text-lg">Upload Event Documents</h4>
+
+      {/* Previously uploaded documents (when editing) */}
+      {existingDocuments.length > 0 && (
+        <div className="mb-4 p-3 bg-blue-50 rounded border border-blue-200">
+          <p className="text-sm font-medium text-blue-900 mb-2">Previously Uploaded Documents:</p>
+          <div className="space-y-2">
+            {existingDocuments.map((doc) => (
+              <div
+                key={doc.doc_id}
+                className="flex items-center justify-between text-sm bg-white p-2 rounded border"
+              >
+                <span className="truncate block">
+                  <span className="font-medium capitalize">{doc.doc_type}</span>
+                  {" – "}
+                  {doc.file_path?.split("/").pop()}
+                </span>
+                <a
+                  href={`${API_URL}${doc.file_path}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline font-medium ml-2 text-xs shrink-0"
+                >
+                  View
+                </a>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Event Program Documents */}
       <div className="space-y-2">
@@ -912,6 +948,11 @@ const DocumentSection = ({
         <div className="grid md:grid-cols-2 gap-3">
           <div>
             <Label>Brochure</Label>
+            {getExistingForType("brochure").length > 0 && (
+              <div className="text-xs text-muted-foreground mb-1">
+                (Existing file(s) shown above)
+              </div>
+            )}
             <Input
               type="file"
               multiple
@@ -937,6 +978,11 @@ const DocumentSection = ({
 
           <div>
             <Label>Script</Label>
+            {getExistingForType("script").length > 0 && (
+              <div className="text-xs text-muted-foreground mb-1">
+                (Existing file(s) shown above)
+              </div>
+            )}
             <Input
               type="file"
               multiple
@@ -962,6 +1008,11 @@ const DocumentSection = ({
 
           <div>
             <Label>Schedule</Label>
+            {getExistingForType("schedule").length > 0 && (
+              <div className="text-xs text-muted-foreground mb-1">
+                (Existing file(s) shown above)
+              </div>
+            )}
             <Input
               type="file"
               multiple
@@ -987,6 +1038,11 @@ const DocumentSection = ({
 
           <div>
             <Label>Invitation Card</Label>
+            {getExistingForType("invitation").length > 0 && (
+              <div className="text-xs text-muted-foreground mb-1">
+                (Existing file(s) shown above)
+              </div>
+            )}
             <Input
               type="file"
               multiple
@@ -1074,6 +1130,7 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
   const [guests, setGuests] = useState<GuestRow[]>([{ ...defaultGuest, id: genId() }]);
   const [guestListFile, setGuestListFile] = useState<File | null>(null);
   const [existingGuestLists, setExistingGuestLists] = useState<Array<{ guest_list_id: number; file_path: string; created_at?: string }>>([]);
+  const [existingDocuments, setExistingDocuments] = useState<Array<{ doc_id: number; doc_type: string; file_path: string }>>([]);
   const [management, setManagement] = useState<ManagementRequirements>({
     ...defaultManagement,
   });
@@ -1096,6 +1153,9 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
   });
 
   const [loading, setLoading] = useState(false);
+
+  /* ------------------ ADVISOR NOTE (edit mode - when editing after revise) ------------------ */
+  const [advisorNote, setAdvisorNote] = useState("");
 
   /* =====================================================================================
      FETCH VENUES AND OCCUPIED SLOTS
@@ -1255,8 +1315,10 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
             }]);
           }
 
-          // Note: Documents and guest list files are not loaded as they are files - user can re-upload if needed
-          // Existing guest lists will be shown in the UI but not loaded as File objects
+          // Populate existing documents (brochure, script, schedule, invitation, other) for display when editing
+          if (data.documents && Array.isArray(data.documents) && data.documents.length > 0) {
+            setExistingDocuments(data.documents);
+          }
         }
       } catch (error: any) {
         console.error("Error loading event request data:", error);
@@ -2186,6 +2248,9 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
       if (isEditMode && reqId) {
         // Update existing event request
         fd.append("req_id", String(reqId));
+        if (advisorNote && advisorNote.trim()) {
+          fd.append("note", advisorNote.trim());
+        }
         res = await axios.put(
           endpoint,
           fd,
@@ -2659,6 +2724,19 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
                 placeholder="Describe media coverage plans..."
               />
             </div>
+
+            {/* Advisor note - only in edit mode (when editing after revise status) */}
+            {isEditMode && (
+              <div>
+                <Label>Advisor Justification Comment</Label>
+                <Textarea
+                  rows={2}
+                  value={advisorNote}
+                  onChange={(e) => setAdvisorNote(e.target.value)}
+                  placeholder="Add a note about changes made (e.g. what was revised based on feedback)..."
+                />
+              </div>
+            )}
           </div>
         );
 
@@ -2796,6 +2874,7 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
               documents={documents}
               handleFileGroup={handleFileGroup}
               removeDocument={removeDocument}
+              existingDocuments={existingDocuments}
             />
           </div>
         );

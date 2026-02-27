@@ -20,6 +20,7 @@ import RegistrarDashboard from "@/components/admin/RegistrarDashboard";
 import VCDashboard from "@/components/admin/VCDashboard";
 import TransportOfficeDashboard from "@/components/admin/TransportOfficeDashboard";
 import ProtocolOfficeDashboard from "@/components/admin/ProtocolOfficeDashboard";
+import PRDashboard from "@/components/admin/PRDashboard";
 import RoleAccess from "@/components/admin/RoleAccess";
 import AddFaculty from "@/components/admin/AddFaculty";
 import AdvisorDashboard from "@/components/admin/AdvisorDashboard";
@@ -176,6 +177,12 @@ const App = () => (
           <Route path="/dashboard/admin/protocol-office" element={
             <ProtectedRoute requireAuth>
               <ProtocolOfficeDashboard />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/dashboard/admin/pr-dashboard" element={
+            <ProtectedRoute requireAuth>
+              <PRDashboard />
             </ProtectedRoute>
           } />
 

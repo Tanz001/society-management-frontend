@@ -37,7 +37,7 @@ const LoginForm = () => {
 
     try {
       const API_URL = import.meta.env.VITE_API_URL;
-      
+
       if (!API_URL) {
         throw new Error("API URL is not configured. Please check your environment variables.");
       }
@@ -129,6 +129,16 @@ const LoginForm = () => {
         navigate("/dashboard/admin/protocol-office");
         return;
       }
+
+      if (
+        roleNames.includes("pr") ||
+        roleNames.includes("pr_office") ||
+        roleNames.includes("public relations") ||
+        roleNames.includes("public_relations")
+      ) {
+        navigate("/dashboard/admin/pr-dashboard");
+        return;
+      }
       if (roleNames.includes("admin")) {
         navigate("/dashboard/admin");
         return;
@@ -174,9 +184,9 @@ const LoginForm = () => {
         status: err.response?.status,
         config: err.config
       });
-      
+
       let errorMessage = "Login failed. Please try again.";
-      
+
       if (err.response?.data?.message) {
         errorMessage = err.response.data.message;
       } else if (err.response?.data?.error) {
@@ -184,17 +194,17 @@ const LoginForm = () => {
       } else if (err.message) {
         errorMessage = err.message;
       }
-      
+
       // Network error
       if (err.code === 'ERR_NETWORK' || err.message.includes('Network Error')) {
         errorMessage = "Network error. Please check your internet connection and try again.";
       }
-      
+
       // Timeout error
       if (err.code === 'ECONNABORTED') {
         errorMessage = "Request timeout. Please try again.";
       }
-      
+
       setError(errorMessage);
       localStorage.removeItem("token");
       localStorage.removeItem("user");
@@ -422,7 +432,7 @@ const LoginForm = () => {
                 disabled={loading || !formData.email || !formData.password}
                 className="w-full h-12 text-white font-bold text-lg rounded-lg shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                 style={{
-                  background: loading 
+                  background: loading
                     ? 'linear-gradient(135deg, rgba(100, 100, 100, 0.9) 0%, rgba(100, 100, 100, 0.9) 50%, rgba(100, 100, 100, 0.8) 100%)'
                     : 'linear-gradient(135deg, rgba(0, 0, 92, 0.9) 0%, rgba(91, 0, 7, 0.9) 50%, rgba(206, 173, 114, 0.8) 100%)',
                   border: '1px solid rgba(206, 173, 114, 0.3)',

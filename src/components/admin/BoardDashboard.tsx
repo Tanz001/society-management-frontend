@@ -1226,6 +1226,71 @@ const BoardDashboard = () => {
                   </Card>
                 )}
 
+              {/* Guest Profiles (with profile documents) */}
+              {Array.isArray(selectedEventRequest.event_guests) && selectedEventRequest.event_guests.length > 0 && (
+                <Card className="p-4">
+                  <h3 className="font-semibold mb-3 text-university-navy">Guest Profiles</h3>
+                  <div className="space-y-3 text-sm">
+                    {selectedEventRequest.event_guests.map((guest: any) => (
+                      <div
+                        key={guest.guest_id}
+                        className="flex items-center justify-between border-b last:border-0 pb-3 last:pb-0"
+                      >
+                        <div className="flex flex-col gap-1">
+                          <span className="font-medium">{guest.guest_name || "Guest"}</span>
+                          {guest.description && (
+                            <span className="text-muted-foreground text-xs">{guest.description}</span>
+                          )}
+                        </div>
+                        {guest.profile_document_path && (
+                          <a
+                            href={`${import.meta.env.VITE_API_URL}${guest.profile_document_path}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 text-xs text-blue-600 hover:underline"
+                          >
+                            <FileText className="h-4 w-4" />
+                            View Profile Document
+                          </a>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
+
+              {/* Guest List Documents */}
+              {Array.isArray(selectedEventRequest.guest_lists) && selectedEventRequest.guest_lists.length > 0 && (
+                <Card className="p-4">
+                  <h3 className="font-semibold mb-3 text-university-navy">Guest List Documents</h3>
+                  <div className="space-y-2 text-sm">
+                    {selectedEventRequest.guest_lists.map((gl: any, idx: number) => (
+                      <div
+                        key={gl.guest_list_id || idx}
+                        className="flex items-center justify-between border-b last:border-0 pb-2 last:pb-0"
+                      >
+                        <span>
+                          <span className="font-medium">Guest List</span>
+                          {" – "}
+                          {gl.file_path?.split("/").pop() || "Document"}
+                          {gl.created_at && (
+                            <span className="text-muted-foreground text-xs block">Uploaded: {new Date(gl.created_at).toLocaleDateString()}</span>
+                          )}
+                        </span>
+                        <a
+                          href={`${import.meta.env.VITE_API_URL}${gl.file_path}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-blue-600 hover:underline"
+                        >
+                          View
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
+
               {/* Admin Notes from History - Grouped by Role */}
               {Array.isArray(selectedEventRequest.status_history) &&
                 selectedEventRequest.status_history.length > 0 && (
@@ -1233,24 +1298,78 @@ const BoardDashboard = () => {
                     <h3 className="font-semibold mb-4 text-university-navy">Admin Notes & Status History</h3>
                     <div className="space-y-6">
                       {/* Group notes by role */}
+                      {/* Group all status changes by role chronologically (including those without notes) */}
                       {(() => {
-                        const notesByRole: { [key: string]: any[] } = {};
-                        selectedEventRequest.status_history
-                          .filter((h: any) => {
-                            // Filter out System and Advisor notes - only show admin notes
-                            const role = h.role || h.role_display_name || h.role_name || "";
-                            const roleLower = role.toLowerCase();
-                            return roleLower !== "system" && roleLower !== "advisor";
-                          })
-                          .forEach((history: any) => {
-                            const role = history.role || history.role_display_name || history.role_name || "Admin";
-                            if (!notesByRole[role]) {
-                              notesByRole[role] = [];
-                            }
-                            notesByRole[role].push(history);
-                          });
+                        // Sort items chronologically first
+                        const sortedHistory: any[] = [...(selectedEventRequest.status_history || [])]
+                          .sort((a: any, b: any) =>
+                            new Date(a.changed_at).getTime() - new Date(b.changed_at).getTime()
+                          );
 
-                        const roleOrder = ["Board Secretary", "Board President", "Registrar", "VC", "Transport Office", "Protocol Office"];
+                        // Process history to group Advisor notes under the latest Admin
+                        let currentAdminRole = "Advisor";
+                        const processedHistory = sortedHistory.map((h: any) => {
+                          const role = h.role || h.role_display_name || h.role_name || "";
+                          const roleLower = role.toLowerCase();
+
+                          let effectiveRole = role || "Admin";
+                          let isAdvisorNote = roleLower === "advisor" || roleLower === "society";
+
+                          let displayNote = h.note ?? h.remarks;
+                          if (displayNote && typeof displayNote === 'string') {
+                            try {
+                              const parsed = JSON.parse(displayNote);
+                              displayNote = parsed.note ?? null;
+                            } catch (e) {
+                              // Not JSON, keep as is
+                            }
+                          }
+
+                          let displayRoleName = (h.firstName && h.lastName) ? `${h.firstName} ${h.lastName}` : role;
+
+                          // Extract advisor notes that were recorded as system-like messages
+                          if (displayNote && displayNote.startsWith("Event request updated. Status set to Pending after revision by")) {
+                            isAdvisorNote = true;
+                            displayRoleName = "Advisor";
+
+                            // Try to extract just the note part
+                            const noteMatch = displayNote.match(/Note:\s*(.*)/i);
+                            if (noteMatch && noteMatch[1]) {
+                              displayNote = noteMatch[1].trim();
+                            }
+                          }
+
+                          if (!isAdvisorNote && roleLower !== "system") {
+                            currentAdminRole = effectiveRole;
+                          }
+
+                          return {
+                            ...h,
+                            note: displayNote,
+                            _displayRoleName: displayRoleName,
+                            _effectiveRole: isAdvisorNote ? currentAdminRole : effectiveRole,
+                            _roleLower: roleLower,
+                            _isAdvisorNote: isAdvisorNote
+                          };
+                        }).filter((h: any) => {
+                          if (h._roleLower === "system" && !h._isAdvisorNote) return false;
+                          // Exclude initial submission status
+                          if (h.note === "Event request submitted" || h.note === "Event request created") return false;
+                          // Exclude empty advisor notes
+                          if (h._isAdvisorNote && (!h.note || String(h.note).trim() === "")) return false;
+                          return true;
+                        });
+
+                        const notesByRole: { [key: string]: any[] } = {};
+                        processedHistory.forEach((history: any) => {
+                          const role = history._effectiveRole;
+                          if (!notesByRole[role]) {
+                            notesByRole[role] = [];
+                          }
+                          notesByRole[role].push(history);
+                        });
+
+                        const roleOrder = ["Advisor", "Board Secretary", "Board President", "Registrar", "VC", "Transport Office", "Protocol Office", "Chief Proctor", "Security Office"];
                         const sortedRoles = Object.keys(notesByRole).sort((a, b) => {
                           const aIndex = roleOrder.indexOf(a);
                           const bIndex = roleOrder.indexOf(b);
@@ -1266,21 +1385,29 @@ const BoardDashboard = () => {
 
                         return sortedRoles.map((role) => (
                           <div key={role} className="space-y-3">
-                            <h4 className="font-semibold text-sm text-university-navy border-b pb-2">
+                            <h4 className="font-semibold text-sm text-university-navy flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-university-navy"></span>
                               {role}
                             </h4>
                             {notesByRole[role].map((history: any, idx: number) => (
                               <div
                                 key={history.history_id || idx}
-                                className="border-l-4 border-blue-500 pl-4 py-2 bg-blue-50 rounded-r"
+                                className={`border-l-4 ${history.note ? 'border-blue-500' : 'border-slate-300'} pl-4 py-2 ${history.note ? 'bg-blue-50/50' : 'bg-slate-50/30'} rounded-r`}
                               >
-                                <div className="flex items-start justify-between mb-2">
+                                <div className="flex items-start justify-between mb-1">
                                   <div>
-                                    <p className="text-xs text-muted-foreground">
-                                      {history.firstName && history.lastName
-                                        ? `${history.firstName} ${history.lastName}`
-                                        : role}
-                                      {history.status_name && ` • ${history.status_name}`}
+                                    <p className="text-xs font-medium text-slate-700">
+                                      {history._displayRoleName}
+                                      {history.status_name && !history._isAdvisorNote && (
+                                        <span className="text-muted-foreground font-normal">
+                                          {" "}changed status to <span className="font-medium text-slate-800">{history.status_name}</span>
+                                        </span>
+                                      )}
+                                      {history._isAdvisorNote && (
+                                        <span className="text-muted-foreground font-normal">
+                                          {" "}added a note
+                                        </span>
+                                      )}
                                     </p>
                                   </div>
                                   <span className="text-xs text-muted-foreground">
@@ -1289,7 +1416,7 @@ const BoardDashboard = () => {
                                 </div>
                                 {/* Only show note if it exists and is not empty */}
                                 {history.note && history.note.trim() !== "" && (
-                                <p className="text-sm text-gray-700 mt-1">{history.note}</p>
+                                  <p className="text-sm text-slate-800 mt-1 whitespace-pre-wrap">{history.note}</p>
                                 )}
                               </div>
                             ))}

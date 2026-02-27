@@ -626,6 +626,73 @@ const EventRequestDetailModal: React.FC<EventRequestDetailModalProps> = ({
                                 </Card>
                             )}
 
+                        {/* Guest Profiles (with profile documents) */}
+                        {Array.isArray(eventRequest.event_guests) && eventRequest.event_guests.length > 0 && (
+                            <Card className="p-4 shadow-sm border-slate-200">
+                                <h3 className="font-semibold mb-3 text-slate-800 border-b pb-2">Guest Profiles</h3>
+                                <div className="space-y-3 text-sm">
+                                    {eventRequest.event_guests.map((guest: any) => (
+                                        <div
+                                            key={guest.guest_id}
+                                            className="flex items-center justify-between border-b border-slate-100 last:border-0 pb-3 last:pb-0"
+                                        >
+                                            <div className="flex flex-col gap-1">
+                                                <span className="font-medium text-slate-900">{guest.guest_name || "Guest"}</span>
+                                                {guest.description && (
+                                                    <span className="text-muted-foreground text-xs">{guest.description}</span>
+                                                )}
+                                            </div>
+                                            {guest.profile_document_path && (
+                                                <a
+                                                    href={`${import.meta.env.VITE_API_URL}${guest.profile_document_path}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="flex items-center gap-2 text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline px-2 py-1 rounded bg-blue-50"
+                                                >
+                                                    <FileText className="h-4 w-4" />
+                                                    View Profile Document
+                                                </a>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </Card>
+                        )}
+
+                        {/* Guest List Documents */}
+                        {(Array.isArray(eventRequest.guest_lists) && eventRequest.guest_lists.length > 0) && (
+                            <Card className="p-4 shadow-sm border-slate-200">
+                                <h3 className="font-semibold mb-3 text-slate-800 border-b pb-2">Guest List Documents</h3>
+                                <div className="space-y-2 text-sm">
+                                    {eventRequest.guest_lists.map((gl: any, idx: number) => (
+                                        <div
+                                            key={gl.guest_list_id || idx}
+                                            className="flex items-center justify-between border-b border-slate-100 last:border-0 pb-2 last:pb-0"
+                                        >
+                                            <span className="flex items-center gap-2">
+                                                <FileText className="h-4 w-4 text-blue-500" />
+                                                <span>
+                                                    <span className="font-medium text-slate-900">Guest List</span>
+                                                    <span className="text-muted-foreground">{" – "}{gl.file_path?.split("/").pop() || "Document"}</span>
+                                                    {gl.created_at && (
+                                                        <span className="text-muted-foreground text-xs block">Uploaded: {new Date(gl.created_at).toLocaleDateString()}</span>
+                                                    )}
+                                                </span>
+                                            </span>
+                                            <a
+                                                href={`${import.meta.env.VITE_API_URL}${gl.file_path}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline px-2 py-1 rounded bg-blue-50"
+                                            >
+                                                View
+                                            </a>
+                                        </div>
+                                    ))}
+                                </div>
+                            </Card>
+                        )}
+
                         {/* Admin Notes from History - Grouped by Role */}
                         {Array.isArray(eventRequest.status_history) &&
                             eventRequest.status_history.length > 0 && (
@@ -633,28 +700,77 @@ const EventRequestDetailModal: React.FC<EventRequestDetailModalProps> = ({
                                     <h3 className="font-semibold mb-4 text-slate-800 border-b pb-2">Admin Notes & Status History</h3>
                                     <div className="space-y-6">
                                         {(() => {
-                                            // Show ALL status changes, not just those with notes
-                                            const historyItems: any[] = eventRequest.status_history
-                                                .filter((h: any) => {
-                                                    // Filter out System and Advisor notes - only show admin notes
-                                                    const role = h.role || h.role_display_name || h.role_name || "";
-                                                    const roleLower = role.toLowerCase();
-                                                    return roleLower !== "system" && roleLower !== "advisor";
-                                                })
+                                            // Sort items chronologically first
+                                            const sortedHistory: any[] = [...(eventRequest.status_history || [])]
                                                 .sort((a: any, b: any) =>
                                                     new Date(a.changed_at).getTime() - new Date(b.changed_at).getTime()
                                                 );
 
+                                            // Process history to group Advisor notes under the latest Admin
+                                            let currentAdminRole = "Advisor";
+                                            const processedHistory = sortedHistory.map((h: any) => {
+                                                const role = h.role || h.role_display_name || h.role_name || "";
+                                                const roleLower = role.toLowerCase();
+
+                                                let effectiveRole = role || "Admin";
+                                                let isAdvisorNote = roleLower === "advisor";
+
+                                                let displayNote = h.note ?? h.remarks;
+                                                if (displayNote && typeof displayNote === 'string') {
+                                                    try {
+                                                        const parsed = JSON.parse(displayNote);
+                                                        displayNote = parsed.note ?? null;
+                                                    } catch (e) {
+                                                        // Not JSON, keep as is
+                                                    }
+                                                }
+
+                                                let displayRoleName = (h.firstName && h.lastName) ? `${h.firstName} ${h.lastName}` : role;
+
+                                                // Extract advisor notes that were recorded as system-like messages
+                                                // Example: "Event request updated. Status set to Pending after revision by Board Secretary. Note: what missing"
+                                                if (h.note && h.note.startsWith("Event request updated. Status set to Pending after revision by")) {
+                                                    isAdvisorNote = true;
+                                                    displayRoleName = "Advisor";
+
+                                                    // Try to extract just the note part
+                                                    const noteMatch = h.note.match(/Note:\s*(.*)/i);
+                                                    if (noteMatch && noteMatch[1]) {
+                                                        displayNote = noteMatch[1].trim();
+                                                    }
+                                                }
+
+                                                if (!isAdvisorNote && roleLower !== "system") {
+                                                    currentAdminRole = effectiveRole;
+                                                }
+
+                                                return {
+                                                    ...h,
+                                                    note: displayNote, // Use the extracted note
+                                                    _displayRoleName: displayRoleName, // Use the proper name (Student/Advisor or Admin)
+                                                    _effectiveRole: isAdvisorNote ? currentAdminRole : effectiveRole,
+                                                    _roleLower: roleLower,
+                                                    _isAdvisorNote: isAdvisorNote
+                                                };
+                                            }).filter((h: any) => {
+                                                if (h._roleLower === "system" && !h._isAdvisorNote) return false;
+                                                // Exclude initial submission status
+                                                if (h.note === "Event request submitted" || h.note === "Event request created") return false;
+                                                // Exclude advisor notes with no content
+                                                if (h._isAdvisorNote && (!h.note || String(h.note).trim() === "")) return false;
+                                                return true;
+                                            });
+
                                             const notesByRole: { [key: string]: any[] } = {};
-                                            historyItems.forEach((history: any) => {
-                                                const role = history.role || history.role_display_name || history.role_name || "Admin";
+                                            processedHistory.forEach((history: any) => {
+                                                const role = history._effectiveRole;
                                                 if (!notesByRole[role]) {
                                                     notesByRole[role] = [];
                                                 }
                                                 notesByRole[role].push(history);
                                             });
 
-                                            const roleOrder = ["Board Secretary", "Board President", "Registrar", "VC", "Transport Office", "Protocol Office", "Chief Proctor", "Security Office"];
+                                            const roleOrder = ["Advisor", "Board Secretary", "Board President", "Registrar", "VC", "Transport Office", "Protocol Office", "Chief Proctor", "Security Office"];
                                             const sortedRoles = Object.keys(notesByRole).sort((a, b) => {
                                                 const aIndex = roleOrder.indexOf(a);
                                                 const bIndex = roleOrder.indexOf(b);
@@ -682,12 +798,15 @@ const EventRequestDetailModal: React.FC<EventRequestDetailModalProps> = ({
                                                             <div className="flex items-start justify-between mb-1">
                                                                 <div>
                                                                     <p className="text-xs font-medium text-slate-700">
-                                                                        {history.firstName && history.lastName
-                                                                            ? `${history.firstName} ${history.lastName}`
-                                                                            : role}
-                                                                        {history.status_name && (
+                                                                        {history._displayRoleName}
+                                                                        {history.status_name && !history._isAdvisorNote && (
                                                                             <span className="text-muted-foreground font-normal">
                                                                                 {" "}changed status to <span className="font-medium text-slate-800">{history.status_name}</span>
+                                                                            </span>
+                                                                        )}
+                                                                        {history._isAdvisorNote && (
+                                                                            <span className="text-muted-foreground font-normal">
+                                                                                {" "}added a note
                                                                             </span>
                                                                         )}
                                                                     </p>
