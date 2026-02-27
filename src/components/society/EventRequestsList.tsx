@@ -615,8 +615,13 @@ const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
                   if (h._roleLower === "system" && !h._isAdvisorNote) return false;
                   // Exclude initial submission status
                   if (h.displayNote === "Event request submitted" || h.displayNote === "Event request created") return false;
-                  // Exclude advisor notes with no content
-                  if (h._isAdvisorNote && (!h.displayNote || String(h.displayNote).trim() === "")) return false;
+                  // Exclude advisor notes with no content or generic update messages
+                  if (h._isAdvisorNote) {
+                    const n = String(h.displayNote || h.note || "").trim();
+                    if (!n) return false;
+                    if (/^Event request updated and resubmitted\.?$/i.test(n)) return false;
+                    if (/^Event request updated\.\s*Status remains .+\.?$/i.test(n)) return false;
+                  }
                   return true;
                 });
 

@@ -2144,8 +2144,13 @@ const RegistrarDashboard = () => {
                           if (h._roleLower === "system" && !h._isAdvisorNote) return false;
                           // Exclude initial submission status
                           if (h.note === "Event request submitted" || h.note === "Event request created") return false;
-                          // Exclude empty advisor notes
-                          if (h._isAdvisorNote && (!h.note || String(h.note).trim() === "")) return false;
+                          // Exclude advisor notes with no content or generic update messages
+                          if (h._isAdvisorNote) {
+                            const n = String(h.note || "").trim();
+                            if (!n) return false;
+                            if (/^Event request updated and resubmitted\.?$/i.test(n)) return false;
+                            if (/^Event request updated\.\s*Status remains .+\.?$/i.test(n)) return false;
+                          }
                           return true;
                         });
 
