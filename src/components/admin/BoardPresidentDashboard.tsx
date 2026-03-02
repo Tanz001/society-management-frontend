@@ -369,13 +369,15 @@ const BoardPresidentDashboard = () => {
     }
   };
 
-  // Handle open event status change modal
+  // President can update only when Approved by Secretary (2) or Revise (15-18)
+  const canUpdateStatus = (statusId: number) => [2, 15, 16, 17, 18].includes(statusId);
   const handleChangeEventStatus = async (request: any) => {
+    if (!canUpdateStatus(request?.status_id)) return;
     setSelectedEventRequest(request);
-    setSelectedEventStatus(0); // Reset selection
-    setEventStatusNote(""); // Always start with empty note
+    setSelectedEventStatus(0);
+    setEventStatusNote("");
     setIsEventStatusModalOpen(true);
-    // Fetch allowed statuses based on the request's current status
+    if ([15, 16, 17, 18].includes(request?.status_id)) return;
     await fetchStatuses(request.status_id);
   };
 
@@ -872,7 +874,7 @@ const BoardPresidentDashboard = () => {
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
                                     onClick={() => handleChangeEventStatus(request)}
-                                    disabled={loadingEventRequests}
+                                    disabled={loadingEventRequests || !canUpdateStatus(request?.status_id)}
                                   >
                                     <Edit className="h-4 w-4 mr-2" />
                                     Update Status
@@ -1130,16 +1132,18 @@ const BoardPresidentDashboard = () => {
         variant="detailed"
         isLoading={loading}
         actionContent={
-          <Button
-            variant="university"
-            onClick={() => {
-              setIsEventRequestModalOpen(false);
-              handleChangeEventStatus(selectedEventRequest);
-            }}
-          >
-            <Edit className="h-4 w-4 mr-2" />
-            Update Status
-          </Button>
+          !selectedEventRequest || !canUpdateStatus(selectedEventRequest.status_id) ? null : (
+            <Button
+              variant="university"
+              onClick={() => {
+                setIsEventRequestModalOpen(false);
+                handleChangeEventStatus(selectedEventRequest);
+              }}
+            >
+              <Edit className="h-4 w-4 mr-2" />
+              Update Status
+            </Button>
+          )
         }
       />
 
@@ -1162,52 +1166,67 @@ const BoardPresidentDashboard = () => {
                 </Badge>
               </div>
 
-              <div>
-                <label className="text-sm font-medium mb-2 block">Select Action</label>
-                <Select
-                  value={selectedEventStatus.toString()}
-                  onValueChange={(value) => setSelectedEventStatus(parseInt(value))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select an action" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {statuses.map((status) => (
-                      <SelectItem key={status.status_id} value={status.status_id.toString()}>
-                        {status.status_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {selectedEventStatus > 0 && statuses.find(s => s.status_id === selectedEventStatus) && (
-                  <p className="text-xs text-muted-foreground mt-2">
-                    {statuses.find(s => s.status_id === selectedEventStatus)?.description}
-                  </p>
-                )}
-              </div>
+              {[15, 16, 17, 18].includes(selectedEventRequest.status_id) ? (
+                <>
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800">
+                    You cannot update status. It is pending from advisor side.
+                  </div>
+                  <div className="flex justify-end pt-4">
+                    <Button variant="outline" onClick={() => setIsEventStatusModalOpen(false)}>
+                      Close
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Select Action</label>
+                    <Select
+                      value={selectedEventStatus.toString()}
+                      onValueChange={(value) => setSelectedEventStatus(parseInt(value))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select an action" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {statuses.map((status) => (
+                          <SelectItem key={status.status_id} value={status.status_id.toString()}>
+                            {status.status_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {selectedEventStatus > 0 && statuses.find(s => s.status_id === selectedEventStatus) && (
+                      <p className="text-xs text-muted-foreground mt-2">
+                        {statuses.find(s => s.status_id === selectedEventStatus)?.description}
+                      </p>
+                    )}
+                  </div>
 
-              <div>
-                <label className="text-sm font-medium mb-2 block">Note (Optional)</label>
-                <Textarea
-                  placeholder="Write note"
-                  value={eventStatusNote}
-                  onChange={(e) => setEventStatusNote(e.target.value)}
-                  rows={4}
-                />
-              </div>
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Note (Optional)</label>
+                    <Textarea
+                      placeholder="Write note"
+                      value={eventStatusNote}
+                      onChange={(e) => setEventStatusNote(e.target.value)}
+                      rows={4}
+                    />
+                  </div>
 
-              <div className="flex justify-end space-x-3 pt-4">
-                <Button variant="outline" onClick={() => setIsEventStatusModalOpen(false)} disabled={actionLoading}>
-                  Cancel
-                </Button>
-                <Button
-                  variant="university"
-                  onClick={handleUpdateEventStatus}
-                  disabled={actionLoading || selectedEventStatus === selectedEventRequest.status_id}
-                >
-                  {actionLoading ? "Updating..." : "Update Status"}
-                </Button>
-              </div>
+                  <div className="flex justify-end space-x-3 pt-4">
+                    <Button variant="outline" onClick={() => setIsEventStatusModalOpen(false)} disabled={actionLoading}>
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="university"
+                      onClick={handleUpdateEventStatus}
+                      disabled={actionLoading || selectedEventStatus === selectedEventRequest.status_id}
+                    >
+                      {actionLoading ? "Updating..." : "Update Status"}
+                    </Button>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </DialogContent>
