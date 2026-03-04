@@ -2725,18 +2725,6 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
               />
             </div>
 
-            {/* Advisor note - only in edit mode (when editing after revise status) */}
-            {isEditMode && (
-              <div>
-                <Label>Advisor Justification Comment</Label>
-                <Textarea
-                  rows={2}
-                  value={advisorNote}
-                  onChange={(e) => setAdvisorNote(e.target.value)}
-                  placeholder="Add a note about changes made (e.g. what was revised based on feedback)..."
-                />
-              </div>
-            )}
           </div>
         );
 
@@ -2876,6 +2864,18 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
               removeDocument={removeDocument}
               existingDocuments={existingDocuments}
             />
+            {/* Advisor justification - only on last step in edit mode (when editing after revise status) */}
+            {isEditMode && (
+              <div>
+                <Label>Advisor Justification Comment</Label>
+                <Textarea
+                  rows={2}
+                  value={advisorNote}
+                  onChange={(e) => setAdvisorNote(e.target.value)}
+                  placeholder="Add a note about changes made (e.g. what was revised based on feedback)..."
+                />
+              </div>
+            )}
           </div>
         );
 

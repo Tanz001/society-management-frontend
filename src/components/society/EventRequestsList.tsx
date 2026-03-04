@@ -635,7 +635,7 @@ const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
                   notesByRole[role].push(history);
                 });
 
-                const roleOrder = ["Advisor", "Board Secretary", "Board President", "Registrar", "VC", "Transport Office", "Protocol Office", "Chief Proctor", "Security Office"];
+                const roleOrder = ["Protocol Office", "Advisor", "Board Secretary", "Board President", "Registrar", "VC", "Transport Office", "Chief Proctor", "Security Office"];
                 const sortedRoles = Object.keys(notesByRole).sort((a, b) => {
                   const aIndex = roleOrder.indexOf(a);
                   const bIndex = roleOrder.indexOf(b);

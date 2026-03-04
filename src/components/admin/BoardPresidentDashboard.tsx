@@ -120,6 +120,7 @@ const BoardPresidentDashboard = () => {
   const [statsLoading, setStatsLoading] = useState(false);
   const [eventRequestFilter, setEventRequestFilter] = useState<string>("all"); // all, pending, approved, rejected
   const [eventRequestSearch, setEventRequestSearch] = useState<string>("");
+  const [eventRequestDateFilter, setEventRequestDateFilter] = useState<string>("");
 
   // Pagination states
   const [eventRequestsCurrentPage, setEventRequestsCurrentPage] = useState(1);
@@ -752,35 +753,60 @@ const BoardPresidentDashboard = () => {
                   />
                 </div>
                 <div className="flex gap-2">
+                  <Input
+                    type="date"
+                    value={eventRequestDateFilter}
+                    onChange={(e) => {
+                      setEventRequestDateFilter(e.target.value);
+                      setEventRequestsCurrentPage(1);
+                    }}
+                    className="w-auto"
+                  />
                   <Button
-                    variant={eventRequestFilter === "all" ? "university" : "outline"}
-                    size="sm"
-                    onClick={() => setEventRequestFilter("all")}
+                    variant={eventRequestDateFilter === new Date().toISOString().split('T')[0] ? "university" : "outline"}
+                    onClick={() => {
+                      const today = new Date().toISOString().split('T')[0];
+                      if (eventRequestDateFilter === today) {
+                        setEventRequestDateFilter(""); // Toggle off
+                      } else {
+                        setEventRequestDateFilter(today); // Toggle on
+                      }
+                      setEventRequestsCurrentPage(1);
+                    }}
                   >
-                    All
-                  </Button>
-                  <Button
-                    variant={eventRequestFilter === "pending" ? "university" : "outline"}
-                    size="sm"
-                    onClick={() => setEventRequestFilter("pending")}
-                  >
-                    Pending
-                  </Button>
-                  <Button
-                    variant={eventRequestFilter === "approved" ? "university" : "outline"}
-                    size="sm"
-                    onClick={() => setEventRequestFilter("approved")}
-                  >
-                    Approved
-                  </Button>
-                  <Button
-                    variant={eventRequestFilter === "rejected" ? "university" : "outline"}
-                    size="sm"
-                    onClick={() => setEventRequestFilter("rejected")}
-                  >
-                    Rejected
+                    Today's Events
                   </Button>
                 </div>
+              </div>
+              <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+                <Button
+                  variant={eventRequestFilter === "all" ? "university" : "outline"}
+                  size="sm"
+                  onClick={() => setEventRequestFilter("all")}
+                >
+                  All
+                </Button>
+                <Button
+                  variant={eventRequestFilter === "pending" ? "university" : "outline"}
+                  size="sm"
+                  onClick={() => setEventRequestFilter("pending")}
+                >
+                  Pending
+                </Button>
+                <Button
+                  variant={eventRequestFilter === "approved" ? "university" : "outline"}
+                  size="sm"
+                  onClick={() => setEventRequestFilter("approved")}
+                >
+                  Approved
+                </Button>
+                <Button
+                  variant={eventRequestFilter === "rejected" ? "university" : "outline"}
+                  size="sm"
+                  onClick={() => setEventRequestFilter("rejected")}
+                >
+                  Rejected
+                </Button>
               </div>
 
               {loadingEventRequests && eventRequests.length === 0 ? (
@@ -800,17 +826,29 @@ const BoardPresidentDashboard = () => {
                     if (![5, 7, 9, 14].includes(request.status_id)) return false;
                   }
 
-                  // 2. Search Filter
-                  if (!eventRequestSearch.trim()) return true;
-                  const searchLower = eventRequestSearch.toLowerCase();
-                  return (
-                    (request.title || "").toLowerCase().includes(searchLower) ||
-                    (request.event_name || "").toLowerCase().includes(searchLower) ||
-                    (request.society_name || "").toLowerCase().includes(searchLower) ||
-                    (request.description || "").toLowerCase().includes(searchLower) ||
-                    (request.venue || "").toLowerCase().includes(searchLower) ||
-                    ((request.firstName || "") + " " + (request.lastName || "")).toLowerCase().includes(searchLower)
-                  );
+                  // 2. Date Filter
+                  if (eventRequestDateFilter) {
+                    const requestDate = request.event_date ? new Date(request.event_date).toISOString().split('T')[0] : (request.date_from ? new Date(request.date_from).toISOString().split('T')[0] : null);
+                    if (requestDate !== eventRequestDateFilter) {
+                      return false;
+                    }
+                  }
+
+                  // 3. Search Filter
+                  if (eventRequestSearch.trim()) {
+                    const searchLower = eventRequestSearch.toLowerCase();
+                    const matchesSearch = (
+                      (request.title || "").toLowerCase().includes(searchLower) ||
+                      (request.event_name || "").toLowerCase().includes(searchLower) ||
+                      (request.society_name || "").toLowerCase().includes(searchLower) ||
+                      (request.description || "").toLowerCase().includes(searchLower) ||
+                      (request.venue || "").toLowerCase().includes(searchLower) ||
+                      ((request.firstName || "") + " " + (request.lastName || "")).toLowerCase().includes(searchLower)
+                    );
+                    if (!matchesSearch) return false;
+                  }
+
+                  return true;
                 });
 
                 return filteredRequests.length > 0 ? (
@@ -825,6 +863,11 @@ const BoardPresidentDashboard = () => {
                                 {request.status_name && (
                                   <Badge variant={request.status_id === 2 ? "default" : request.status_id === 3 ? "destructive" : "secondary"}>
                                     {request.status_name}
+                                  </Badge>
+                                )}
+                                {[15, 16, 17, 18].includes(request.status_id) && (
+                                  <Badge variant="outline" className="border-amber-500 text-amber-700 bg-amber-50">
+                                    Pending from Advisor
                                   </Badge>
                                 )}
                                 {request.society_name && (

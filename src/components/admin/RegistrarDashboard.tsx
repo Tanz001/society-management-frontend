@@ -131,6 +131,7 @@ const RegistrarDashboard = () => {
   const [statsLoading, setStatsLoading] = useState(false);
   const [eventRequestFilter, setEventRequestFilter] = useState<string>("all"); // all, pending, approved, rejected
   const [eventRequestSearch, setEventRequestSearch] = useState<string>("");
+  const [eventRequestDateFilter, setEventRequestDateFilter] = useState<string>("");
 
   // Pagination states
   const [societiesCurrentPage, setSocietiesCurrentPage] = useState(1);
@@ -1053,7 +1054,33 @@ const RegistrarDashboard = () => {
                     className="pl-10"
                   />
                 </div>
-                <div className="flex gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Input
+                    type="date"
+                    value={eventRequestDateFilter}
+                    onChange={(e) => {
+                      setEventRequestDateFilter(e.target.value);
+                      setEventRequestsCurrentPage(1);
+                    }}
+                    className="w-auto h-9"
+                  />
+                  <Button
+                    variant={eventRequestDateFilter === new Date().toISOString().split('T')[0] ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      const today = new Date().toISOString().split('T')[0];
+                      if (eventRequestDateFilter === today) {
+                        setEventRequestDateFilter("");
+                      } else {
+                        setEventRequestDateFilter(today);
+                      }
+                      setEventRequestsCurrentPage(1);
+                    }}
+                  >
+                    Today's Events
+                  </Button>
+                </div>
+                <div className="flex gap-2 flex-wrap">
                   <Button
                     variant={eventRequestFilter === "all" ? "university" : "outline"}
                     size="sm"
@@ -1104,16 +1131,31 @@ const RegistrarDashboard = () => {
                   }
 
                   // 2. Search Filter
-                  if (!eventRequestSearch.trim()) return true;
-                  const searchLower = eventRequestSearch.toLowerCase();
-                  return (
-                    (request.title || "").toLowerCase().includes(searchLower) ||
-                    (request.event_name || "").toLowerCase().includes(searchLower) ||
-                    (request.society_name || "").toLowerCase().includes(searchLower) ||
-                    (request.description || "").toLowerCase().includes(searchLower) ||
-                    (request.venue || "").toLowerCase().includes(searchLower) ||
-                    ((request.firstName || "") + " " + (request.lastName || "")).toLowerCase().includes(searchLower)
-                  );
+                  let passesSearchFilter = true;
+                  if (eventRequestSearch.trim()) {
+                    const searchLower = eventRequestSearch.toLowerCase();
+                    passesSearchFilter = (
+                      (request.title || "").toLowerCase().includes(searchLower) ||
+                      (request.event_name || "").toLowerCase().includes(searchLower) ||
+                      (request.society_name || "").toLowerCase().includes(searchLower) ||
+                      (request.description || "").toLowerCase().includes(searchLower) ||
+                      (request.venue || "").toLowerCase().includes(searchLower) ||
+                      ((request.firstName || "") + " " + (request.lastName || "")).toLowerCase().includes(searchLower)
+                    );
+                  }
+
+                  // 3. Date Filter
+                  let passesDateFilter = true;
+                  if (eventRequestDateFilter) {
+                    if (!request.event_date) {
+                      passesDateFilter = false;
+                    } else {
+                      const eventDateStr = request.event_date.substring(0, 10);
+                      passesDateFilter = eventDateStr === eventRequestDateFilter;
+                    }
+                  }
+
+                  return passesSearchFilter && passesDateFilter;
                 });
 
                 return filteredRequests.length > 0 ? (
@@ -1146,6 +1188,11 @@ const RegistrarDashboard = () => {
                                   >
                                     {request.status_name}
                                   </Badge>
+                                  {[15, 16, 17, 18].includes(request.status_id) && (
+                                    <Badge variant="outline" className="border-amber-500 text-amber-700 bg-amber-50">
+                                      Pending from Advisor
+                                    </Badge>
+                                  )}
                                   {request.society_name && (
                                     <Badge variant="outline">{request.society_name}</Badge>
                                   )}
@@ -2166,7 +2213,7 @@ const RegistrarDashboard = () => {
                           notesByRole[role].push(history);
                         });
 
-                        const roleOrder = ["Advisor", "Board Secretary", "Board President", "Registrar", "VC", "Transport Office", "Protocol Office", "Chief Proctor", "Security Office"];
+                        const roleOrder = ["Protocol Office", "Advisor", "Board Secretary", "Board President", "Registrar", "VC", "Transport Office", "Chief Proctor", "Security Office"];
                         const sortedRoles = Object.keys(notesByRole).sort((a, b) => {
                           const aIndex = roleOrder.indexOf(a);
                           const bIndex = roleOrder.indexOf(b);

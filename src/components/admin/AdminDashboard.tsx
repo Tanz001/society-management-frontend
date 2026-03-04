@@ -95,6 +95,7 @@ const AdminDashboard = () => {
   const [societyFilter, setSocietyFilter] = useState("all"); // all, active, pending, rejected
   const [eventRequestFilter, setEventRequestFilter] = useState<string>("all"); // all, pending, approved, rejected
   const [eventRequestSearch, setEventRequestSearch] = useState<string>("");
+  const [eventRequestDateFilter, setEventRequestDateFilter] = useState<string>("");
   const [societySearchTerm, setSocietySearchTerm] = useState(""); // Search term for societies
   const [eventRequestStats, setEventRequestStats] = useState({
     total: 0,
@@ -174,11 +175,11 @@ const AdminDashboard = () => {
     else if (societyFilter === "active") matchesFilter = society.status_name === 'Approved by VC' || society.status === 'active';
     else if (societyFilter === "pending") matchesFilter = society.status_id === 1 || society.status === 'pending' || society.status === 'under_review';
     else if (societyFilter === "rejected") matchesFilter = society.status_name?.includes('Rejected') || society.status === 'rejected';
-    
+
     // Apply search filter
     if (!matchesFilter) return false;
     if (!societySearchTerm.trim()) return true;
-    
+
     const query = societySearchTerm.toLowerCase();
     return (
       society.name?.toLowerCase().includes(query) ||
@@ -1597,47 +1598,73 @@ const AdminDashboard = () => {
                     className="pl-10"
                   />
                 </div>
-                <div className="flex gap-2">
-                <Button
-                  variant={eventRequestFilter === "all" ? "university" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setEventRequestFilter("all");
-                    getAllEventRequests();
-                  }}
-                >
-                  All
-                </Button>
-                <Button
-                  variant={eventRequestFilter === "pending" ? "university" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setEventRequestFilter("pending");
-                    getAllEventRequests();
-                  }}
-                >
-                  Pending
-                </Button>
-                <Button
-                  variant={eventRequestFilter === "approved" ? "university" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setEventRequestFilter("approved");
-                    getAllEventRequests();
-                  }}
-                >
-                  Approved
-                </Button>
-                <Button
-                  variant={eventRequestFilter === "rejected" ? "university" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setEventRequestFilter("rejected");
-                    getAllEventRequests();
-                  }}
-                >
-                  Rejected
-                </Button>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Input
+                    type="date"
+                    value={eventRequestDateFilter}
+                    onChange={(e) => {
+                      setEventRequestDateFilter(e.target.value);
+                      setEventRequestsCurrentPage(1);
+                    }}
+                    className="w-auto h-9"
+                  />
+                  <Button
+                    variant={eventRequestDateFilter === new Date().toISOString().split('T')[0] ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      const today = new Date().toISOString().split('T')[0];
+                      if (eventRequestDateFilter === today) {
+                        setEventRequestDateFilter("");
+                      } else {
+                        setEventRequestDateFilter(today);
+                      }
+                      setEventRequestsCurrentPage(1);
+                    }}
+                  >
+                    Today's Events
+                  </Button>
+                </div>
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    variant={eventRequestFilter === "all" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setEventRequestFilter("all");
+                      getAllEventRequests();
+                    }}
+                  >
+                    All
+                  </Button>
+                  <Button
+                    variant={eventRequestFilter === "pending" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setEventRequestFilter("pending");
+                      getAllEventRequests();
+                    }}
+                  >
+                    Pending
+                  </Button>
+                  <Button
+                    variant={eventRequestFilter === "approved" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setEventRequestFilter("approved");
+                      getAllEventRequests();
+                    }}
+                  >
+                    Approved
+                  </Button>
+                  <Button
+                    variant={eventRequestFilter === "rejected" ? "university" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setEventRequestFilter("rejected");
+                      getAllEventRequests();
+                    }}
+                  >
+                    Rejected
+                  </Button>
                 </div>
               </div>
 
@@ -1656,7 +1683,7 @@ const AdminDashboard = () => {
                       if (eventRequestFilter === "pending") passesStatusFilter = request.status_id === 1;
                       else if (eventRequestFilter === "approved") passesStatusFilter = [2, 4, 6, 8, 11, 13, 15].includes(request.status_id);
                       else if (eventRequestFilter === "rejected") passesStatusFilter = request.status_id === 3 || request.status_name?.includes('Rejected');
-                      
+
                       // Apply search filter
                       let passesSearchFilter = true;
                       if (eventRequestSearch.trim()) {
@@ -1670,8 +1697,19 @@ const AdminDashboard = () => {
                           ((request.firstName || "") + " " + (request.lastName || "")).toLowerCase().includes(searchLower)
                         );
                       }
-                      
-                      return passesStatusFilter && passesSearchFilter;
+
+                      // Apply date filter
+                      let passesDateFilter = true;
+                      if (eventRequestDateFilter) {
+                        if (!request.event_date) {
+                          passesDateFilter = false;
+                        } else {
+                          const eventDateStr = request.event_date.substring(0, 10);
+                          passesDateFilter = eventDateStr === eventRequestDateFilter;
+                        }
+                      }
+
+                      return passesStatusFilter && passesSearchFilter && passesDateFilter;
                     });
 
                     return filteredRequests.length > 0 ? (
@@ -1686,6 +1724,11 @@ const AdminDashboard = () => {
                                     {request.status_name && (
                                       <Badge variant={request.status_id === 2 ? "default" : request.status_id === 3 ? "destructive" : "secondary"}>
                                         {request.status_name}
+                                      </Badge>
+                                    )}
+                                    {[15, 16, 17, 18].includes(request.status_id) && (
+                                      <Badge variant="outline" className="border-amber-500 text-amber-700 bg-amber-50">
+                                        Pending from Advisor
                                       </Badge>
                                     )}
                                     {request.society_name && (
@@ -2049,8 +2092,8 @@ const AdminDashboard = () => {
                     {societySearchTerm
                       ? `No societies found matching "${societySearchTerm}". Try a different search term.`
                       : societyFilter !== "all"
-                      ? `No societies found with the selected filter.`
-                      : "No societies have been registered yet."}
+                        ? `No societies found with the selected filter.`
+                        : "No societies have been registered yet."}
                   </p>
                   {(societySearchTerm || societyFilter !== "all") && (
                     <Button

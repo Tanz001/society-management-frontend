@@ -704,6 +704,11 @@ const ProtocolOfficeDashboard = () => {
                                   Event: {request.event_status_name || request.status_name || "Pending"}
                                 </Badge>
                               )}
+                              {[15, 16, 17, 18].includes(request.event_status_id) && (
+                                <Badge variant="outline" className="border-amber-500 text-amber-700 bg-amber-50">
+                                  Pending from Advisor
+                                </Badge>
+                              )}
                               {request.society_name && (
                                 <Badge variant="outline">{request.society_name}</Badge>
                               )}

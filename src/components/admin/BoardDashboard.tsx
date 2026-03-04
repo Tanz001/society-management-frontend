@@ -594,6 +594,11 @@ const BoardDashboard = () => {
                                 {request.status_name}
                               </Badge>
                             )}
+                            {[15, 16, 17, 18].includes(request.status_id) && (
+                              <Badge variant="outline" className="border-amber-500 text-amber-700 bg-amber-50">
+                                Pending from Advisor
+                              </Badge>
+                            )}
                             {request.society_name && (
                               <Badge variant="outline">{request.society_name}</Badge>
                             )}
@@ -1377,7 +1382,7 @@ const BoardDashboard = () => {
                           notesByRole[role].push(history);
                         });
 
-                        const roleOrder = ["Advisor", "Board Secretary", "Board President", "Registrar", "VC", "Transport Office", "Protocol Office", "Chief Proctor", "Security Office"];
+                        const roleOrder = ["Protocol Office", "Advisor", "Board Secretary", "Board President", "Registrar", "VC", "Transport Office", "Chief Proctor", "Security Office"];
                         const sortedRoles = Object.keys(notesByRole).sort((a, b) => {
                           const aIndex = roleOrder.indexOf(a);
                           const bIndex = roleOrder.indexOf(b);

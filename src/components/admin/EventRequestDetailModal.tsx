@@ -151,7 +151,7 @@ const EventRequestDetailModal: React.FC<EventRequestDetailModalProps> = ({
                             </Card>
                         )}
 
-                        {/* Details Grid */}
+                        {/* Details Grid - shown first (above Admin Notes) */}
                         <div className={`grid grid-cols-1 md:grid-cols-2 ${variant === 'detailed' ? 'lg:grid-cols-3' : ''} gap-6`}>
                             <Card className="p-4 shadow-sm border-slate-200 border-t-4 border-t-university-navy">
                                 <h3 className="font-semibold mb-3 text-slate-800 border-b pb-2">Event Information</h3>
@@ -693,30 +693,34 @@ const EventRequestDetailModal: React.FC<EventRequestDetailModalProps> = ({
                             </Card>
                         )}
 
-                        {/* Admin Notes from History - Grouped by Role */}
+                        {/* Admin Notes & Status History - below detail; Protocol slot logs first, then event request history by timestamp */}
                         {Array.isArray(eventRequest.status_history) &&
                             eventRequest.status_history.length > 0 && (
                                 <Card className="p-4 shadow-sm border-slate-200">
                                     <h3 className="font-semibold mb-4 text-slate-800 border-b pb-2">Admin Notes & Status History</h3>
                                     <div className="space-y-6">
                                         {(() => {
-                                            // Sort items chronologically first
-                                            const sortedHistory: any[] = [...(eventRequest.status_history || [])]
-                                                .sort((a: any, b: any) =>
-                                                    new Date(a.changed_at).getTime() - new Date(b.changed_at).getTime()
-                                                );
+                                            const raw = eventRequest.status_history || [];
+                                            // First: protocol slot logs (is_protocol === true), sorted by timestamp ascending (earlier first)
+                                            const protocolEntries = raw
+                                                .filter((h: any) => h.is_protocol === true)
+                                                .sort((a: any, b: any) => new Date(a.changed_at).getTime() - new Date(b.changed_at).getTime());
+                                            // Then: event request history (non-protocol), sorted by timestamp ascending (earlier first)
+                                            const eventHistoryEntries = raw
+                                                .filter((h: any) => !h.is_protocol)
+                                                .sort((a: any, b: any) => new Date(a.changed_at).getTime() - new Date(b.changed_at).getTime());
+                                            const sortedHistory: any[] = [...protocolEntries, ...eventHistoryEntries];
 
-                                            // Process history to group Advisor notes under the latest Admin
                                             let currentAdminRole = "Advisor";
                                             const processedHistory = sortedHistory.map((h: any) => {
                                                 const role = h.role || h.role_display_name || h.role_name || "";
-                                                const roleLower = role.toLowerCase();
+                                                const roleLower = (role || "").toLowerCase();
 
                                                 let effectiveRole = role || "Admin";
                                                 let isAdvisorNote = roleLower === "advisor";
 
                                                 let displayNote = h.note ?? h.remarks;
-                                                if (displayNote && typeof displayNote === 'string') {
+                                                if (displayNote && typeof displayNote === "string") {
                                                     try {
                                                         const parsed = JSON.parse(displayNote);
                                                         displayNote = parsed.note ?? null;
@@ -725,38 +729,28 @@ const EventRequestDetailModal: React.FC<EventRequestDetailModalProps> = ({
                                                     }
                                                 }
 
-                                                let displayRoleName = (h.firstName && h.lastName) ? `${h.firstName} ${h.lastName}` : role;
+                                                let displayRoleName = (h.firstName && h.lastName) ? `${h.firstName} ${h.lastName}` : (h.changed_by_name || role);
 
-                                                // Extract advisor notes that were recorded as system-like messages
-                                                // Example: "Event request updated. Status set to Pending after revision by Board Secretary. Note: what missing"
-                                                if (h.note && h.note.startsWith("Event request updated. Status set to Pending after revision by")) {
+                                                if (h.note && typeof h.note === "string" && h.note.startsWith("Event request updated. Status set to Pending after revision by")) {
                                                     isAdvisorNote = true;
                                                     displayRoleName = "Advisor";
-
-                                                    // Try to extract just the note part
                                                     const noteMatch = h.note.match(/Note:\s*(.*)/i);
-                                                    if (noteMatch && noteMatch[1]) {
-                                                        displayNote = noteMatch[1].trim();
-                                                    }
+                                                    if (noteMatch && noteMatch[1]) displayNote = noteMatch[1].trim();
                                                 }
 
-                                                if (!isAdvisorNote && roleLower !== "system") {
-                                                    currentAdminRole = effectiveRole;
-                                                }
+                                                if (!isAdvisorNote && roleLower !== "system") currentAdminRole = effectiveRole;
 
                                                 return {
                                                     ...h,
-                                                    note: displayNote, // Use the extracted note
-                                                    _displayRoleName: displayRoleName, // Use the proper name (Student/Advisor or Admin)
+                                                    note: displayNote,
+                                                    _displayRoleName: displayRoleName,
                                                     _effectiveRole: isAdvisorNote ? currentAdminRole : effectiveRole,
                                                     _roleLower: roleLower,
                                                     _isAdvisorNote: isAdvisorNote
                                                 };
                                             }).filter((h: any) => {
                                                 if (h._roleLower === "system" && !h._isAdvisorNote) return false;
-                                                // Exclude initial submission status
                                                 if (h.note === "Event request submitted" || h.note === "Event request created") return false;
-                                                // Exclude advisor notes with no content or generic update messages
                                                 if (h._isAdvisorNote) {
                                                     const n = String(h.note || "").trim();
                                                     if (!n) return false;
@@ -770,13 +764,11 @@ const EventRequestDetailModal: React.FC<EventRequestDetailModalProps> = ({
                                             const notesByRole: { [key: string]: any[] } = {};
                                             processedHistory.forEach((history: any) => {
                                                 const role = history._effectiveRole;
-                                                if (!notesByRole[role]) {
-                                                    notesByRole[role] = [];
-                                                }
+                                                if (!notesByRole[role]) notesByRole[role] = [];
                                                 notesByRole[role].push(history);
                                             });
 
-                                            const roleOrder = ["Advisor", "Board Secretary", "Board President", "Registrar", "VC", "Transport Office", "Protocol Office", "Chief Proctor", "Security Office"];
+                                            const roleOrder = ["Protocol Office", "Advisor", "Board Secretary", "Board President", "Registrar", "VC", "Transport Office", "Chief Proctor", "Security Office"];
                                             const sortedRoles = Object.keys(notesByRole).sort((a, b) => {
                                                 const aIndex = roleOrder.indexOf(a);
                                                 const bIndex = roleOrder.indexOf(b);
@@ -798,8 +790,8 @@ const EventRequestDetailModal: React.FC<EventRequestDetailModalProps> = ({
                                                     </h4>
                                                     {notesByRole[role].map((history: any, idx: number) => (
                                                         <div
-                                                            key={history.history_id || idx}
-                                                            className={`border-l-4 ${history.note ? 'border-blue-500' : 'border-slate-300'} pl-4 py-2 ${history.note ? 'bg-blue-50/50' : 'bg-slate-50/30'} rounded-r`}
+                                                            key={history.history_id || history.log_id || idx}
+                                                            className={`border-l-4 ${history.note ? "border-blue-500" : "border-slate-300"} pl-4 py-2 ${history.note ? "bg-blue-50/50" : "bg-slate-50/30"} rounded-r`}
                                                         >
                                                             <div className="flex items-start justify-between mb-1">
                                                                 <div>
@@ -811,9 +803,7 @@ const EventRequestDetailModal: React.FC<EventRequestDetailModalProps> = ({
                                                                             </span>
                                                                         )}
                                                                         {history._isAdvisorNote && (
-                                                                            <span className="text-muted-foreground font-normal">
-                                                                                {" "}added a note
-                                                                            </span>
+                                                                            <span className="text-muted-foreground font-normal">{" "}added a note</span>
                                                                         )}
                                                                     </p>
                                                                 </div>
@@ -821,7 +811,6 @@ const EventRequestDetailModal: React.FC<EventRequestDetailModalProps> = ({
                                                                     {new Date(history.changed_at).toLocaleString()}
                                                                 </span>
                                                             </div>
-                                                            {/* Only show note if it exists and is not empty */}
                                                             {history.note && history.note.trim() !== "" && (
                                                                 <p className="text-sm text-slate-800 mt-1 whitespace-pre-wrap">{history.note}</p>
                                                             )}
