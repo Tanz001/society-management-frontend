@@ -141,14 +141,31 @@ const TransportOfficeDashboard = () => {
       if (response.data.success) {
         let data = response.data.data || [];
 
+        // Only show approved event requests (exclude Report Missing = 13, Report Submitted = 12, and other non-approved)
+        const approvedStatusIds = [2, 4, 6, 8, 10, 11, 15];
+        data = data.filter((item: any) => approvedStatusIds.includes(item.status_id));
+
         // Client-side filtering
         if (selectedVenueId && selectedVenueId !== "all") {
-          data = data.filter(item => item.venue === venues.find(v => String(v.venue_id) === selectedVenueId)?.venue_name);
+          data = data.filter((item: any) => item.venue === venues.find(v => String(v.venue_id) === selectedVenueId)?.venue_name);
         }
 
         if (selectedDate) {
-          data = data.filter(item => item.event_date && item.event_date.startsWith(selectedDate));
+          data = data.filter((item: any) => {
+            const itemDate = (item.date_from || item.event_date || "").toString().substring(0, 10);
+            return itemDate === selectedDate;
+          });
         }
+
+        // Sort: earlier events on top (by date, then by time)
+        data.sort((a: any, b: any) => {
+          const dateA = new Date(a.date_from || a.event_date || 0).getTime();
+          const dateB = new Date(b.date_from || b.event_date || 0).getTime();
+          if (dateA !== dateB) return dateA - dateB;
+          const timeA = (a.time_from || a.event_time || "").toString();
+          const timeB = (b.time_from || b.event_time || "").toString();
+          return timeA.localeCompare(timeB);
+        });
 
         setEventRequests(data);
         setCurrentPage(1); // Reset to first page when data changes
@@ -235,7 +252,7 @@ const TransportOfficeDashboard = () => {
                 <Truck className="h-8 w-8 mr-3" />
                 Transport Office Dashboard
               </h1>
-              <p className="text-white/80">View Approved Event Transport Requests</p>
+              <p className="text-white/80">Approved event requests only (earliest first). Filter by venue or date.</p>
             </div>
             <div className="flex items-center space-x-3">
               <Button
@@ -321,7 +338,7 @@ const TransportOfficeDashboard = () => {
               <Filter className="h-5 w-5 text-university-navy" />
               <h3 className="text-lg font-semibold text-university-navy">Filters</h3>
             </div>
-            <div className="grid md:grid-cols-3 gap-4">
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
                 <Label>Venue</Label>
                 <Select value={selectedVenueId} onValueChange={setSelectedVenueId}>
@@ -339,13 +356,23 @@ const TransportOfficeDashboard = () => {
                 </Select>
               </div>
               <div>
-                <Label>Date</Label>
-                <Input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  placeholder="Select date"
-                />
+                <Label>Filter by date</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button
+                    variant="outline"
+                    size="default"
+                    onClick={() => setSelectedDate(new Date().toISOString().slice(0, 10))}
+                    className="shrink-0"
+                  >
+                    Today
+                  </Button>
+                </div>
               </div>
               <div className="flex items-end">
                 <Button
@@ -360,6 +387,9 @@ const TransportOfficeDashboard = () => {
                 </Button>
               </div>
             </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Showing only approved event requests. Sorted by event date and time (earliest first).
+            </p>
           </Card>
 
           {/* Error Display */}

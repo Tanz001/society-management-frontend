@@ -751,6 +751,7 @@ const EventRequestDetailModal: React.FC<EventRequestDetailModalProps> = ({
                                             }).filter((h: any) => {
                                                 if (h._roleLower === "system" && !h._isAdvisorNote) return false;
                                                 if (h.note === "Event request submitted" || h.note === "Event request created") return false;
+                                                if (h.note === "Automatically set to Active after VC approval" || h.remarks === "Automatically set to Active after VC approval") return false;
                                                 if (h._isAdvisorNote) {
                                                     const n = String(h.note || "").trim();
                                                     if (!n) return false;
