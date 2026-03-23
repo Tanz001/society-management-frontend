@@ -992,7 +992,7 @@ const VCDashboard = () => {
                                     </p>
                                     {society.student_info && (
                                       <p className="text-sm text-muted-foreground mb-2">
-                                        📧 {society.student_info.firstName} {society.student_info.lastName} ({society.student_info.rollNo})
+                                        {society.student_info.firstName} {society.student_info.lastName}
                                       </p>
                                     )}
                                     <p className="text-sm text-muted-foreground mb-3">

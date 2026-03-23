@@ -869,7 +869,7 @@ const RegistrarDashboard = () => {
                               <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mb-2">
                                 <span>📍 {society.location}</span>
                                 <span>👨‍🏫 {society.advisor}</span>
-                                <span>📧 {society.student_info.firstName} {society.student_info.lastName}</span>
+                                <span>{society.student_info.firstName} {society.student_info.lastName}</span>
                               </div>
                               <div className="flex items-center text-xs text-muted-foreground">
                                 <Clock className="h-3 w-3 mr-1" />

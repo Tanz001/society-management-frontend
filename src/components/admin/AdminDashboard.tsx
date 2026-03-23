@@ -570,14 +570,29 @@ const AdminDashboard = () => {
       const requests = response.data.data || [];
       setAllEventRequests(requests);
 
-      // Calculate stats
-      const stats = {
-        total: requests.length,
-        pending: requests.filter((r: any) => r.status_id === 1).length,
-        approved: requests.filter((r: any) => [2, 4, 6, 8, 11, 13, 15].includes(r.status_id)).length,
-        rejected: requests.filter((r: any) => r.status_id === 3 || r.status_name?.includes('Rejected')).length
-      };
-      setEventRequestStats(stats);
+      // Calculate stats (unified buckets):
+      // - Pending: pending + intermediate approvals + any "revise by ..." states
+      // - Approved: final approval (approved by all) + report states
+      // - Rejected: rejected by any admin
+      const total = requests.length;
+
+      // Status IDs used across the app:
+      // 1: Pending
+      // 2/4/6/8: Approved by Secretary/President/Registrar/VC (intermediate)
+      // 3/5/7/9: Rejected by Secretary/President/Registrar/VC
+      // 10: Approved by all (final)
+      // 12/13: Report missing / report submitted
+      // 15/16/17/18: Revise by Secretary/President/Registrar/VC
+      const pending = requests.filter((r: any) => [1, 2, 4, 6, 8, 11, 15, 16, 17, 18].includes(r.status_id)).length;
+      const approved = requests.filter((r: any) => [10, 12, 13].includes(r.status_id)).length;
+      const rejected = requests.filter((r: any) => [3, 5, 7, 9, 14].includes(r.status_id)).length;
+
+      setEventRequestStats({
+        total,
+        pending,
+        approved,
+        rejected
+      });
     } catch (err: any) {
       console.error("Error fetching event requests:", err);
       setError(err.response?.data?.message || err.message || "Failed to fetch event requests");
@@ -1680,9 +1695,15 @@ const AdminDashboard = () => {
                     const filteredRequests = allEventRequests.filter((request: any) => {
                       // Apply status filter
                       let passesStatusFilter = true;
-                      if (eventRequestFilter === "pending") passesStatusFilter = request.status_id === 1;
-                      else if (eventRequestFilter === "approved") passesStatusFilter = [2, 4, 6, 8, 11, 13, 15].includes(request.status_id);
-                      else if (eventRequestFilter === "rejected") passesStatusFilter = request.status_id === 3 || request.status_name?.includes('Rejected');
+                      if (eventRequestFilter === "pending") {
+                        // Pending + intermediate approvals + revise states
+                        passesStatusFilter = [1, 2, 4, 6, 8, 11, 15, 16, 17, 18].includes(request.status_id);
+                      } else if (eventRequestFilter === "approved") {
+                        // Final approval + report states
+                        passesStatusFilter = [10, 12, 13].includes(request.status_id);
+                      } else if (eventRequestFilter === "rejected") {
+                        passesStatusFilter = [3, 5, 7, 9, 14].includes(request.status_id) || request.status_name?.includes("Rejected");
+                      }
 
                       // Apply search filter
                       let passesSearchFilter = true;
@@ -2506,10 +2527,7 @@ const AdminDashboard = () => {
               )}
 
               {/* Action Buttons */}
-              <div className="flex justify-end space-x-3 pt-4 border-t">
-                <Button variant="outline" onClick={() => setIsSocietyDetailModalOpen(false)}>
-                  Close
-                </Button>
+              <div className="flex items-center justify-between pt-4 border-t">
                 <Button
                   variant="destructive"
                   onClick={() => {
@@ -2527,6 +2545,9 @@ const AdminDashboard = () => {
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
                   Delete Society
+                </Button>
+                <Button variant="outline" onClick={() => setIsSocietyDetailModalOpen(false)}>
+                  Close
                 </Button>
               </div>
             </div>

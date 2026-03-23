@@ -1181,9 +1181,7 @@ const BoardSecretaryDashboard = () => {
                                 <p className="text-sm text-muted-foreground mb-2">
                                   📍 {society.location} • 👨‍🏫 {society.advisor}
                                 </p>
-                                {/* <p className="text-sm text-muted-foreground mb-2">
-                            📧 {society.student_info.firstName} {society.student_info.lastName} ({society.student_info.rollNo})
-                          </p> */}
+                                {/* requester row removed per UI requirement */}
                                 <p className="text-sm text-muted-foreground mb-3">
                                   {society.description.length > 150
                                     ? `${society.description.substring(0, 150)}...`
