@@ -131,10 +131,13 @@ const ProtocolOfficeDashboard = () => {
     // Check if event status is REVISE (15, 16, 17, 18) - can edit
     const eventRevise = [15, 16, 17, 18].includes(request.event_status_id);
 
+    // Date passed but not approved on time (19) - can edit & resubmit
+    const datePassed = request.event_status_id === 19;
+
     // Check if event status is PENDING (1) - can edit
     const eventPending = request.event_status_id === 1;
 
-    return slotRejectedOrSuggested || eventRevise || eventPending;
+    return slotRejectedOrSuggested || eventRevise || eventPending || datePassed;
   };
 
   // Handle edit request - redirect to edit form

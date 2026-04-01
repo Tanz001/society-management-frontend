@@ -157,14 +157,14 @@ const TransportOfficeDashboard = () => {
           });
         }
 
-        // Sort: earlier events on top (by date, then by time)
+        // Sort: latest events on top (by date, then by time)
         data.sort((a: any, b: any) => {
           const dateA = new Date(a.date_from || a.event_date || 0).getTime();
           const dateB = new Date(b.date_from || b.event_date || 0).getTime();
-          if (dateA !== dateB) return dateA - dateB;
+          if (dateA !== dateB) return dateB - dateA;
           const timeA = (a.time_from || a.event_time || "").toString();
           const timeB = (b.time_from || b.event_time || "").toString();
-          return timeA.localeCompare(timeB);
+          return timeB.localeCompare(timeA);
         });
 
         setEventRequests(data);
@@ -252,7 +252,7 @@ const TransportOfficeDashboard = () => {
                 <Truck className="h-8 w-8 mr-3" />
                 Transport Office Dashboard
               </h1>
-              <p className="text-white/80">Approved event requests only (earliest first). Filter by venue or date.</p>
+              <p className="text-white/80">Approved event requests only (latest first). Filter by venue or date.</p>
             </div>
             <div className="flex items-center space-x-3">
               <Button
@@ -388,7 +388,7 @@ const TransportOfficeDashboard = () => {
               </div>
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              Showing only approved event requests. Sorted by event date and time (earliest first).
+              Showing only approved event requests. Sorted by event date and time (latest first).
             </p>
           </Card>
 

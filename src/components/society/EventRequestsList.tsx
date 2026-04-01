@@ -11,6 +11,26 @@ import axios from "axios";
 import toast from "react-hot-toast";
 import { formatTimeToAMPM } from "@/lib/utils";
 
+const DATE_PASSED_STATUS_ID = 19;
+// Statuses that mean the event is already approved/closed for reporting flow
+const EXEMPT_FROM_DATE_PASSED = new Set<number>([
+  10, // Approved
+  11, // Completed
+  12, // Report Submitted
+  13, // Report Missing
+  DATE_PASSED_STATUS_ID,
+]);
+// Rejected statuses should not be overridden by "Date Passed"
+const REJECTED_STATUSES = new Set<number>([3, 5, 7, 9, 14]);
+
+const startOfLocalDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+const getEventDate = (request: any): Date | null => {
+  const raw = request?.date_from ?? request?.event_date ?? null;
+  if (!raw) return null;
+  const dt = new Date(raw);
+  return Number.isNaN(dt.getTime()) ? null : dt;
+};
+
 interface EventRequest {
   req_id: number;
   society_id: number;
@@ -92,6 +112,64 @@ const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
   const [cancelReason, setCancelReason] = useState("");
   const [cancelling, setCancelling] = useState(false);
 
+  const autoMarkDatePassedIfNeeded = async (requests: EventRequest[]) => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    const userRaw = localStorage.getItem("user");
+    const user = userRaw ? JSON.parse(userRaw) : null;
+    const changedBy = user?.faculty_id || user?.id || user?.user_id;
+    if (!changedBy) return;
+
+    const today = startOfLocalDay(new Date());
+
+    const candidates = (requests || []).filter((r: any) => {
+      const statusId = Number(r?.status_id ?? 0);
+      if (EXEMPT_FROM_DATE_PASSED.has(statusId)) return false;
+      if (REJECTED_STATUSES.has(statusId)) return false;
+      const eventDate = getEventDate(r);
+      if (!eventDate) return false;
+      return startOfLocalDay(eventDate).getTime() < today.getTime();
+    });
+
+    if (candidates.length === 0) return;
+
+    const API_URL = import.meta.env.VITE_API_URL;
+
+    // Best-effort update: if backend forbids this role, we silently keep UI as-is.
+    await Promise.allSettled(
+      candidates.map(async (r: any) => {
+        try {
+          await axios.put(
+            `${API_URL}/admin/event-requests/${r.req_id}/status`,
+            {
+              status_id: DATE_PASSED_STATUS_ID,
+              note: "Automatically set to Date Passed (Not approved on time) because the event date has passed.",
+              changed_by: changedBy,
+            },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+
+          // Optimistically reflect in UI even if we don't re-fetch immediately
+          setEventRequests((prev) =>
+            prev.map((p) =>
+              p.req_id === r.req_id
+                ? ({
+                    ...p,
+                    status_id: DATE_PASSED_STATUS_ID,
+                    status_name: "Date Passed",
+                    status_description: "Not approved on time",
+                  } as any)
+                : p
+            )
+          );
+        } catch {
+          // ignore
+        }
+      })
+    );
+  };
+
   const fetchEventRequests = async () => {
     if (!societyId) return;
 
@@ -115,7 +193,10 @@ const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
       );
 
       if (response.data.success) {
-        setEventRequests(response.data.data || []);
+        const data = response.data.data || [];
+        setEventRequests(data);
+        // Run after state is set; still uses the fetched payload for candidates
+        void autoMarkDatePassedIfNeeded(data);
       } else {
         toast.error(response.data.message || "Failed to fetch event requests");
         setEventRequests([]);
@@ -232,10 +313,13 @@ const EventRequestsList = ({ societyId }: EventRequestsListProps) => {
     // Check if event status is REVISE (15, 16, 17, 18) - can edit
     const eventRevise = [15, 16, 17, 18].includes(request.status_id);
 
+    // Date passed but not approved on time (19) - can edit & resubmit
+    const datePassed = request.status_id === DATE_PASSED_STATUS_ID;
+
     // Check if event status is PENDING (1) - can edit
     const eventPending = request.status_id === 1;
 
-    return slotRejectedOrSuggested || eventRevise || eventPending;
+    return slotRejectedOrSuggested || eventRevise || eventPending || datePassed;
   };
 
   // Handle edit request
