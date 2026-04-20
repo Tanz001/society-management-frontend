@@ -48,6 +48,12 @@ import axios from "axios";
 import { useToast } from "@/components/ui/use-toast";
 import ChangePasswordDialog from "@/components/auth/ChangePasswordDialog";
 
+const normalizeDateForInput = (value?: string | null) => {
+  if (!value) return "";
+  const datePart = value.split("T")[0];
+  return /^\d{4}-\d{2}-\d{2}$/.test(datePart) ? datePart : "";
+};
+
 const ProtocolOfficeDashboard = () => {
   const { toast } = useToast();
   const [eventRequests, setEventRequests] = useState([]);
@@ -460,7 +466,7 @@ const ProtocolOfficeDashboard = () => {
   const handleOpenSuggestSlotModal = async (request: any) => {
     setSelectedEventRequest(request);
     setSuggestSlotNote("");
-    setSuggestSlotDate(request.slot_date ? new Date(request.slot_date).toISOString().split('T')[0] : "");
+    setSuggestSlotDate(normalizeDateForInput(request.slot_date));
     setSuggestSlotTimeFrom(request.slot_time_from || "");
     setSuggestSlotTimeTo(request.slot_time_to || "");
     setSuggestSlotVenueId(request.venue_id ? String(request.venue_id) : "");

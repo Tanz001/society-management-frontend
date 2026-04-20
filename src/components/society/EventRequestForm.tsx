@@ -119,6 +119,12 @@ const defaultGuest: GuestRow = {
   profile_document: null,
 };
 
+const normalizeDateForInput = (value?: string | null) => {
+  if (!value) return "";
+  const datePart = value.split("T")[0];
+  return /^\d{4}-\d{2}-\d{2}$/.test(datePart) ? datePart : "";
+};
+
 const defaultManagement: ManagementRequirements = {
   sound_system: false,
   recording: false,
@@ -1221,8 +1227,8 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
           setMain({
             event_name: data.event_name || "",
             event_type: data.event_type || "",
-            date_from: data.date_from ? new Date(data.date_from).toISOString().split('T')[0] : "",
-            date_to: data.date_to ? new Date(data.date_to).toISOString().split('T')[0] : "",
+            date_from: normalizeDateForInput(data.date_from),
+            date_to: normalizeDateForInput(data.date_to),
             time_from: data.time_from || "",
             time_to: data.time_to || "",
             venue_id: data.venue_id ? String(data.venue_id) : (data.custom_venue_name ? "4" : ""),
@@ -1270,7 +1276,7 @@ const EventFullForm: React.FC<EventFullFormProps> = ({
               purpose: t.purpose || "",
               no_of_persons: String(t.no_of_persons || ""),
               destination: t.destination || "",
-              date: t.date ? new Date(t.date).toISOString().split('T')[0] : "",
+              date: normalizeDateForInput(t.date),
               time: t.time || "",
             })));
           }

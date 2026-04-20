@@ -62,6 +62,14 @@ import {
 } from "@/components/ui/pagination";
 import ChangePasswordDialog from "@/components/auth/ChangePasswordDialog";
 
+const getTodayDateLocal = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 interface Society {
   society_id: number;
   name: string;
@@ -1402,10 +1410,10 @@ const BoardSecretaryDashboard = () => {
                     className="w-auto h-9"
                   />
                   <Button
-                    variant={eventRequestDateFilter === new Date().toISOString().split('T')[0] ? "university" : "outline"}
+                    variant={eventRequestDateFilter === getTodayDateLocal() ? "university" : "outline"}
                     size="sm"
                     onClick={() => {
-                      const today = new Date().toISOString().split('T')[0];
+                      const today = getTodayDateLocal();
                       if (eventRequestDateFilter === today) {
                         setEventRequestDateFilter("");
                       } else {

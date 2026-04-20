@@ -47,6 +47,20 @@ import { Input } from "@/components/ui/input";
 import ChangePasswordDialog from "@/components/auth/ChangePasswordDialog";
 import EventRequestDetailModal from "@/components/admin/EventRequestDetailModal";
 
+const getTodayDateLocal = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const normalizeDateForInput = (value?: string | null) => {
+  if (!value) return null;
+  const datePart = value.split("T")[0];
+  return /^\d{4}-\d{2}-\d{2}$/.test(datePart) ? datePart : null;
+};
+
 interface Society {
   society_id: number;
   name: string;
@@ -763,9 +777,9 @@ const BoardPresidentDashboard = () => {
                     className="w-auto"
                   />
                   <Button
-                    variant={eventRequestDateFilter === new Date().toISOString().split('T')[0] ? "university" : "outline"}
+                    variant={eventRequestDateFilter === getTodayDateLocal() ? "university" : "outline"}
                     onClick={() => {
-                      const today = new Date().toISOString().split('T')[0];
+                      const today = getTodayDateLocal();
                       if (eventRequestDateFilter === today) {
                         setEventRequestDateFilter(""); // Toggle off
                       } else {
@@ -828,7 +842,7 @@ const BoardPresidentDashboard = () => {
 
                   // 2. Date Filter
                   if (eventRequestDateFilter) {
-                    const requestDate = request.event_date ? new Date(request.event_date).toISOString().split('T')[0] : (request.date_from ? new Date(request.date_from).toISOString().split('T')[0] : null);
+                    const requestDate = normalizeDateForInput(request.event_date) ?? normalizeDateForInput(request.date_from);
                     if (requestDate !== eventRequestDateFilter) {
                       return false;
                     }
