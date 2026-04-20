@@ -513,7 +513,7 @@ const VCDashboard = () => {
       // Update stats locally based on the refined logic
       setEventRequestStats({
         total: allRequests.length,
-        pending: allRequests.filter((r: any) => [6, 18].includes(r.status_id)).length,
+        pending: allRequests.filter((r: any) => [6, 18, 19].includes(Number(r.status_id))).length,
         approved: allRequests.filter((r: any) => [8, 10, 11, 12, 13].includes(r.status_id)).length,
         rejected: allRequests.filter((r: any) => [9, 14].includes(r.status_id)).length
       });
@@ -1210,13 +1210,13 @@ const VCDashboard = () => {
                 const filteredRequests = eventRequests.filter((request: any) => {
                   // 1. Status Filter (Refined Logic)
                   if (eventRequestFilter === "pending") {
-                    if (![6, 18].includes(request.status_id)) return false;
+                    if (![6, 18, 19].includes(Number(request.status_id))) return false;
                   } else if (eventRequestFilter === "approved") {
-                    if (![8, 10, 11, 12, 13].includes(request.status_id)) return false;
+                    if (![8, 10, 11, 12, 13].includes(Number(request.status_id))) return false;
                   } else if (eventRequestFilter === "rejected") {
-                    if (![9, 14].includes(request.status_id)) return false;
+                    if (![9, 14].includes(Number(request.status_id))) return false;
                   } else if (eventRequestFilter === "report_missing") {
-                    if (request.status_id !== 13) return false;
+                    if (Number(request.status_id) !== 13) return false;
                   }
 
                   // 2. Date Filter

@@ -322,7 +322,7 @@ const BoardPresidentDashboard = () => {
       // Update stats locally based on the refined logic
       setEventRequestStats({
         total: allRequests.length,
-        pending: allRequests.filter((r: any) => [2, 16].includes(r.status_id)).length,
+        pending: allRequests.filter((r: any) => [2, 16, 19].includes(Number(r.status_id))).length,
         approved: allRequests.filter((r: any) => [4, 6, 8, 10, 11, 12, 13].includes(r.status_id)).length,
         rejected: allRequests.filter((r: any) => [5, 7, 9, 14].includes(r.status_id)).length
       });
@@ -833,11 +833,11 @@ const BoardPresidentDashboard = () => {
                 const filteredRequests = eventRequests.filter((request: any) => {
                   // 1. Status Filter (Refined Logic)
                   if (eventRequestFilter === "pending") {
-                    if (![2, 16].includes(request.status_id)) return false;
+                    if (![2, 16, 19].includes(Number(request.status_id))) return false;
                   } else if (eventRequestFilter === "approved") {
-                    if (![4, 6, 8, 10, 11, 12, 13].includes(request.status_id)) return false;
+                    if (![4, 6, 8, 10, 11, 12, 13].includes(Number(request.status_id))) return false;
                   } else if (eventRequestFilter === "rejected") {
-                    if (![5, 7, 9, 14].includes(request.status_id)) return false;
+                    if (![5, 7, 9, 14].includes(Number(request.status_id))) return false;
                   }
 
                   // 2. Date Filter

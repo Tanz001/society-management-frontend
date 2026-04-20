@@ -809,10 +809,12 @@ const BoardSecretaryDashboard = () => {
       setStatsLoading(true);
       const token = localStorage.getItem("token");
       if (!token) return;
+      const currentUser = getCurrentUser();
+      const roleForRequests = currentUser?.role || "board_secretary";
 
       const response = await axios.post(
         `${import.meta.env.VITE_API_URL}/admin/event-requests/stats`,
-        { role: "board_secretary" },
+        { role: roleForRequests },
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -837,6 +839,7 @@ const BoardSecretaryDashboard = () => {
 
       const currentUser = getCurrentUser();
       const token = localStorage.getItem("token");
+      const roleForRequests = currentUser?.role || "board_secretary";
 
       if (!token) {
         throw new Error("No authentication token found");
@@ -847,7 +850,7 @@ const BoardSecretaryDashboard = () => {
       const response = await axios.post(
         `${import.meta.env.VITE_API_URL}/admin/event-requests`,
         {
-          role: "board_secretary",
+          role: roleForRequests,
           filter: "all"
         },
         {
@@ -864,7 +867,7 @@ const BoardSecretaryDashboard = () => {
       // Update stats locally based on the refined logic
       setEventRequestStats({
         total: allRequests.length,
-        pending: allRequests.filter((r: any) => [1, 15].includes(r.status_id)).length,
+        pending: allRequests.filter((r: any) => [1, 15, 19].includes(Number(r.status_id))).length,
         approved: allRequests.filter((r: any) => [2, 4, 6, 8, 10, 11, 12, 13].includes(r.status_id)).length,
         rejected: allRequests.filter((r: any) => [3, 5, 7, 9, 14].includes(r.status_id)).length
       });
@@ -1467,11 +1470,11 @@ const BoardSecretaryDashboard = () => {
                 const filteredRequests = eventRequests.filter((request: any) => {
                   // 1. Status Filter (Refined Logic)
                   if (eventRequestFilter === "pending") {
-                    if (![1, 15].includes(request.status_id)) return false;
+                    if (![1, 15, 19].includes(Number(request.status_id))) return false;
                   } else if (eventRequestFilter === "approved") {
-                    if (![2, 4, 6, 8, 10, 11, 12, 13].includes(request.status_id)) return false;
+                    if (![2, 4, 6, 8, 10, 11, 12, 13].includes(Number(request.status_id))) return false;
                   } else if (eventRequestFilter === "rejected") {
-                    if (![3, 5, 7, 9, 14].includes(request.status_id)) return false;
+                    if (![3, 5, 7, 9, 14].includes(Number(request.status_id))) return false;
                   }
 
                   // 2. Search Filter

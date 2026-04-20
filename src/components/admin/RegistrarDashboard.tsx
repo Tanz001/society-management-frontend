@@ -412,7 +412,7 @@ const RegistrarDashboard = () => {
       // Update stats locally based on the refined logic
       setEventRequestStats({
         total: allRequests.length,
-        pending: allRequests.filter((r: any) => [4, 17].includes(r.status_id)).length,
+        pending: allRequests.filter((r: any) => [4, 17, 19].includes(Number(r.status_id))).length,
         approved: allRequests.filter((r: any) => [6, 8, 10, 11, 12, 13].includes(r.status_id)).length,
         rejected: allRequests.filter((r: any) => [7, 9, 14].includes(r.status_id)).length
       });
@@ -1131,11 +1131,11 @@ const RegistrarDashboard = () => {
                 const filteredRequests = eventRequests.filter((request: any) => {
                   // 1. Status Filter (Refined Logic)
                   if (eventRequestFilter === "pending") {
-                    if (![4, 17].includes(request.status_id)) return false;
+                    if (![4, 17, 19].includes(Number(request.status_id))) return false;
                   } else if (eventRequestFilter === "approved") {
-                    if (![6, 8, 10, 11, 12, 13].includes(request.status_id)) return false;
+                    if (![6, 8, 10, 11, 12, 13].includes(Number(request.status_id))) return false;
                   } else if (eventRequestFilter === "rejected") {
-                    if (![7, 9, 14].includes(request.status_id)) return false;
+                    if (![7, 9, 14].includes(Number(request.status_id))) return false;
                   }
 
                   // 2. Search Filter
