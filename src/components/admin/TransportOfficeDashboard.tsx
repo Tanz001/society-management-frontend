@@ -131,14 +131,20 @@ const TransportOfficeDashboard = () => {
           transportVisibleStatusIds.includes(Number(item.status_id))
         );
 
-        // Sort: newest request first (created_at), then by event start date
+        // Sort: latest event date first; missing/invalid event dates last; tie-break by created_at
+        const eventDateMs = (item: any) => {
+          const raw = item.date_from ?? item.event_date;
+          if (raw == null || raw === "") return 0;
+          const t = new Date(String(raw).slice(0, 10)).getTime();
+          return Number.isNaN(t) ? 0 : t;
+        };
         data.sort((a: any, b: any) => {
+          const evB = eventDateMs(b);
+          const evA = eventDateMs(a);
+          if (evB !== evA) return evB - evA;
           const createdB = new Date(b.created_at || 0).getTime();
           const createdA = new Date(a.created_at || 0).getTime();
-          if (createdB !== createdA) return createdB - createdA;
-          const evB = new Date(String(b.date_from || b.event_date || "").slice(0, 10) || 0).getTime();
-          const evA = new Date(String(a.date_from || a.event_date || "").slice(0, 10) || 0).getTime();
-          return evB - evA;
+          return createdB - createdA;
         });
 
         setAllEventRequests(data);
@@ -392,7 +398,7 @@ const TransportOfficeDashboard = () => {
               />
             </div>
             <p className="text-xs text-muted-foreground">
-              Each tab lists requests for that status, newest first. Search applies within the active tab.
+              Each tab lists requests for that status, sorted by event date (latest first). Search applies within the active tab.
             </p>
           </Card>
 
