@@ -30,6 +30,8 @@ import {
   UserPlus,
   ShieldCheck,
   FileText,
+  Download,
+  User,
   Edit,
   Clock,
   MoreVertical,
@@ -93,7 +95,10 @@ const AdminDashboard = () => {
   const [studentsLoading, setStudentsLoading] = useState(false);
   const [eventRequestsLoading, setEventRequestsLoading] = useState(false);
   const [eventReportsLoading, setEventReportsLoading] = useState(false);
-  const [pdfLoadingId, setPdfLoadingId] = useState<number | null>(null);
+  const [pdfLoading, setPdfLoading] = useState<{
+    id: number;
+    action: "view" | "download";
+  } | null>(null);
   const [facultyLoading, setFacultyLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selectedEventRequest, setSelectedEventRequest] = useState<any>(null);
@@ -112,6 +117,7 @@ const AdminDashboard = () => {
     rejected: 0
   });
   const [eventRequestsCurrentPage, setEventRequestsCurrentPage] = useState(1);
+  const [eventReportsCurrentPage, setEventReportsCurrentPage] = useState(1);
   const [societiesCurrentPage, setSocietiesCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [isAdvisorDialogOpen, setIsAdvisorDialogOpen] = useState(false);
@@ -629,6 +635,7 @@ const AdminDashboard = () => {
 
       console.log("All event reports fetched:", response.data);
       setAllEventReports(response.data.data || []);
+      setEventReportsCurrentPage(1);
     } catch (err: any) {
       console.error("Error fetching event reports:", err);
       setError(err.response?.data?.message || err.message || "Failed to fetch event reports");
@@ -637,11 +644,31 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleViewReportPdf = async (reportId: number) => {
+    const token = localStorage.getItem("token");
+    const API_URL = import.meta.env.VITE_API_URL;
+    if (!token) return;
+    setPdfLoading({ id: reportId, action: "view" });
+    try {
+      const response = await axios.get(`${API_URL}/admin/event-reports/${reportId}/pdf`, {
+        responseType: "blob",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const url = URL.createObjectURL(response.data);
+      window.open(url, "_blank", "noopener,noreferrer");
+      window.setTimeout(() => URL.revokeObjectURL(url), 120000);
+    } catch (e) {
+      setError("Failed to open report PDF");
+    } finally {
+      setPdfLoading(null);
+    }
+  };
+
   const handleDownloadPdf = async (reportId: number) => {
     const token = localStorage.getItem("token");
     const API_URL = import.meta.env.VITE_API_URL;
     if (!token) return;
-    setPdfLoadingId(reportId);
+    setPdfLoading({ id: reportId, action: "download" });
     try {
       const response = await axios.get(`${API_URL}/admin/event-reports/${reportId}/pdf?download=1`, {
         responseType: "blob",
@@ -656,7 +683,7 @@ const AdminDashboard = () => {
     } catch (e) {
       setError("Failed to download PDF");
     } finally {
-      setPdfLoadingId(null);
+      setPdfLoading(null);
     }
   };
 
@@ -1894,44 +1921,235 @@ const AdminDashboard = () => {
                   <p className="text-muted-foreground">No event reports have been submitted yet.</p>
                 </Card>
               ) : (
-                <div className="grid gap-4">
-                  {allEventReports.map((report: any) => (
-                    <Card key={report.report_id} className="p-4 hover:shadow-lg transition-shadow">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <h3 className="text-lg font-semibold text-university-navy mb-2">{report.report_title}</h3>
-                          <p className="text-sm text-muted-foreground mb-2">{report.report_description}</p>
-                          <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
-                            <span>📅 Event: {report.event_title}</span>
-                            <span>🏛️ {report.society_name}</span>
-                            <span>👤 {report.firstName} {report.lastName}</span>
-                            <span>📆 Submitted: {new Date(report.submitted_at).toLocaleDateString()}</span>
-                          </div>
-                          <div className="flex flex-wrap gap-2 mt-3">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleDownloadPdf(report.report_id)}
-                              disabled={pdfLoadingId === report.report_id}
-                            >
-                              {pdfLoadingId === report.report_id ? "Loading..." : "Download PDF"}
-                            </Button>
-                            {report.report_file && (
-                              <a
-                                href={`${import.meta.env.VITE_API_URL}/${report.report_file}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-sm text-university-navy hover:underline inline-flex items-center"
+                <>
+                  <div className="grid gap-3">
+                    {allEventReports
+                      .slice(
+                        (eventReportsCurrentPage - 1) * itemsPerPage,
+                        eventReportsCurrentPage * itemsPerPage
+                      )
+                      .map((report: any) => {
+                        const pdfBusy = pdfLoading?.id === report.report_id;
+                        const eventDateStr = report.event_date
+                          ? new Date(report.event_date).toLocaleDateString()
+                          : "—";
+                        const submittedStr = report.submitted_at
+                          ? new Date(report.submitted_at).toLocaleDateString()
+                          : "—";
+                        const statusLower = String(report.event_status || "").toLowerCase();
+                        const statusBadgeClass =
+                          statusLower.includes("report submitted") ||
+                          statusLower.includes("submitted")
+                            ? "border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-50"
+                            : statusLower.includes("missing")
+                              ? "border-amber-200 bg-amber-50 text-amber-950 hover:bg-amber-50"
+                              : "border-slate-200 bg-slate-50 text-slate-800 hover:bg-slate-50";
+
+                        return (
+                        <Card
+                          key={report.report_id}
+                          className="overflow-hidden rounded-xl border border-slate-200/90 bg-white p-6 shadow-sm transition-shadow hover:shadow-md dark:border-slate-700 dark:bg-card"
+                        >
+                          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
+                            <div className="min-w-0 flex-1 space-y-4">
+                              <div>
+                                <div className="flex flex-wrap items-center gap-3 gap-y-2">
+                                  <h3 className="font-serif text-xl font-bold tracking-tight text-university-navy md:text-2xl">
+                                    {report.report_title || "Untitled report"}
+                                  </h3>
+                                  {report.event_status ? (
+                                    <Badge
+                                      variant="outline"
+                                      className={`gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusBadgeClass}`}
+                                    >
+                                      <FileText className="h-3 w-3 shrink-0" />
+                                      {report.event_status}
+                                    </Badge>
+                                  ) : null}
+                                </div>
+                                {report.report_description?.trim() ? (
+                                  <p
+                                    className="mt-2 line-clamp-2 text-sm leading-relaxed text-muted-foreground"
+                                    title={report.report_description}
+                                  >
+                                    {report.report_description}
+                                  </p>
+                                ) : (
+                                  <p className="mt-2 text-sm italic text-muted-foreground">
+                                    No description
+                                  </p>
+                                )}
+                              </div>
+
+                              <div className="grid grid-cols-1 gap-x-10 gap-y-3 text-sm sm:grid-cols-2">
+                                <div className="space-y-3">
+                                  <div className="flex gap-2.5">
+                                    <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                                    <span className="text-muted-foreground">
+                                      Event:{" "}
+                                      <span className="font-semibold text-foreground">
+                                        {report.event_title || "—"}
+                                      </span>
+                                    </span>
+                                  </div>
+                                  <div className="flex gap-2.5">
+                                    <Building className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                                    <span className="text-muted-foreground">
+                                      Society:{" "}
+                                      <span className="font-semibold text-foreground">
+                                        {report.society_name?.trim() || "—"}
+                                      </span>
+                                    </span>
+                                  </div>
+                                  <div className="flex gap-2.5">
+                                    <Clock className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                                    <span className="text-muted-foreground">
+                                      Event date:{" "}
+                                      <span className="font-semibold text-foreground">{eventDateStr}</span>
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="space-y-3">
+                                  <div className="flex gap-2.5">
+                                    <User className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                                    <span className="text-muted-foreground">
+                                      Submitted by:{" "}
+                                      <span className="font-semibold text-foreground">
+                                        {[report.firstName, report.lastName].filter(Boolean).join(" ") || "—"}
+                                      </span>
+                                    </span>
+                                  </div>
+                                  <div className="flex gap-2.5">
+                                    <Clock className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                                    <span className="text-muted-foreground">
+                                      Submitted:{" "}
+                                      <span className="font-semibold text-foreground">{submittedStr}</span>
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex w-full shrink-0 flex-col gap-2 sm:flex-row sm:justify-end lg:w-auto lg:flex-col lg:items-stretch lg:justify-start lg:border-l lg:border-border/80 lg:pl-6">
+                              <Button
+                                type="button"
+                                variant="university"
+                                size="sm"
+                                className="w-full justify-center sm:w-40 lg:w-44"
+                                onClick={() => handleViewReportPdf(report.report_id)}
+                                disabled={pdfBusy}
                               >
-                                📄 View Report File
-                              </a>
-                            )}
+                                <Eye className="h-4 w-4" />
+                                {pdfBusy && pdfLoading?.action === "view" ? "Opening…" : "View Report"}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="w-full justify-center border-university-navy/25 bg-white text-university-navy hover:bg-muted sm:w-40 lg:w-44 dark:bg-background"
+                                onClick={() => handleDownloadPdf(report.report_id)}
+                                disabled={pdfBusy}
+                              >
+                                <Download className="h-4 w-4" />
+                                {pdfBusy && pdfLoading?.action === "download" ? "Preparing…" : "Download PDF"}
+                              </Button>
+                              {report.report_file ? (
+                                <a
+                                  href={`${import.meta.env.VITE_API_URL}/${report.report_file}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-input py-2 text-center text-xs font-medium text-university-navy transition-colors hover:bg-muted sm:w-40 lg:w-44"
+                                >
+                                  <FileText className="h-3.5 w-3.5" />
+                                  View attachment
+                                </a>
+                              ) : null}
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
+                        </Card>
+                        );
+                      })}
+                  </div>
+
+                  {allEventReports.length > itemsPerPage && (
+                    <div className="mt-6 flex flex-col gap-3 border-t border-border/60 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                      <p className="text-sm text-muted-foreground">
+                        Showing {(eventReportsCurrentPage - 1) * itemsPerPage + 1} to{" "}
+                        {Math.min(eventReportsCurrentPage * itemsPerPage, allEventReports.length)} of{" "}
+                        {allEventReports.length} reports
+                      </p>
+                      <Pagination>
+                        <PaginationContent>
+                          <PaginationItem>
+                            <PaginationPrevious
+                              onClick={() =>
+                                setEventReportsCurrentPage((p) => Math.max(1, p - 1))
+                              }
+                              className={
+                                eventReportsCurrentPage === 1
+                                  ? "pointer-events-none opacity-50"
+                                  : "cursor-pointer"
+                              }
+                            />
+                          </PaginationItem>
+                          {Array.from(
+                            { length: Math.ceil(allEventReports.length / itemsPerPage) },
+                            (_, i) => i + 1
+                          )
+                            .filter((page) => {
+                              const last = Math.ceil(allEventReports.length / itemsPerPage);
+                              return (
+                                page === 1 ||
+                                page === last ||
+                                (page >= eventReportsCurrentPage - 1 &&
+                                  page <= eventReportsCurrentPage + 1)
+                              );
+                            })
+                            .map((page, idx, array) => {
+                              const prevPage = array[idx - 1];
+                              const showEllipsisBefore = prevPage && page - prevPage > 1;
+                              return (
+                                <React.Fragment key={page}>
+                                  {showEllipsisBefore && (
+                                    <PaginationItem>
+                                      <PaginationEllipsis />
+                                    </PaginationItem>
+                                  )}
+                                  <PaginationItem>
+                                    <PaginationLink
+                                      onClick={() => setEventReportsCurrentPage(page)}
+                                      isActive={eventReportsCurrentPage === page}
+                                      className="cursor-pointer"
+                                    >
+                                      {page}
+                                    </PaginationLink>
+                                  </PaginationItem>
+                                </React.Fragment>
+                              );
+                            })}
+                          <PaginationItem>
+                            <PaginationNext
+                              onClick={() =>
+                                setEventReportsCurrentPage((p) =>
+                                  Math.min(
+                                    Math.ceil(allEventReports.length / itemsPerPage),
+                                    p + 1
+                                  )
+                                )
+                              }
+                              className={
+                                eventReportsCurrentPage >=
+                                Math.ceil(allEventReports.length / itemsPerPage)
+                                  ? "pointer-events-none opacity-50"
+                                  : "cursor-pointer"
+                              }
+                            />
+                          </PaginationItem>
+                        </PaginationContent>
+                      </Pagination>
+                    </div>
+                  )}
+                </>
               )}
             </TabsContent>
 

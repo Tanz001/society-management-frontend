@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,8 +18,8 @@ import {
   FileText,
   MapPin,
   Truck,
-  Filter,
   MoreVertical,
+  Search,
   CheckCircle,
   XCircle,
   Lock
@@ -28,20 +28,22 @@ import {
   Pagination,
   PaginationContent,
   PaginationItem,
-  PaginationLink,
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useToast } from "@/components/ui/use-toast";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import EventRequestDetailModal from "@/components/admin/EventRequestDetailModal";
 import ChangePasswordDialog from "@/components/auth/ChangePasswordDialog";
 
+type TransportTab = "approved" | "report-missing" | "report-submitted";
+
+/** Approved tab: VC-approved through finalized, excluding report rows (12, 13) */
+const APPROVED_TAB_STATUS_IDS = [8, 10, 11, 15];
+
 const TransportOfficeDashboard = () => {
   const { toast } = useToast();
-  const [eventRequests, setEventRequests] = useState([]);
   const [selectedEventRequest, setSelectedEventRequest] = useState(null);
   const [isEventRequestModalOpen, setIsEventRequestModalOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
@@ -49,12 +51,12 @@ const TransportOfficeDashboard = () => {
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
-  // Filters
-  const [selectedVenueId, setSelectedVenueId] = useState<string>("all");
-  const [selectedDate, setSelectedDate] = useState<string>("");
+  // Filters & tabs
+  const [activeTab, setActiveTab] = useState<TransportTab>("approved");
+  const [searchQuery, setSearchQuery] = useState("");
 
-  // Venues list
-  const [venues, setVenues] = useState<Array<{ venue_id: number; venue_name: string }>>([]);
+  /** Full list from API (transport-visible statuses only), sorted */
+  const [allEventRequests, setAllEventRequests] = useState<any[]>([]);
 
   // Stats
   const [eventRequestStats, setEventRequestStats] = useState({
@@ -86,28 +88,10 @@ const TransportOfficeDashboard = () => {
   // Get status badge variant
   const getStatusVariant = (statusId) => {
     if ([1].includes(statusId)) return "secondary"; // Pending
-    if ([2, 4, 6, 8, 10, 11, 13, 15].includes(statusId)) return "default"; // Approved statuses
-    if ([3, 5, 7, 9, 12, 14, 16].includes(statusId)) return "destructive"; // Rejected statuses
+    if ([2, 4, 6, 8, 10, 11, 12, 15].includes(statusId)) return "default"; // Approved/Submitted statuses
+    if ([13].includes(statusId)) return "outline"; // Report Missing
+    if ([3, 5, 7, 9, 14, 16].includes(statusId)) return "destructive"; // Rejected statuses
     return "outline";
-  };
-
-  // Fetch venues
-  const fetchVenues = async () => {
-    try {
-      const API_URL = import.meta.env.VITE_API_URL;
-      const token = localStorage.getItem("token");
-      if (!token) return;
-
-      const response = await axios.get(`${API_URL}/society/venues`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (response.data.success) {
-        setVenues(response.data.data || []);
-      }
-    } catch (err) {
-      console.error("Error fetching venues:", err);
-    }
   };
 
   // Fetch event requests with filters
@@ -141,34 +125,23 @@ const TransportOfficeDashboard = () => {
       if (response.data.success) {
         let data = response.data.data || [];
 
-        // Only show approved event requests (exclude Report Missing = 13, Report Submitted = 12, and other non-approved)
-        const approvedStatusIds = [2, 4, 6, 8, 10, 11, 15];
-        data = data.filter((item: any) => approvedStatusIds.includes(item.status_id));
+        // Approved pipeline + reports (align with transport office visibility; exclude rejected/revise-only)
+        const transportVisibleStatusIds = [8, 10, 11, 12, 13, 15];
+        data = data.filter((item: any) =>
+          transportVisibleStatusIds.includes(Number(item.status_id))
+        );
 
-        // Client-side filtering
-        if (selectedVenueId && selectedVenueId !== "all") {
-          data = data.filter((item: any) => item.venue === venues.find(v => String(v.venue_id) === selectedVenueId)?.venue_name);
-        }
-
-        if (selectedDate) {
-          data = data.filter((item: any) => {
-            const itemDate = (item.date_from || item.event_date || "").toString().substring(0, 10);
-            return itemDate === selectedDate;
-          });
-        }
-
-        // Sort: latest events on top (by date, then by time)
+        // Sort: newest request first (created_at), then by event start date
         data.sort((a: any, b: any) => {
-          const dateA = new Date(a.date_from || a.event_date || 0).getTime();
-          const dateB = new Date(b.date_from || b.event_date || 0).getTime();
-          if (dateA !== dateB) return dateB - dateA;
-          const timeA = (a.time_from || a.event_time || "").toString();
-          const timeB = (b.time_from || b.event_time || "").toString();
-          return timeB.localeCompare(timeA);
+          const createdB = new Date(b.created_at || 0).getTime();
+          const createdA = new Date(a.created_at || 0).getTime();
+          if (createdB !== createdA) return createdB - createdA;
+          const evB = new Date(String(b.date_from || b.event_date || "").slice(0, 10) || 0).getTime();
+          const evA = new Date(String(a.date_from || a.event_date || "").slice(0, 10) || 0).getTime();
+          return evB - evA;
         });
 
-        setEventRequests(data);
-        setCurrentPage(1); // Reset to first page when data changes
+        setAllEventRequests(data);
       }
     } catch (err: any) {
       console.error("Error fetching event requests:", err);
@@ -228,11 +201,57 @@ const TransportOfficeDashboard = () => {
     }
   };
 
+  const tabCounts = useMemo(
+    () => ({
+      approved: allEventRequests.filter((r: any) =>
+        APPROVED_TAB_STATUS_IDS.includes(Number(r.status_id))
+      ).length,
+      reportMissing: allEventRequests.filter((r: any) => Number(r.status_id) === 13).length,
+      reportSubmitted: allEventRequests.filter((r: any) => Number(r.status_id) === 12).length,
+    }),
+    [allEventRequests]
+  );
+
+  const displayedEventRequests = useMemo(() => {
+    let data = allEventRequests;
+    if (activeTab === "approved") {
+      data = data.filter((r: any) => APPROVED_TAB_STATUS_IDS.includes(Number(r.status_id)));
+    } else if (activeTab === "report-missing") {
+      data = data.filter((r: any) => Number(r.status_id) === 13);
+    } else {
+      data = data.filter((r: any) => Number(r.status_id) === 12);
+    }
+
+    const q = searchQuery.trim().toLowerCase();
+    if (q) {
+      data = data.filter((r: any) => {
+        const hay = [
+          r.title,
+          r.event_name,
+          r.society_name,
+          r.venue,
+          r.venue_name,
+          r.event_type,
+          r.status_name,
+          r.req_id != null ? String(r.req_id) : "",
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return hay.includes(q);
+      });
+    }
+    return data;
+  }, [allEventRequests, activeTab, searchQuery]);
+
   useEffect(() => {
-    fetchVenues();
     fetchEventRequests();
     fetchEventRequestStats();
-  }, [selectedVenueId, selectedDate]);
+  }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, searchQuery]);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -252,7 +271,7 @@ const TransportOfficeDashboard = () => {
                 <Truck className="h-8 w-8 mr-3" />
                 Transport Office Dashboard
               </h1>
-              <p className="text-white/80">Approved event requests only (latest first). Filter by venue or date.</p>
+              <p className="text-white/80">Browse by status tab and search.</p>
             </div>
             <div className="flex items-center space-x-3">
               <Button
@@ -332,63 +351,48 @@ const TransportOfficeDashboard = () => {
             </Card>
           </div>
 
-          {/* Filters Section */}
-          <Card className="p-4 mb-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Filter className="h-5 w-5 text-university-navy" />
-              <h3 className="text-lg font-semibold text-university-navy">Filters</h3>
+          {/* Tabs + search */}
+          <Card className="p-4 mb-6 space-y-4">
+            <Tabs
+              value={activeTab}
+              onValueChange={(v) => setActiveTab(v as TransportTab)}
+              className="w-full"
+            >
+              <TabsList className="grid h-auto w-full grid-cols-1 gap-2 p-2 sm:grid-cols-3">
+                <TabsTrigger value="approved" className="w-full justify-center gap-2">
+                  Approved
+                  <Badge variant="secondary" className="tabular-nums">
+                    {tabCounts.approved}
+                  </Badge>
+                </TabsTrigger>
+                <TabsTrigger value="report-missing" className="w-full justify-center gap-2">
+                  Report missing
+                  <Badge variant="secondary" className="tabular-nums">
+                    {tabCounts.reportMissing}
+                  </Badge>
+                </TabsTrigger>
+                <TabsTrigger value="report-submitted" className="w-full justify-center gap-2">
+                  Report submitted
+                  <Badge variant="secondary" className="tabular-nums">
+                    {tabCounts.reportSubmitted}
+                  </Badge>
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Search by event name, society, venue, type, or request ID…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+                aria-label="Search event requests"
+              />
             </div>
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div>
-                <Label>Venue</Label>
-                <Select value={selectedVenueId} onValueChange={setSelectedVenueId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All Venues" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Venues</SelectItem>
-                    {venues.map((venue) => (
-                      <SelectItem key={venue.venue_id} value={String(venue.venue_id)}>
-                        {venue.venue_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Filter by date</Label>
-                <div className="flex gap-2">
-                  <Input
-                    type="date"
-                    value={selectedDate}
-                    onChange={(e) => setSelectedDate(e.target.value)}
-                    className="flex-1"
-                  />
-                  <Button
-                    variant="outline"
-                    size="default"
-                    onClick={() => setSelectedDate(new Date().toISOString().slice(0, 10))}
-                    className="shrink-0"
-                  >
-                    Today
-                  </Button>
-                </div>
-              </div>
-              <div className="flex items-end">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setSelectedVenueId("all");
-                    setSelectedDate("");
-                  }}
-                  className="w-full"
-                >
-                  Clear Filters
-                </Button>
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              Showing only approved event requests. Sorted by event date and time (latest first).
+            <p className="text-xs text-muted-foreground">
+              Each tab lists requests for that status, newest first. Search applies within the active tab.
             </p>
           </Card>
 
@@ -400,15 +404,15 @@ const TransportOfficeDashboard = () => {
           )}
 
           {/* Event Requests List */}
-          {loading && eventRequests.length === 0 ? (
+          {loading && allEventRequests.length === 0 ? (
             <div className="text-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-university-navy mx-auto mb-4"></div>
               <p className="text-muted-foreground">Loading event requests...</p>
             </div>
-          ) : eventRequests.length > 0 ? (
+          ) : displayedEventRequests.length > 0 ? (
             <>
               <div className="grid gap-4">
-                {eventRequests.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((request) => (
+                {displayedEventRequests.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((request) => (
                   <Card key={request.req_id} className="p-4 shadow-card">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
@@ -488,10 +492,10 @@ const TransportOfficeDashboard = () => {
               </div>
 
               {/* Pagination */}
-              {eventRequests.length > itemsPerPage && (
+              {displayedEventRequests.length > itemsPerPage && (
                 <div className="flex items-center justify-between mt-6">
                   <div className="text-sm text-muted-foreground">
-                    Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, eventRequests.length)} of {eventRequests.length} event requests
+                    Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, displayedEventRequests.length)} of {displayedEventRequests.length} event requests
                   </div>
                   <Pagination>
                     <PaginationContent>
@@ -506,8 +510,8 @@ const TransportOfficeDashboard = () => {
                       </PaginationItem>
                       <PaginationItem>
                         <PaginationNext
-                          onClick={() => setCurrentPage(prev => Math.min(Math.ceil(eventRequests.length / itemsPerPage), prev + 1))}
-                          className={currentPage === Math.ceil(eventRequests.length / itemsPerPage) ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                          onClick={() => setCurrentPage(prev => Math.min(Math.ceil(displayedEventRequests.length / itemsPerPage), prev + 1))}
+                          className={currentPage === Math.ceil(displayedEventRequests.length / itemsPerPage) ? "pointer-events-none opacity-50" : "cursor-pointer"}
                         />
                       </PaginationItem>
                     </PaginationContent>
@@ -540,7 +544,3 @@ const TransportOfficeDashboard = () => {
 };
 
 export default TransportOfficeDashboard;
-
-function Label({ children, className, ...props }: React.LabelHTMLAttributes<HTMLLabelElement>) {
-  return <label className={`text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 ${className}`} {...props}>{children}</label>
-}
