@@ -79,6 +79,7 @@ import toast from "react-hot-toast";
 import EventRequestForm from "./EventRequestForm";
 import EventRequestsList from "./EventRequestsList";
 import EventReportUpload from "./EventReportUpload";
+import DutyLeave from "./DutyLeave";
 
 const SocietyDashboard = () => {
   const [activeTab, setActiveTab] = useState("overview");
@@ -1045,6 +1046,12 @@ const SocietyDashboard = () => {
         icon: <Building className="h-4 w-4" />,
         onClick: () => setActiveTab("society-details"),
         variant: (activeTab === "society-details" ? "active" : "default") as "active" | "default" | "secondary"
+      },
+      {
+        label: "Duty Leave",
+        icon: <FileText className="h-4 w-4" />,
+        onClick: () => setActiveTab("duty-leave"),
+        variant: (activeTab === "duty-leave" ? "active" : "default") as "active" | "default" | "secondary"
       }
     ] : []),
   ];
@@ -1166,6 +1173,12 @@ const SocietyDashboard = () => {
                   onClick={() => setActiveTab("society-details")}
                 >
                   Society Details
+                </Button>
+                <Button
+                  variant={activeTab === "duty-leave" ? "university" : "outline"}
+                  onClick={() => setActiveTab("duty-leave")}
+                >
+                  Duty Leave
                 </Button>
               </>
             )}
@@ -3176,6 +3189,10 @@ const SocietyDashboard = () => {
                 </Card>
               )}
             </div>
+          )}
+
+          {activeTab === "duty-leave" && isAdvisor() && (
+            <DutyLeave societyInfo={societyInfo} events={events} />
           )}
         </div>
       </section>
